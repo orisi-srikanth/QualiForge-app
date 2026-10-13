@@ -19,11 +19,7 @@ try:
 except Exception:
     pass
 
-try:
-    import torch
-    torch.set_num_threads(1)
-except Exception:
-    pass
+# Note: Torch thread limits are set lazily on demand when defect inspection models initialize
 
 # Ensure both repo root and backend directory are in sys.path
 _current_dir = os.path.dirname(os.path.abspath(__file__))

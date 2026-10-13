@@ -16,8 +16,13 @@ from fastapi import APIRouter, UploadFile, File, Form, Query, HTTPException, Dep
 from sqlalchemy.orm import Session
 from PIL import Image
 
-from backend.app.agents.visual_agent import visual_agent
-from backend.app.services.yolo_detector import yolo_defect_detector
+def _get_visual_agent():
+    from backend.app.agents.visual_agent import visual_agent
+    return visual_agent
+
+def _get_yolo_detector():
+    from backend.app.services.yolo_detector import yolo_defect_detector
+    return yolo_defect_detector
 from backend.app.core.security import require_authenticated_role
 from backend.app.database.session import get_db
 from backend.app.database.models import VisualFinding, HumanDecision, InspectionImage, Batch, Product
@@ -134,7 +139,7 @@ def inspect_sample_image(sample_name: str = "metal_nut_scratch.png", batch_id: s
                 img_path = os.path.join(samples_dir, avail[0])
             else:
                 raise HTTPException(status_code=404, detail=f"Sample image {sample_name} not found in samples directory.")
-        res = visual_agent.inspect(img_path, batch_id=batch_id, image_id=f"IMG-{sample_name}")
+        res = _get_visual_agent().inspect(img_path, batch_id=batch_id, image_id=f"IMG-{sample_name}")
         out = _handle_inspection_persistence_and_mismatch(res, img_path, batch_id, db)
         _SAMPLE_CACHE[cache_key] = out
         return out
@@ -240,7 +245,7 @@ async def upload_and_inspect_image(
     # 6. Run YOLO inference
     effective_thresh = conf_threshold if conf_threshold is not None else conf_threshold_query
     try:
-        yolo_res = yolo_defect_detector.detect(file_path, conf_threshold=effective_thresh)
+        yolo_res = _get_yolo_detector().detect(file_path, conf_threshold=effective_thresh)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"YOLO model inference failed: {str(exc)}")
 

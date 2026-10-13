@@ -74,147 +74,176 @@ CATEGORY_CLASSES = {
     "precision_shaft": ["no_defect", "surface_scratch", "dent", "crack", "missing_feature", "incorrect_assembly"]
 }
 
-import torch
-import torch.nn as nn
-import torchvision.models as models
+_torch_initialized = False
+torch = None
+nn = None
+models = None
+MultiProductModel = None
+DefectClassifier = None
+GradCAM = None
+MultiProductGradCAM = None
 
+def _ensure_torch_classes():
+    global torch, nn, models, MultiProductModel, DefectClassifier, GradCAM, MultiProductGradCAM, _torch_initialized
+    if _torch_initialized:
+        return
+    import torch as _torch
+    import torch.nn as _nn
+    import torchvision.models as _models
 
-class MultiProductModel(nn.Module):
-    """
-    MobileNetV3-Small backbone with two-stage multi-task heads:
-    1. Product Recognition Head: classifies visual product domain (screw, nut, etc.)
-    2. Category Defect Heads: specialized classifier for each product
-    """
-    def __init__(self, pretrained: bool = False):
-        super().__init__()
-        weights = models.MobileNet_V3_Small_Weights.DEFAULT if pretrained else None
-        base = models.mobilenet_v3_small(weights=weights)
-        self.features = base.features
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        in_features = 576
+    torch = _torch
+    nn = _nn
+    models = _models
 
-        # Product Classifier Head
-        self.product_head = nn.Sequential(
-            nn.Linear(in_features, 256),
-            nn.Hardswish(),
-            nn.Dropout(p=0.2),
-            nn.Linear(256, len(PRODUCT_CATEGORIES))
-        )
+    class _MultiProductModel(nn.Module):
+        """
+        MobileNetV3-Small backbone with two-stage multi-task heads:
+        1. Product Recognition Head: classifies visual product domain (screw, nut, etc.)
+        2. Category Defect Heads: specialized classifier for each product
+        """
+        def __init__(self, pretrained: bool = False):
+            super().__init__()
+            weights = models.MobileNet_V3_Small_Weights.DEFAULT if pretrained else None
+            base = models.mobilenet_v3_small(weights=weights)
+            self.features = base.features
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            in_features = 576
 
-        # Defect Classifier Heads
-        self.defect_heads = nn.ModuleDict({
-            cat: nn.Sequential(
-                nn.Linear(in_features, 128),
+            # Product Classifier Head
+            self.product_head = nn.Sequential(
+                nn.Linear(in_features, 256),
                 nn.Hardswish(),
                 nn.Dropout(p=0.2),
-                nn.Linear(128, len(classes))
+                nn.Linear(256, len(PRODUCT_CATEGORIES))
             )
-            for cat, classes in CATEGORY_CLASSES.items()
-        })
 
-    def forward(self, x: torch.Tensor, category: Optional[str] = None) -> Tuple[torch.Tensor, torch.Tensor, str]:
-        feat = self.features(x)
-        pooled = self.avgpool(feat)
-        flat = torch.flatten(pooled, 1)
+            # Defect Classifier Heads
+            self.defect_heads = nn.ModuleDict({
+                cat: nn.Sequential(
+                    nn.Linear(in_features, 128),
+                    nn.Hardswish(),
+                    nn.Dropout(p=0.2),
+                    nn.Linear(128, len(classes))
+                )
+                for cat, classes in CATEGORY_CLASSES.items()
+            })
 
-        product_logits = self.product_head(flat)
-        if category is None or category not in self.defect_heads:
-            pred_cat_idx = int(torch.argmax(product_logits, dim=1)[0].item())
-            category = PRODUCT_CATEGORIES[pred_cat_idx]
+        def forward(self, x: torch.Tensor, category: Optional[str] = None) -> Tuple[torch.Tensor, torch.Tensor, str]:
+            feat = self.features(x)
+            pooled = self.avgpool(feat)
+            flat = torch.flatten(pooled, 1)
 
-        defect_logits = self.defect_heads[category](flat)
-        return product_logits, defect_logits, category
+            product_logits = self.product_head(flat)
+            if category is None or category not in self.defect_heads:
+                pred_cat_idx = int(torch.argmax(product_logits, dim=1)[0].item())
+                category = PRODUCT_CATEGORIES[pred_cat_idx]
 
-    def extract_embedding(self, x: torch.Tensor) -> torch.Tensor:
-        feat = self.features(x)
-        pooled = self.avgpool(feat)
-        return torch.flatten(pooled, 1)
+            defect_logits = self.defect_heads[category](flat)
+            return product_logits, defect_logits, category
 
-
-class DefectClassifier(nn.Module):
-    """MobileNetV3-Small backbone with fine-tuned defect classification head."""
-    def __init__(self, num_classes: int = len(SHAFT_CLASSES), pretrained: bool = False):
-        super().__init__()
-        weights = models.MobileNet_V3_Small_Weights.DEFAULT if pretrained else None
-        base = models.mobilenet_v3_small(weights=weights)
-        self.features = base.features
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        in_features = base.classifier[0].in_features  # 576
-        self.classifier = nn.Sequential(
-            nn.Linear(in_features, 256),
-            nn.Hardswish(),
-            nn.Dropout(p=0.2),
-            nn.Linear(256, num_classes)
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.features(x)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.classifier(x)
-        return x
+        def extract_embedding(self, x: torch.Tensor) -> torch.Tensor:
+            feat = self.features(x)
+            pooled = self.avgpool(feat)
+            return torch.flatten(pooled, 1)
 
 
-class GradCAM:
-    """Computes class-activation maps for interpretability and bounding box localization without backward graphs."""
-    def __init__(self, model: DefectClassifier, target_layer: Optional[nn.Module] = None):
-        self.model = model
-        self.target_layer = target_layer if target_layer is not None else model.features[-1]
-        self.activations = None
-        self.target_layer.register_forward_hook(self._forward_hook)
+    class _DefectClassifier(nn.Module):
+        """MobileNetV3-Small backbone with fine-tuned defect classification head."""
+        def __init__(self, num_classes: int = len(SHAFT_CLASSES), pretrained: bool = False):
+            super().__init__()
+            weights = models.MobileNet_V3_Small_Weights.DEFAULT if pretrained else None
+            base = models.mobilenet_v3_small(weights=weights)
+            self.features = base.features
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            in_features = base.classifier[0].in_features  # 576
+            self.classifier = nn.Sequential(
+                nn.Linear(in_features, 256),
+                nn.Hardswish(),
+                nn.Dropout(p=0.2),
+                nn.Linear(256, num_classes)
+            )
 
-    def _forward_hook(self, module, inp, outp):
-        self.activations = outp
-
-    def generate(self, input_tensor: torch.Tensor, class_idx: int) -> np.ndarray:
-        self.model.eval()
-        try:
-            with torch.no_grad():
-                _ = self.model(input_tensor)
-                if self.activations is not None:
-                    acts = self.activations.detach()
-                    cam = torch.mean(torch.relu(acts), dim=1).squeeze().cpu().numpy()
-                else:
-                    cam = np.zeros((16, 16), dtype=np.float32)
-        except Exception:
-            cam = np.zeros((16, 16), dtype=np.float32)
-
-        cam = np.maximum(cam, 0)
-        if np.max(cam) > 0:
-            cam = cam / np.max(cam)
-        cam = cv2.resize(cam, (512, 512))
-        return cam
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            x = self.features(x)
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+            x = self.classifier(x)
+            return x
 
 
-class MultiProductGradCAM:
-    """Computes class-activation maps for multi-head multi-product model without memory-intensive backward graph."""
-    def __init__(self, model):
-        self.model = model
-        self.target_layer = model.features[-1]
-        self.activations = None
-        self.target_layer.register_forward_hook(self._forward_hook)
+    class _GradCAM:
+        """Computes class-activation maps for interpretability and bounding box localization without backward graphs."""
+        def __init__(self, model: _DefectClassifier, target_layer: Optional[nn.Module] = None):
+            self.model = model
+            self.target_layer = target_layer if target_layer is not None else model.features[-1]
+            self.activations = None
+            self.target_layer.register_forward_hook(self._forward_hook)
 
-    def _forward_hook(self, module, inp, outp):
-        self.activations = outp
+        def _forward_hook(self, module, inp, outp):
+            self.activations = outp
 
-    def generate(self, input_tensor: Any, category: str, class_idx: int) -> np.ndarray:
-        self.model.eval()
-        try:
-            with torch.no_grad():
-                _ = self.model(input_tensor, category=category)
-                if self.activations is not None:
-                    acts = self.activations.detach()
-                    cam = torch.mean(torch.relu(acts), dim=1).squeeze().cpu().numpy()
-                else:
-                    cam = np.zeros((16, 16), dtype=np.float32)
-        except Exception:
-            cam = np.zeros((16, 16), dtype=np.float32)
+        def generate(self, input_tensor: torch.Tensor, class_idx: int) -> np.ndarray:
+            self.model.eval()
+            try:
+                with torch.no_grad():
+                    _ = self.model(input_tensor)
+                    if self.activations is not None:
+                        acts = self.activations.detach()
+                        cam = torch.mean(torch.relu(acts), dim=1).squeeze().cpu().numpy()
+                    else:
+                        cam = np.zeros((16, 16), dtype=np.float32)
+            except Exception:
+                cam = np.zeros((16, 16), dtype=np.float32)
 
-        cam = np.maximum(cam, 0)
-        if np.max(cam) > 0:
-            cam = cam / np.max(cam)
-        cam = cv2.resize(cam, (512, 512))
-        return cam
+            cam = np.maximum(cam, 0)
+            if np.max(cam) > 0:
+                cam = cam / np.max(cam)
+            cam = cv2.resize(cam, (512, 512))
+            return cam
+
+
+    class _MultiProductGradCAM:
+        """Computes class-activation maps for multi-head multi-product model without memory-intensive backward graph."""
+        def __init__(self, model):
+            self.model = model
+            self.target_layer = model.features[-1]
+            self.activations = None
+            self.target_layer.register_forward_hook(self._forward_hook)
+
+        def _forward_hook(self, module, inp, outp):
+            self.activations = outp
+
+        def generate(self, input_tensor: Any, category: str, class_idx: int) -> np.ndarray:
+            self.model.eval()
+            try:
+                with torch.no_grad():
+                    _ = self.model(input_tensor, category=category)
+                    if self.activations is not None:
+                        acts = self.activations.detach()
+                        cam = torch.mean(torch.relu(acts), dim=1).squeeze().cpu().numpy()
+                    else:
+                        cam = np.zeros((16, 16), dtype=np.float32)
+            except Exception:
+                cam = np.zeros((16, 16), dtype=np.float32)
+
+            cam = np.maximum(cam, 0)
+            if np.max(cam) > 0:
+                cam = cam / np.max(cam)
+            cam = cv2.resize(cam, (512, 512))
+            return cam
+
+    MultiProductModel = _MultiProductModel
+    DefectClassifier = _DefectClassifier
+    GradCAM = _GradCAM
+    MultiProductGradCAM = _MultiProductGradCAM
+    _torch_initialized = True
+
+
+def __getattr__(name: str):
+    if name in ("MultiProductModel", "DefectClassifier", "GradCAM", "MultiProductGradCAM", "torch", "nn", "models"):
+        _ensure_torch_classes()
+        return globals()[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class TwoStageDefectInspector:
@@ -248,6 +277,7 @@ class TwoStageDefectInspector:
     def _ensure_initialized(self):
         if self._initialized:
             return
+        _ensure_torch_classes()
         import torchvision.transforms as transforms
         self.device = torch.device("cpu")
         self.clf_transform = transforms.Compose([
