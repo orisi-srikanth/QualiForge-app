@@ -1,0 +1,4 @@
+record_id,part_number,product_name,material,inspection_parameter,nominal_mm,tolerance_mm,usl_mm,lsl_mm,critical_characteristics,approval_status
+SPEC-PS-101,PS-2026-101,Precision Drive Shaft,Carbon Steel (AISI 1045),shaft_diameter,50.00,0.05,50.05,49.95,Outer diameter cylindrical tolerance +/- 0.02 mm; Surface finish Ra <= 1.6 um,APPROVED
+SPEC-BH-202,BH-2026-202,Bearing Housing Ring,Stainless Steel 304,bore_diameter,80.00,0.03,80.03,79.97,Internal bore diameter H7 fit; Concentricity 0.015 mm,APPROVED
+SPEC-FB-303,FB-2026-303,Flanged Bushing,Alloy Steel 4140,flange_thickness,35.00,0.02,35.02,34.98,Perpendicularity to axis 0.01 mm,APPROVED

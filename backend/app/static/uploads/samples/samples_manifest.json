@@ -1,0 +1,211 @@
+[
+  {
+    "sample_id": "IMG-001.png",
+    "filename": "IMG-001.png",
+    "category": "metal_nut",
+    "defect_type": "surface_scratch",
+    "raw_defect": "scratch",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\metal_nut\\test\\scratch\\000.png"
+  },
+  {
+    "sample_id": "metal_nut_scratch.png",
+    "filename": "metal_nut_scratch.png",
+    "category": "metal_nut",
+    "defect_type": "surface_scratch",
+    "raw_defect": "scratch",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\metal_nut\\test\\scratch\\000.png"
+  },
+  {
+    "sample_id": "metal_nut_bent.png",
+    "filename": "metal_nut_bent.png",
+    "category": "metal_nut",
+    "defect_type": "dent_deformation",
+    "raw_defect": "bent",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\metal_nut\\test\\bent\\007.png"
+  },
+  {
+    "sample_id": "metal_nut_flip.png",
+    "filename": "metal_nut_flip.png",
+    "category": "metal_nut",
+    "defect_type": "incorrect_assembly",
+    "raw_defect": "flip",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\metal_nut\\test\\flip\\022.png"
+  },
+  {
+    "sample_id": "metal_nut_color.png",
+    "filename": "metal_nut_color.png",
+    "category": "metal_nut",
+    "defect_type": "surface_contamination",
+    "raw_defect": "color",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\metal_nut\\test\\color\\007.png"
+  },
+  {
+    "sample_id": "metal_nut_normal.png",
+    "filename": "metal_nut_normal.png",
+    "category": "metal_nut",
+    "defect_type": "no_defect",
+    "raw_defect": "good",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\metal_nut\\test\\good\\000.png"
+  },
+  {
+    "sample_id": "screw_scratch_head.png",
+    "filename": "screw_scratch_head.png",
+    "category": "screw",
+    "defect_type": "surface_scratch",
+    "raw_defect": "scratch_head",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\screw\\test\\scratch_head\\000.png"
+  },
+  {
+    "sample_id": "screw_thread.png",
+    "filename": "screw_thread.png",
+    "category": "screw",
+    "defect_type": "thread_damage",
+    "raw_defect": "thread_side",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\screw\\test\\thread_side\\004.png"
+  },
+  {
+    "sample_id": "screw_front_dent.png",
+    "filename": "screw_front_dent.png",
+    "category": "screw",
+    "defect_type": "dent_deformation",
+    "raw_defect": "manipulated_front",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\screw\\test\\manipulated_front\\015.png"
+  },
+  {
+    "sample_id": "screw_normal.png",
+    "filename": "screw_normal.png",
+    "category": "screw",
+    "defect_type": "no_defect",
+    "raw_defect": "good",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\screw\\test\\good\\000.png"
+  },
+  {
+    "sample_id": "transistor_damaged.png",
+    "filename": "transistor_damaged.png",
+    "category": "transistor",
+    "defect_type": "dent_deformation",
+    "raw_defect": "damaged_case",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\transistor\\test\\damaged_case\\009.png"
+  },
+  {
+    "sample_id": "transistor_misplaced.png",
+    "filename": "transistor_misplaced.png",
+    "category": "transistor",
+    "defect_type": "incorrect_assembly",
+    "raw_defect": "misplaced",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\transistor\\test\\misplaced\\005.png"
+  },
+  {
+    "sample_id": "transistor_cut_lead.png",
+    "filename": "transistor_cut_lead.png",
+    "category": "transistor",
+    "defect_type": "missing_component",
+    "raw_defect": "cut_lead",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\transistor\\test\\cut_lead\\002.png"
+  },
+  {
+    "sample_id": "transistor_normal.png",
+    "filename": "transistor_normal.png",
+    "category": "transistor",
+    "defect_type": "no_defect",
+    "raw_defect": "good",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\transistor\\test\\good\\000.png"
+  },
+  {
+    "sample_id": "cable_missing.png",
+    "filename": "cable_missing.png",
+    "category": "cable",
+    "defect_type": "missing_component",
+    "raw_defect": "missing_wire",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\cable\\test\\missing_wire\\005.png"
+  },
+  {
+    "sample_id": "cable_swap.png",
+    "filename": "cable_swap.png",
+    "category": "cable",
+    "defect_type": "incorrect_assembly",
+    "raw_defect": "cable_swap",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\cable\\test\\cable_swap\\011.png"
+  },
+  {
+    "sample_id": "cable_bent_wire.png",
+    "filename": "cable_bent_wire.png",
+    "category": "cable",
+    "defect_type": "insulation_or_wire_damage",
+    "raw_defect": "bent_wire",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\cable\\test\\bent_wire\\001.png"
+  },
+  {
+    "sample_id": "cable_cut_insul.png",
+    "filename": "cable_cut_insul.png",
+    "category": "cable",
+    "defect_type": "insulation_or_wire_damage",
+    "raw_defect": "cut_outer_insulation",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\cable\\test\\cut_outer_insulation\\008.png"
+  },
+  {
+    "sample_id": "cable_normal.png",
+    "filename": "cable_normal.png",
+    "category": "cable",
+    "defect_type": "no_defect",
+    "raw_defect": "good",
+    "source": "MVTec AD (proxy part)",
+    "batch_association": "BATCH-0245",
+    "is_held_out_test": true,
+    "original_path": "D:\\Projects Local\\BV-DATASETS\\mvtec_anomaly_detection\\cable\\test\\good\\000.png"
+  }
+]

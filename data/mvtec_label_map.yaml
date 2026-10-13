@@ -1,0 +1,102 @@
+# MVTec AD Label Map for QualityMind Academic Prototype
+# Maps category folder names and raw defect folders to unified defect types and families.
+# Note: Cracks are not present in these categories and are not supported.
+
+version: "1.0.0"
+dataset: "MVTec AD"
+citation: "Bergmann et al., CVPR 2019 (CC BY-NC-SA 4.0)"
+allowed_categories:
+  - metal_nut
+  - screw
+  - transistor
+  - cable
+
+categories:
+  metal_nut:
+    proxy_part: "Hexagonal Flange Metal Nut"
+    defects:
+      scratch:
+        unified_defect_type: "surface_scratch"
+        defect_family: "surface_defect"
+      bent:
+        unified_defect_type: "dent_deformation"
+        defect_family: "geometric_deformation"
+      flip:
+        unified_defect_type: "incorrect_assembly"
+        defect_family: "assembly_error"
+      color:
+        unified_defect_type: "surface_contamination"
+        defect_family: "surface_defect"
+
+  screw:
+    proxy_part: "Threaded Fastener Screw"
+    defects:
+      scratch_head:
+        unified_defect_type: "surface_scratch"
+        defect_family: "surface_defect"
+      scratch_neck:
+        unified_defect_type: "surface_scratch"
+        defect_family: "surface_defect"
+      manipulated_front:
+        unified_defect_type: "dent_deformation"
+        defect_family: "geometric_deformation"
+      thread_side:
+        unified_defect_type: "thread_damage"
+        defect_family: "machining_defect"
+      thread_top:
+        unified_defect_type: "thread_damage"
+        defect_family: "machining_defect"
+
+  transistor:
+    proxy_part: "TO-220 Power Transistor Assembly"
+    defects:
+      misplaced:
+        unified_defect_type: "incorrect_assembly"
+        defect_family: "assembly_error"
+      cut_lead:
+        unified_defect_type: "missing_component"
+        defect_family: "component_integrity"
+      bent_lead:
+        unified_defect_type: "missing_component"
+        defect_family: "component_integrity"
+      damaged_case:
+        unified_defect_type: "dent_deformation"
+        defect_family: "geometric_deformation"
+
+  cable:
+    proxy_part: "Multi-Conductor Industrial Wiring Cable Harness"
+    defects:
+      missing_wire:
+        unified_defect_type: "missing_component"
+        defect_family: "component_integrity"
+      missing_cable:
+        unified_defect_type: "missing_component"
+        defect_family: "component_integrity"
+      cable_swap:
+        unified_defect_type: "incorrect_assembly"
+        defect_family: "assembly_error"
+      bent_wire:
+        unified_defect_type: "insulation_or_wire_damage"
+        defect_family: "conductor_damage"
+      cut_inner_insulation:
+        unified_defect_type: "insulation_or_wire_damage"
+        defect_family: "insulation_damage"
+      cut_outer_insulation:
+        unified_defect_type: "insulation_or_wire_damage"
+        defect_family: "insulation_damage"
+      poke_insulation:
+        unified_defect_type: "insulation_or_wire_damage"
+        defect_family: "insulation_damage"
+      combined:
+        unified_defect_type: "insulation_or_wire_damage"
+        defect_family: "compound_damage"
+
+unified_defect_types:
+  - no_defect
+  - surface_scratch
+  - dent_deformation
+  - incorrect_assembly
+  - surface_contamination
+  - thread_damage
+  - missing_component
+  - insulation_or_wire_damage

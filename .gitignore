@@ -1,0 +1,45 @@
+# Machine Learning Dataset Assets
+backend/data/mvtec_ad/
+data/mvtec_ad/
+
+# Python Cache & Environment
+*.pyc
+__pycache__/
+.env
+.pytest_cache/
+.venv/
+venv/
+*.sqlite3-journal
+
+# Node & Frontend Build
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Workspace & Tool Clutter Archive
+_archive_not_required/
+scratch/
+.gemini/
+.antigravity/
+.cursor/
+.claude/
+.vscode/
+*.bak
+*.old
+powershell.exe
+
+# Local Databases & Runtime Storage
+*.db
+*.sqlite
+*.sqlite3
+backend/data/knowledge_db/
+backend/data/synthetic_shafts/
+data/synthetic_shafts/
+
+# Runtime Generated Reports & Annotations
+*.pdf
+backend/app/static/uploads/annotated/
+backend/app/static/uploads/evidence/
+backend/app/static/uploads/inspection/
+docs/screenshots/

@@ -1,0 +1,76 @@
+name: QualityMind CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: "."
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Seed Database
+        run: |
+          python -m backend.app.db.seed
+
+      - name: Run Test Suite (TC-01..TC-08 and Unit Tests)
+        run: |
+          set -o pipefail
+          pytest backend/tests/ -v --tb=short 2>&1 | tee pytest_output.log
+
+      - name: Publish Test Summary to GitHub Actions Summary
+        if: always()
+        run: |
+          echo "### Backend Pytest Results" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          if [ -f pytest_output.log ]; then
+            tail -n 80 pytest_output.log >> $GITHUB_STEP_SUMMARY
+          fi
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Test Log Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-logs
+          path: pytest_output.log
+
+      - name: Run Test Scenarios Documentation Harness
+        run: |
+          python scripts/run_test_cases.py
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci || npm install
+
+      - name: Build Frontend & Typecheck
+        working-directory: ./frontend
+        run: npm run build

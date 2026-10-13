@@ -1,0 +1,45 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    "node_modules",
+    "dist",
+    "_archive_not_required",
+    "venv",
+    ".venv"
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+exclude = '''
+/(
+    \.git
+  | \.pytest_cache
+  | node_modules
+  | dist
+  | _archive_not_required
+  | venv
+  | \.venv
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["backend/tests"]
+python_files = ["test_*.py"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]

@@ -1,0 +1,167 @@
+[
+  {
+    "action_code": "CAPA-2026-001",
+    "incident_ref": "NCR-011",
+    "type": "containment",
+    "description": "Implement comprehensive process improvement #1 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.1% to 1.1%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-002",
+    "incident_ref": "NCR-012",
+    "type": "corrective",
+    "description": "Implement comprehensive process improvement #2 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.2% to 1.2%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-003",
+    "incident_ref": "NCR-013",
+    "type": "containment",
+    "description": "Implement comprehensive process improvement #3 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.3% to 1.0%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-004",
+    "incident_ref": "NCR-014",
+    "type": "preventive",
+    "description": "Implement comprehensive process improvement #4 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.4% to 1.1%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-005",
+    "incident_ref": "NCR-015",
+    "type": "corrective",
+    "description": "Implement comprehensive process improvement #5 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.5% to 1.2%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-006",
+    "incident_ref": "NCR-016",
+    "type": "preventive",
+    "description": "Implement comprehensive process improvement #6 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.6% to 1.0%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-007",
+    "incident_ref": "NCR-017",
+    "type": "preventive",
+    "description": "Implement comprehensive process improvement #7 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.7% to 1.1%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-008",
+    "incident_ref": "NCR-018",
+    "type": "corrective",
+    "description": "Implement comprehensive process improvement #8 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.8% to 1.2%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-009",
+    "incident_ref": "NCR-019",
+    "type": "preventive",
+    "description": "Implement comprehensive process improvement #9 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.9% to 1.0%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-010",
+    "incident_ref": "NCR-020",
+    "type": "containment",
+    "description": "Implement comprehensive process improvement #10 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.10% to 1.1%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-011",
+    "incident_ref": "NCR-021",
+    "type": "preventive",
+    "description": "Implement comprehensive process improvement #11 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.11% to 1.2%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-012",
+    "incident_ref": "NCR-022",
+    "type": "containment",
+    "description": "Implement comprehensive process improvement #12 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.12% to 1.0%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-013",
+    "incident_ref": "NCR-023",
+    "type": "containment",
+    "description": "Implement comprehensive process improvement #13 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.13% to 1.1%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-014",
+    "incident_ref": "NCR-024",
+    "type": "preventive",
+    "description": "Implement comprehensive process improvement #14 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.14% to 1.2%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  },
+  {
+    "action_code": "CAPA-2026-015",
+    "incident_ref": "NCR-025",
+    "type": "containment",
+    "description": "Implement comprehensive process improvement #15 targeting CNC machining repeatability.",
+    "responsible_role": "Lead Quality Engineer",
+    "due_date": "2026-11-15",
+    "status": "completed",
+    "effectiveness_result": "Observed rejection rate dropped from 7.15% to 1.0%. Statistically confirmed reduction.",
+    "completion_date": "2026-10-01"
+  }
+]

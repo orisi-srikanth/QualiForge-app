@@ -1,0 +1,74 @@
+[
+  {
+    "id": "NCR-019",
+    "type": "Historical NCR",
+    "title": "Dimensional Increase Associated with Confirmed Tool Wear",
+    "defect_type": "Oversized shaft diameter",
+    "machine": "CNC-04",
+    "material": "Carbon Steel (AISI 1045)",
+    "description": "Shaft outer diameter measured 50.07 mm to 50.09 mm, exceeding the 50.05 mm USL. Telemetry indicated tool cycle count reached 1,180 cycles (exceeding standard 600-cycle threshold). Machine vibration rose to 3.7 mm/s. Physical inspection confirmed flank wear on the primary turning carbide insert.",
+    "confirmed_root_cause": "Excessive cutting tool flank wear due to tool usage exceeding the recommended change interval (>1,000 cycles).",
+    "action_taken": "Immediate replacement of carbide insert; tool offset recalibration; revised preventative tool replacement threshold to 850 cycles.",
+    "verification_method": "Tool microscope visual inspection and tool wear gauge comparison."
+  },
+  {
+    "id": "NCR-014",
+    "type": "Historical NCR",
+    "title": "Surface Chatter and High Vibration During High-Feed Machining",
+    "defect_type": "Surface scratch / chatter marks",
+    "machine": "CNC-04",
+    "material": "Carbon Steel",
+    "description": "Visual inspection revealed circumferential chatter marks and micro-scratches on machined shaft surfaces. Vibration sensor telemetry logged 3.9 mm/s peak amplitude. Spindle bearing looseness detected during root cause verification.",
+    "confirmed_root_cause": "Spindle bearing play combined with tool holder clamping deflection causing severe chatter.",
+    "action_taken": "Spindle bearing assembly rebuild; hydraulic chuck pressure re-torqued; toolholder runout certified.",
+    "verification_method": "Dial indicator dial runout check and accelerometer spectrum test."
+  },
+  {
+    "id": "NCR-022",
+    "type": "Historical NCR",
+    "title": "Dimensional Deviation Following Tool Offset Adjustment",
+    "defect_type": "Oversized shaft diameter",
+    "machine": "CNC-02",
+    "material": "Carbon Steel",
+    "description": "Sudden step increase in diameter on consecutive parts immediately following night-shift operator changeover. Measurement exceeded USL by 0.04 mm on first 12 parts.",
+    "confirmed_root_cause": "Operator manual input error during tool wear offset register entry (offset entered as +0.03 instead of -0.03 mm).",
+    "action_taken": "Corrected CNC tool offset register; quarantined initial 12 parts; implemented barcode-scanned automated tool presetter upload.",
+    "verification_method": "Audit of CNC controller parameter revision history log."
+  },
+  {
+    "id": "NCR-008",
+    "type": "Historical NCR",
+    "title": "Thermal Expansion and Dimensional Drift under Coolant Starvation",
+    "defect_type": "Dimensional drift / thermal taper",
+    "machine": "CNC-04",
+    "material": "Alloy Steel 4140",
+    "description": "Gradual upward creep of shaft diameter during continuous production window. Coolant temperature increased from 24\u00b0C to 38\u00b0C over 90 minutes due to clogged coolant recirculation filter.",
+    "confirmed_root_cause": "Workpiece and machine bed thermal expansion caused by degraded coolant circulation.",
+    "action_taken": "Cleaned coolant sump, replaced filter elements, installed temperature interlock alarm on coolant reservoir.",
+    "verification_method": "Continuous temperature logging and post-cooling dimension re-verification."
+  },
+  {
+    "id": "SOP-CNC-04-QUAL",
+    "type": "Standard Operating Procedure",
+    "title": "SOP-04: Precision CNC Turning Tool Life Management & Quality Gates",
+    "defect_type": "Tool Wear & Dimensional Quality",
+    "machine": "CNC-04",
+    "material": "All Steels",
+    "description": "Standard operating procedure requiring cutting tool inspection every 300 cycles. Mandatory replacement when tool usage hits 800 cycles or flank wear band exceeds 0.2 mm. Dimensional sampling required at 100% on startup and 5-piece subgroup per hour.",
+    "confirmed_root_cause": "Reference Standard",
+    "action_taken": "Process guideline for quality compliance",
+    "verification_method": "Quality audit log review"
+  },
+  {
+    "id": "SOP-SPC-01",
+    "type": "Quality Standard",
+    "title": "Statistical Process Control Rules and Process Capability Targets",
+    "defect_type": "Statistical Process Control",
+    "machine": "All CNC Machines",
+    "material": "All Materials",
+    "description": "Mandates calculation of Cp and Cpk with minimum sample size of 30 parts. Target Cpk >= 1.33 for capable process, Cpk >= 1.67 for critical safety characteristics. Western Electric Nelson Rules 1-4 must trigger immediate investigation.",
+    "confirmed_root_cause": "Reference Standard",
+    "action_taken": "Statistical conformance monitoring",
+    "verification_method": "SPC dashboard calculation"
+  }
+]

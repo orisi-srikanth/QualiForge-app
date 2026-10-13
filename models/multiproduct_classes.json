@@ -1,0 +1,86 @@
+{
+  "model_architecture": "MobileNetV3-Small Multi-Head Transfer Learning",
+  "product_categories": [
+    "screw",
+    "metal_nut",
+    "cable",
+    "transistor",
+    "precision_shaft"
+  ],
+  "category_classes": {
+    "screw": [
+      "no_defect",
+      "scratch_head",
+      "thread_damage",
+      "neck_dent"
+    ],
+    "metal_nut": [
+      "no_defect",
+      "scratch",
+      "bent",
+      "color",
+      "flip"
+    ],
+    "cable": [
+      "no_defect",
+      "cut_inner_insulation",
+      "bent_wire",
+      "missing_wire",
+      "cable_swap"
+    ],
+    "transistor": [
+      "no_defect",
+      "damaged_case",
+      "misplaced",
+      "cut_lead",
+      "bent_lead"
+    ],
+    "precision_shaft": [
+      "no_defect",
+      "surface_scratch",
+      "dent",
+      "crack",
+      "missing_feature",
+      "incorrect_assembly"
+    ]
+  },
+  "category_accuracy": 1.0,
+  "metrics_by_category": {
+    "screw": {
+      "accuracy": 0.8056,
+      "precision": 0.8577,
+      "recall": 0.8056,
+      "f1_score": 0.8226,
+      "test_samples": 72
+    },
+    "metal_nut": {
+      "accuracy": 0.8269,
+      "precision": 0.903,
+      "recall": 0.8269,
+      "f1_score": 0.8539,
+      "test_samples": 52
+    },
+    "cable": {
+      "accuracy": 0.8276,
+      "precision": 0.7981,
+      "recall": 0.8276,
+      "f1_score": 0.8016,
+      "test_samples": 58
+    },
+    "transistor": {
+      "accuracy": 0.8889,
+      "precision": 0.9267,
+      "recall": 0.8889,
+      "f1_score": 0.8987,
+      "test_samples": 45
+    },
+    "precision_shaft": {
+      "accuracy": 0.9306,
+      "precision": 0.9359,
+      "recall": 0.9306,
+      "f1_score": 0.9315,
+      "test_samples": 72
+    }
+  },
+  "trained_timestamp": "2026-10-11T05:54:31Z"
+}

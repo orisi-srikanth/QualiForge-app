@@ -1,0 +1,7 @@
+MACHINE CNC-04 OPERATING BASELINES & LIMITS
+=========================================
+1. Normal Operating Spindle Speed: 1,200 RPM
+2. Standard Feed Rate: 0.20 mm/rev
+3. Coolant Operating Range: 20C to 24C
+4. Vibration Baseline: 1.8 to 2.2 mm/s
+5. Alarm Trigger Limit: > 3.5 mm/s (Trips quality hold alert)

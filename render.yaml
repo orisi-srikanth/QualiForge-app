@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: qualitymind-backend
+    runtime: python
+    rootDir: backend
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python -m app.database.seed"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: ENVIRONMENT
+        value: production
+      - key: LLM_PROVIDER
+        value: none
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: qualitymind-postgres
+          property: connectionString
+      - key: FRONTEND_ORIGINS
+        value: "https://qualitymind.vercel.app,https://quality-mind.vercel.app,https://qualiforge-app.vercel.app,http://localhost:5173,http://localhost:3000"
+      - key: CORS_ORIGINS
+        value: "https://qualitymind.vercel.app,https://quality-mind.vercel.app,https://qualiforge-app.vercel.app,http://localhost:5173,http://localhost:3000"
+
+databases:
+  - name: qualitymind-postgres
+    region: oregon
+    plan: free
+    databaseName: qualitymind
+    user: qualitymind_user

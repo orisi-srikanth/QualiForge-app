@@ -1,0 +1,113 @@
+{
+  "dataset_metadata": {
+    "total_records": 780,
+    "normal_records": 650,
+    "anomaly_records": 130,
+    "batches_count": 25,
+    "anomaly_counts_by_type": {
+      "sudden_change": 45,
+      "drift": 45,
+      "threshold": 25,
+      "multivariate": 15,
+      "normal": 650
+    }
+  },
+  "models": {
+    "univariate_zscore": {
+      "precision": 0.9542,
+      "recall": 0.9615,
+      "f1": 0.9579,
+      "false_alarms_count": 6,
+      "false_alarm_rate_per_1000": 9.23,
+      "false_alarm_rate_pct": 0.92,
+      "detection_delay_median_samples": 0.0,
+      "detection_delay_worst_case_samples": 2.0,
+      "per_anomaly_type": {
+        "sudden_change": {
+          "precision": 0.8824,
+          "recall": 1.0,
+          "f1": 0.9375
+        },
+        "drift": {
+          "precision": 0.8696,
+          "recall": 0.8889,
+          "f1": 0.8791
+        },
+        "threshold": {
+          "precision": 0.8065,
+          "recall": 1.0,
+          "f1": 0.8929
+        },
+        "multivariate": {
+          "precision": 0.7143,
+          "recall": 1.0,
+          "f1": 0.8333
+        }
+      }
+    },
+    "isolation_forest": {
+      "precision": 0.9338,
+      "recall": 0.9769,
+      "f1": 0.9549,
+      "false_alarms_count": 9,
+      "false_alarm_rate_per_1000": 13.85,
+      "false_alarm_rate_pct": 1.38,
+      "detection_delay_median_samples": 0.0,
+      "detection_delay_worst_case_samples": 1.0,
+      "per_anomaly_type": {
+        "sudden_change": {
+          "precision": 0.8333,
+          "recall": 1.0,
+          "f1": 0.9091
+        },
+        "drift": {
+          "precision": 0.8235,
+          "recall": 0.9333,
+          "f1": 0.875
+        },
+        "threshold": {
+          "precision": 0.7353,
+          "recall": 1.0,
+          "f1": 0.8475
+        },
+        "multivariate": {
+          "precision": 0.625,
+          "recall": 1.0,
+          "f1": 0.7692
+        }
+      }
+    },
+    "hybrid_ensemble": {
+      "precision": 0.9542,
+      "recall": 0.9615,
+      "f1": 0.9579,
+      "false_alarms_count": 6,
+      "false_alarm_rate_per_1000": 9.23,
+      "false_alarm_rate_pct": 0.92,
+      "detection_delay_median_samples": 0.0,
+      "detection_delay_worst_case_samples": 2.0,
+      "per_anomaly_type": {
+        "sudden_change": {
+          "precision": 0.8824,
+          "recall": 1.0,
+          "f1": 0.9375
+        },
+        "drift": {
+          "precision": 0.8696,
+          "recall": 0.8889,
+          "f1": 0.8791
+        },
+        "threshold": {
+          "precision": 0.8065,
+          "recall": 1.0,
+          "f1": 0.8929
+        },
+        "multivariate": {
+          "precision": 0.7143,
+          "recall": 1.0,
+          "f1": 0.8333
+        }
+      }
+    }
+  }
+}

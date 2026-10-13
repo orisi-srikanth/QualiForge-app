@@ -1,0 +1,45 @@
+{
+  "classes": [
+    "no_defect",
+    "surface_scratch",
+    "dent",
+    "crack",
+    "missing_feature",
+    "incorrect_assembly"
+  ],
+  "class_to_idx": {
+    "no_defect": 0,
+    "surface_scratch": 1,
+    "dent": 2,
+    "crack": 3,
+    "missing_feature": 4,
+    "incorrect_assembly": 5
+  },
+  "idx_to_class": {
+    "0": "no_defect",
+    "1": "surface_scratch",
+    "2": "dent",
+    "3": "crack",
+    "4": "missing_feature",
+    "5": "incorrect_assembly"
+  },
+  "model_architecture": "MobileNetV3-Small Transfer Learning",
+  "data_source": "synthetic",
+  "model_version": "synthetic-shaft-v1.0",
+  "input_resolution": [
+    224,
+    224
+  ],
+  "normalization": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  }
+}

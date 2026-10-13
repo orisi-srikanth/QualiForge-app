@@ -1,0 +1,6 @@
+operator_name,Diameter (mm),station_code,component_id,notes
+Alex V.,50.01,ST-04,P001,CMM Calibration OK
+Alex V.,50.03,ST-04,P002,Checked
+Alex V.,50.06,ST-04,P003,Near USL
+Alex V.,50.08,ST-04,P004,Exceeds USL
+Alex V.,50.07,ST-04,P005,Exceeds USL
