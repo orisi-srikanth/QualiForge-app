@@ -4,12 +4,24 @@ import {
   WorkflowState, TestScenarioResult, AgentStepLog
 } from "./types";
 
-// In production on Vercel, route through same-origin "/api" proxy rewrites to permanently eliminate CORS
-const isProd = import.meta.env.PROD;
+// Resolve API Base URL:
+// Prioritizes VITE_API_BASE_URL if configured; otherwise defaults to same-origin "/api"
 const rawApiUrl = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
-const API_BASE = isProd && !import.meta.env.VITE_FORCE_CROSS_ORIGIN
-  ? "/api"
-  : (rawApiUrl ? (rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`) : "/api");
+const API_BASE = rawApiUrl
+  ? (rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`)
+  : "/api";
+
+async function parseJsonSafe(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
+      throw new Error(`API returned HTML (HTTP ${res.status}) instead of JSON. Ensure VITE_API_BASE_URL is set to https://qualiforge-app.onrender.com/api`);
+    }
+    throw new Error(`API returned invalid JSON (HTTP ${res.status}): ${text.slice(0, 100)}`);
+  }
+}
 
 function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem("qualiforge_token");

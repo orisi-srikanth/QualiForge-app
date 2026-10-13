@@ -5,11 +5,11 @@
   "rewrites": [
     {
       "source": "/api/:match*",
-      "destination": "https://qualitymind-backend.onrender.com/api/:match*"
+      "destination": "https://qualiforge-app.onrender.com/api/:match*"
     },
     {
       "source": "/uploads/:match*",
-      "destination": "https://qualitymind-backend.onrender.com/uploads/:match*"
+      "destination": "https://qualiforge-app.onrender.com/uploads/:match*"
     },
     {
       "source": "/(.*)",
