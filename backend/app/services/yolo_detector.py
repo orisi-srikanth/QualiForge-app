@@ -190,9 +190,10 @@ class YoloDefectDetector:
         }
 
 
-# Global singleton instance loaded once on service initialization
+# Global singleton instance loaded lazily on first inference to conserve startup memory (<120MB)
 try:
-    yolo_defect_detector = YoloDefectDetector(auto_load=True)
+    auto_load_flag = os.environ.get("YOLO_AUTO_LOAD", "false").lower() in ("true", "1")
+    yolo_defect_detector = YoloDefectDetector(auto_load=auto_load_flag)
 except Exception:
     # Allow deferred initialization if weights path is configured later or under test mock
     yolo_defect_detector = YoloDefectDetector(auto_load=False)
