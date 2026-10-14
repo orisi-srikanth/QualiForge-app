@@ -126,11 +126,14 @@ class ProcessMonitoringAnomalyAgent(BaseQualityAgent):
                         "p01": b.p01,
                         "p99": b.p99
                     }
+                    default_cfg = OPERATIONAL_THRESHOLDS.get(b.parameter, {})
+                    warn_val = default_cfg.get("warn", default_cfg.get("warn_high", b.upper_threshold))
+                    crit_val = b.upper_threshold if b.upper_threshold is not None else default_cfg.get("critical", default_cfg.get("critical_high"))
                     custom_thresholds[b.parameter] = {
                         "lower": b.lower_threshold,
                         "upper": b.upper_threshold,
-                        "warn": b.lower_threshold,
-                        "critical": b.upper_threshold
+                        "warn": warn_val,
+                        "critical": crit_val
                     }
                 for p_key in OPERATIONAL_THRESHOLDS:
                     if p_key not in custom_baselines:

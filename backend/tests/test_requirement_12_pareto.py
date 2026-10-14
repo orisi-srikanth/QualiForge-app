@@ -32,6 +32,18 @@ client = TestClient(app)
 _token = create_access_token({"sub": "engineer@precisionaero.com", "role": UserRole.QUALITY_ENGINEER.value})
 client.headers["Authorization"] = f"Bearer {_token}"
 
+
+@pytest.fixture(autouse=True)
+def clean_transient_test_incidents():
+    db = SessionLocal()
+    for inc in db.query(QualityIncident).all():
+        if not inc.id.startswith("inc-"):
+            db.query(RCAHypothesis).filter(RCAHypothesis.incident_id == inc.id).delete()
+            db.delete(inc)
+    db.commit()
+    db.close()
+    yield
+
 # =====================================================================
 # CHECK 1: Five Dimensions & Response Shapes
 # =====================================================================

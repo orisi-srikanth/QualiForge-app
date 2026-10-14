@@ -204,7 +204,7 @@ async def upload_and_inspect_image(
                 db.rollback()
                 batch_rec = db.query(Batch).filter((Batch.batch_number == req_batch) | (Batch.id == req_batch)).first()
     else:
-        batch_rec = db.query(Batch).order_by(Batch.created_at.desc()).first()
+        batch_rec = db.query(Batch).order_by(Batch.start_time.desc()).first()
         if not batch_rec:
             raise HTTPException(status_code=404, detail="No active production batch found. Please specify batch_id or register a batch first.")
 

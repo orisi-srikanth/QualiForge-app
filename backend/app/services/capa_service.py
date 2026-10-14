@@ -586,7 +586,7 @@ class CAPAManagementService:
             .join(Batch, QualityIncident.batch_id == Batch.id)\
             .filter(
                 Batch.machine_id == mach_id,
-                QualityIncident.defect_type == defect_type,
+                (QualityIncident.defect_type == defect_type) | (QualityIncident.defect_type.like(f"%{defect_type}%")),
                 CAPAAction.status.in_(["completed", "verified"])
             ).all()
 
@@ -606,7 +606,7 @@ class CAPAManagementService:
             subsequent_incidents = db.query(QualityIncident).join(Batch, QualityIncident.batch_id == Batch.id)\
                 .filter(
                     Batch.machine_id == mach_id,
-                    QualityIncident.defect_type == defect_type,
+                    (QualityIncident.defect_type == defect_type) | (QualityIncident.defect_type.like(f"%{defect_type}%")),
                     func.date(QualityIncident.created_at) > comp_dt
                 ).all()
 

@@ -162,7 +162,7 @@ def test_scenario_d_product_image_mismatch_quarantine():
     screw_img = os.path.abspath("backend/app/static/uploads/samples/screw_thread.png")
     state = orchestrator.run_full_pipeline(
         batch_meta={
-            "batch_id": "BATCH-SHAFT-MISMATCH",
+            "batch_id": "BATCH-0245",
             "part_number": "PS-2026-101",
             "part_name": "Precision Ground Shaft",
             "machine": "CNC-04",

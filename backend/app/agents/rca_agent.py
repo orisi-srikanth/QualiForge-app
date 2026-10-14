@@ -1351,6 +1351,8 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                 b_rec = db_sess.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
                 b_fk = b_rec.id if b_rec else batch_id
 
+                clean_defect_type = effective_defect_type.split(" (Feedback:")[0].strip() if effective_defect_type else "Oversized shaft diameter"
+
                 db_inc = db_sess.query(QualityIncident).filter(
                     (QualityIncident.id == incident_id) | (QualityIncident.batch_id == b_fk)
                 ).first()
@@ -1359,8 +1361,8 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                     db_inc = QualityIncident(
                         id=incident_id,
                         batch_id=b_fk,
-                        title=f"Dimensional Nonconformance: {effective_defect_type}",
-                        defect_type=effective_defect_type,
+                        title=f"Dimensional Nonconformance: {clean_defect_type}",
+                        defect_type=clean_defect_type,
                         severity="HIGH",
                         status="open",
                         created_at=datetime.now(timezone.utc)
@@ -1370,8 +1372,8 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                     db_sess.refresh(db_inc)
                 else:
                     if db_inc.status == "open":
-                        db_inc.title = f"Dimensional Nonconformance: {effective_defect_type}"
-                        db_inc.defect_type = effective_defect_type
+                        db_inc.title = f"Dimensional Nonconformance: {clean_defect_type}"
+                        db_inc.defect_type = clean_defect_type
                         db_sess.commit()
 
                 # Upsert hypotheses for this incident

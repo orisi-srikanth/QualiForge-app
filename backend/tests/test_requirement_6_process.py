@@ -285,11 +285,23 @@ def test_check9_process_telemetry_upload():
     files = {"file": ("test_upload.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
     res = client.post("/api/process/upload", files=files, data={"batch_id": "BATCH-0245", "machine_id": "CNC-04"})
 
-    assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "success"
-    assert data["records_received"] == 3
-    assert data["anomalies_detected"] > 0
+    try:
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert data["records_received"] == 3
+        assert data["anomalies_detected"] > 0
+    finally:
+        from backend.app.database.session import SessionLocal
+        from backend.app.database.models import ProcessReading, Batch
+        _db = SessionLocal()
+        _b = _db.query(Batch).filter(Batch.batch_number == "BATCH-0245").first()
+        if _b:
+            _db.query(ProcessReading).filter(
+                (ProcessReading.batch_id == _b.id) & (ProcessReading.ts >= "2026-10-10 09:00:00")
+            ).delete()
+            _db.commit()
+        _db.close()
 
 # -----------------------------------------------------------------------------
 # CHECK 10: Swagger / OpenAPI Schema Endpoints
