@@ -214,7 +214,14 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  onClick={() => onNavigate("process-investigation")}
+                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <GitFork className="w-3.5 h-3.5" />
+                  <span>Process Investigation</span>
+                </button>
                 <button
                   onClick={() => onNavigate("rca")}
                   className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer"

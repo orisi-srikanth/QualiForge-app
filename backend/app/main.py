@@ -111,18 +111,20 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# Support FRONTEND_ORIGINS environment variable as well as default approved origins
+# Support FRONTEND_ORIGINS environment variable, settings.cors_origin_list, and default approved origins
+from backend.app.core.config import settings
 raw_frontend_origins = os.environ.get("FRONTEND_ORIGINS", "")
 env_origins = [o.strip().rstrip("/") for o in raw_frontend_origins.split(",") if o.strip()]
 default_origins = [
+    "https://quali-forge-app.vercel.app",
+    "https://qualiforge-app.vercel.app",
     "https://quality-mind.vercel.app",
     "https://qualitymind.vercel.app",
-    "https://qualiforge-app.vercel.app",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://localhost:8000",
 ]
-origins = list(dict.fromkeys(env_origins + default_origins))
+origins = list(dict.fromkeys(env_origins + settings.cors_origin_list + default_origins))
 
 # Enable CORS with explicit origins, regex for all Vercel previews, and full method/header support
 app.add_middleware(
@@ -131,7 +133,7 @@ app.add_middleware(
     allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "*"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "*"],
     expose_headers=["*"],
 )
 
@@ -141,18 +143,19 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 
 # Global exception handler ensuring CORS headers are preserved even on 500 crashes
+import re
+_vercel_regex = re.compile(r"^https:\/\/.*\.vercel\.app$")
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     origin = request.headers.get("origin")
     headers = {
-        "Access-Control-Allow-Credentials": "true",
-        "Access-Control-Allow-Methods": "*",
-        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, X-Requested-With, Origin, *",
     }
-    if origin:
+    if origin and (origin in origins or _vercel_regex.match(origin)):
         headers["Access-Control-Allow-Origin"] = origin
-    else:
-        headers["Access-Control-Allow-Origin"] = "*"
+        headers["Access-Control-Allow-Credentials"] = "true"
 
     if isinstance(exc, (HTTPException, StarletteHTTPException)):
         return JSONResponse(

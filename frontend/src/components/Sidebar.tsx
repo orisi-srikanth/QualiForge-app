@@ -37,6 +37,7 @@ export const Sidebar: React.FC<Props> = ({
     {
       title: "QUALITY ANALYTICS",
       items: [
+        { id: "process-investigation", label: "Process Investigation", icon: GitFork, purpose: "Defect-specific process investigation & telemetry correlation" },
         { id: "spc-dashboard", label: "SPC Dashboard", icon: LineChart, purpose: "I-MR charts and process capability (Cp/Cpk)" },
         { id: "incidents", label: "Quality Incidents", icon: AlertTriangle, purpose: "Non-conformance reports (NCR)" },
         { id: "rca", label: "Root Cause Analysis", icon: GitFork, purpose: "6M Ishikawa and 5-Whys causal chains" },
@@ -72,6 +73,7 @@ export const Sidebar: React.FC<Props> = ({
         { id: "batch-intake", label: "Batch Registration", icon: PlusCircle, purpose: "Guided 8-step production intake wizard" },
         { id: "batches", label: "Production Batches", icon: Layers, purpose: "Batch records and traceability" },
         { id: "inspection", label: "Measurement Center", icon: Ruler, purpose: "CMM measurements intake and verification" },
+        { id: "process-investigation", label: "Process Investigation", icon: GitFork, purpose: "Defect-specific process investigation & containment" },
         { id: "visual-inspection", label: "Visual Surface Check", icon: Camera, purpose: "Upload part photos for visual inspection" },
         { id: "process-monitoring", label: "Process Telemetry", icon: Activity, purpose: "Machine telemetry and sensor logs" },
       ]

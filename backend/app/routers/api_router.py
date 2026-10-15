@@ -15,6 +15,7 @@ from backend.app.routers.orchestrator import router as orchestrator_router
 from backend.app.routers.reports import router as reports_router
 from backend.app.routers.scenarios import router as scenarios_router
 from backend.app.routers.auth import router as auth_router
+from backend.app.routers.investigation import router as investigation_router
 
 router = APIRouter(prefix="/api")
 
@@ -30,5 +31,6 @@ router.include_router(capa_router)
 router.include_router(orchestrator_router)
 router.include_router(reports_router)
 router.include_router(scenarios_router)
+router.include_router(investigation_router)
 
 __all__ = ["router"]

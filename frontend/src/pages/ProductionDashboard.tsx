@@ -4,7 +4,7 @@ import { ProductionBatch } from "../types";
 import {
   PlusCircle, Upload, Camera, Activity, Play, Search,
   RefreshCw, CheckCircle2, Clock, AlertTriangle, Layers,
-  FileSpreadsheet, ArrowRight, Eye, ShieldAlert, Cpu
+  FileSpreadsheet, ArrowRight, Eye, ShieldAlert, Cpu, GitFork
 } from "lucide-react";
 
 interface Props {
@@ -293,6 +293,17 @@ export const ProductionDashboard: React.FC<Props> = ({
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              if (onSelectBatch) onSelectBatch(bId);
+                              onNavigate("process-investigation");
+                            }}
+                            className="px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold border border-amber-200 transition-colors cursor-pointer flex items-center gap-1"
+                            title="View Process Investigation"
+                          >
+                            <GitFork className="w-3 h-3 text-amber-600" />
+                            <span>View Process Investigation</span>
+                          </button>
                           <button
                             onClick={() => {
                               if (onSelectBatch) onSelectBatch(bId);

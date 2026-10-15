@@ -254,16 +254,29 @@ def add_manual_measurement(
 
     # Automatic Quality Incident handling (Requirement 4 Check 7)
     if not is_conforming:
+        clean_char = (char.name if char else "dimension").replace("_", " ")
+        if val_mm > usl:
+            defect_classification = f"Oversized {clean_char}"
+        elif val_mm < lsl:
+            defect_classification = f"Undersized {clean_char}"
+        else:
+            defect_classification = f"Out-of-specification {clean_char}"
+
         inc = db.query(QualityIncident).filter(QualityIncident.batch_id == b.id).first()
         if not inc:
             inc = QualityIncident(
                 batch_id=b.id,
-                title="Dimensional Nonconformance flagged via manual measurement entry",
-                defect_type="Oversized shaft diameter",
+                title=f"Dimensional Nonconformance flagged via manual measurement entry ({defect_classification})",
+                defect_type=defect_classification,
                 severity="HIGH",
                 status="open"
             )
             db.add(inc)
+            db.commit()
+        else:
+            inc.title = f"Dimensional Nonconformance: {defect_classification}"
+            inc.defect_type = defect_classification
+            inc.status = "open"
             db.commit()
 
     return {

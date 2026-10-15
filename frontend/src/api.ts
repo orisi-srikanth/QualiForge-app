@@ -16,10 +16,13 @@ async function parseJsonSafe(res: Response): Promise<any> {
   try {
     return JSON.parse(text);
   } catch {
-    if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
-      throw new Error(`API returned HTML (HTTP ${res.status}) instead of JSON. Ensure VITE_API_BASE_URL is set to https://qualiforge-app.onrender.com/api`);
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      throw new Error(`Backend service is warming up or temporarily unreachable (HTTP ${res.status}). Render free-tier instances sleep after inactivity and take ~40s to spin up. Please retry.`);
     }
-    throw new Error(`API returned invalid JSON (HTTP ${res.status}): ${text.slice(0, 100)}`);
+    if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
+      throw new Error(`API returned HTML (HTTP ${res.status}) instead of JSON. Backend may be cold starting or proxying.`);
+    }
+    throw new Error(`API returned non-JSON response (HTTP ${res.status}): ${text.slice(0, 100)}`);
   }
 }
 
@@ -773,6 +776,28 @@ export const api = {
     const res = await fetch(`${API_BASE}/effectiveness/${encodeURIComponent(actionCode)}`);
     if (!res.ok) throw new Error("Failed to fetch CAPA effectiveness");
     return res.json();
+  },
+
+  getProcessInvestigation: async (batchId: string = "BATCH-0245"): Promise<any> => {
+    const res = await fetch(`${API_BASE}/investigation/${encodeURIComponent(batchId)}`);
+    const data = await parseJsonSafe(res);
+    if (!res.ok) {
+      throw new Error(data.detail || `Failed to fetch process investigation for batch ${batchId}`);
+    }
+    return data;
+  },
+
+  runProcessInvestigation: async (batchId: string, forceRefresh: boolean = false): Promise<any> => {
+    const res = await fetch(`${API_BASE}/investigation/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_id: batchId, force_refresh: forceRefresh }),
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) {
+      throw new Error(data.detail || `Failed to run process investigation for batch ${batchId}`);
+    }
+    return data;
   }
 };
 

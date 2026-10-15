@@ -16,20 +16,47 @@ interface Props {
 
 export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) => {
   // -------------------- HERO DYNAMIC TELEMETRY STATE --------------------
-  const [telemetryData, setTelemetryData] = useState<any[]>([]);
-  const [liveSampleCount, setLiveSampleCount] = useState(0);
-  const [liveDiameter, setLiveDiameter] = useState<number | null>(null);
-  const [liveVibration, setLiveVibration] = useState<number | null>(null);
-  const [liveCpk, setLiveCpk] = useState<number | null>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+    return false;
+  });
+
+  const [telemetryData, setTelemetryData] = useState<any[]>([
+    { sample: "101", diameter: 50.008, vibration: 2.12 },
+    { sample: "102", diameter: 49.994, vibration: 2.08 },
+    { sample: "103", diameter: 50.015, vibration: 2.18 },
+    { sample: "104", diameter: 50.002, vibration: 2.11 },
+    { sample: "105", diameter: 49.998, vibration: 2.14 },
+    { sample: "106", diameter: 50.012, vibration: 2.20 },
+    { sample: "107", diameter: 50.006, vibration: 2.09 },
+    { sample: "108", diameter: 49.995, vibration: 2.15 },
+    { sample: "109", diameter: 50.018, vibration: 2.22 },
+    { sample: "110", diameter: 50.004, vibration: 2.10 },
+  ]);
+  const [liveSampleCount, setLiveSampleCount] = useState(110);
+  const [liveDiameter, setLiveDiameter] = useState<number | null>(50.004);
+  const [liveVibration, setLiveVibration] = useState<number | null>(2.10);
+  const [liveCpk, setLiveCpk] = useState<number | null>(1.42);
   const [systemBatchesCount, setSystemBatchesCount] = useState(0);
 
+  // Monitor prefers-reduced-motion changes
   useEffect(() => {
-    // Fetch real operational metrics from backend
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Fetch real operational metrics from backend
+  useEffect(() => {
     import("../api").then(({ api }) => {
       api.getDashboardSummary().then((sum) => {
         if (sum) {
-          setSystemBatchesCount(sum.total_batches || 0);
-          setLiveSampleCount(sum.total_inspected_parts || 0);
+          if (sum.total_batches) setSystemBatchesCount(sum.total_batches);
+          if (sum.total_inspected_parts) setLiveSampleCount(sum.total_inspected_parts);
           if (sum.process_control_status?.cpk !== null && sum.process_control_status?.cpk !== undefined) {
             setLiveCpk(sum.process_control_status.cpk);
           }
@@ -37,6 +64,32 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
       }).catch(() => {});
     });
   }, []);
+
+  // Live real-time telemetry line animation ticker (disabled if prefers-reduced-motion is true)
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+
+    let sampleCounter = 111;
+    const interval = setInterval(() => {
+      // Subtle micro-variation around nominal 50.00 mm (within ±0.02 mm)
+      const microDelta = (Math.sin(sampleCounter * 0.75) * 0.014) + ((Math.random() - 0.5) * 0.008);
+      const nextDiameter = parseFloat((50.000 + microDelta).toFixed(3));
+      const nextVib = parseFloat((2.10 + (Math.sin(sampleCounter * 0.4) * 0.18) + ((Math.random() - 0.5) * 0.08)).toFixed(2));
+      const sLabel = String(sampleCounter);
+
+      setTelemetryData((prev) => {
+        const nextList = [...prev.slice(1), { sample: sLabel, diameter: nextDiameter, vibration: nextVib }];
+        return nextList;
+      });
+
+      setLiveDiameter(nextDiameter);
+      setLiveVibration(nextVib);
+      setLiveSampleCount((c) => c + 1);
+      sampleCounter += 1;
+    }, 1800);
+
+    return () => clearInterval(interval);
+  }, [prefersReducedMotion]);
 
   // -------------------- 11-STAGE WORKFLOW ANIMATION STATE --------------------
   const [activeStage, setActiveStage] = useState(0);
@@ -286,7 +339,7 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
                   <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 transition-all">
                     <div className="text-[11px] font-medium text-slate-400">Specification Nominal</div>
                     <div className="mt-1 text-lg sm:text-xl font-bold font-mono text-white tracking-tight">
-                      50.000 <span className="text-xs text-slate-400 font-sans">mm</span>
+                      {liveDiameter !== null ? liveDiameter.toFixed(3) : "50.000"} <span className="text-xs text-slate-400 font-sans">mm</span>
                     </div>
                     <div className="mt-1 text-[10px] text-emerald-400 font-medium flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" /> Bilateral ±0.05 mm
@@ -296,7 +349,7 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
                   <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 transition-all">
                     <div className="text-[11px] font-medium text-slate-400">Machinery Baseline</div>
                     <div className="mt-1 text-lg sm:text-xl font-bold font-mono text-white tracking-tight">
-                      2.10 <span className="text-xs text-slate-400 font-sans">mm/s</span>
+                      {liveVibration !== null ? liveVibration.toFixed(2) : "2.10"} <span className="text-xs text-slate-400 font-sans">mm/s</span>
                     </div>
                     <div className="mt-1 text-[10px] text-blue-400 font-medium flex items-center gap-1">
                       <Activity className="w-3 h-3" /> Trip Limit 3.50 mm/s
@@ -366,10 +419,12 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
                           <Line
                             type="monotone"
                             dataKey="diameter"
-                            stroke="#3b82f6"
+                            stroke="#38bdf8"
                             strokeWidth={2.5}
-                            dot={{ fill: "#60a5fa", r: 3.5, stroke: "#1d4ed8", strokeWidth: 1.5 }}
-                            isAnimationActive={true}
+                            dot={{ fill: "#38bdf8", r: 3, stroke: "#0284c7", strokeWidth: 1.5 }}
+                            activeDot={{ r: 5, fill: "#38bdf8" }}
+                            isAnimationActive={!prefersReducedMotion}
+                            animationDuration={500}
                           />
                         </LineChart>
                       </ResponsiveContainer>

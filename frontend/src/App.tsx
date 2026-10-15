@@ -20,6 +20,7 @@ import { AiReviewPage } from "./pages/AiReviewPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { TestScenariosPage } from "./pages/TestScenariosPage";
 import { MachineConfigPage } from "./pages/MachineConfigPage";
+import { ProcessInvestigationPage } from "./pages/ProcessInvestigationPage";
 import { api } from "./api";
 import {
   CheckCircle2, Clock, Loader2, Minus, Maximize2, X, ShieldAlert,
@@ -43,27 +44,79 @@ const PIPELINE_STAGES: PipelineStep[] = [
   { id: 8, label: "Preparing quality dossier for human review", durationEstimateMs: 500 }
 ];
 
-export function App() {
-  // Top-level View State: 'landing' | 'login' | 'register' | 'app'
-  const [currentView, setCurrentView] = useState<"landing" | "login" | "register" | "app">(() => {
-    // If a session exists in localStorage, go straight to app; otherwise open public landing page
+const VALID_APP_PAGES: Record<string, string> = {
+  "quality-dashboard": "quality-dashboard",
+  "dashboard": "quality-dashboard",
+  "production-dashboard": "production-dashboard",
+  "batch-intake": "batch-intake",
+  "product-config": "product-config",
+  "machine-config": "machine-config",
+  "batches": "batches",
+  "inspection": "inspection",
+  "process-investigation": "process-investigation",
+  "visual-inspection": "visual-inspection",
+  "process-monitoring": "process-monitoring",
+  "spc-dashboard": "spc-dashboard",
+  "spc": "spc-dashboard",
+  "incidents": "incidents",
+  "rca": "rca",
+  "capa": "capa",
+  "ai-review": "ai-review",
+  "reports": "reports",
+  "test-scenarios": "test-scenarios"
+};
+
+function parseInitialRoute() {
+  if (typeof window === "undefined") {
+    return { view: "landing" as const, page: "quality-dashboard", batchId: "", machineId: "CNC-01" };
+  }
+  const cleanPath = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  const searchParams = new URLSearchParams(window.location.search);
+  const qBatch = searchParams.get("batch_id") || searchParams.get("batch") || "";
+  const qMachine = searchParams.get("machine_id") || searchParams.get("machine") || "CNC-01";
+
+  if (cleanPath === "login") {
+    return { view: "login" as const, page: "quality-dashboard", batchId: qBatch, machineId: qMachine };
+  }
+  if (cleanPath === "register") {
+    return { view: "register" as const, page: "quality-dashboard", batchId: qBatch, machineId: qMachine };
+  }
+  if (cleanPath === "landing") {
+    return { view: "landing" as const, page: "quality-dashboard", batchId: qBatch, machineId: qMachine };
+  }
+  if (cleanPath === "") {
+    // Root "/" - check if user already has an active session / saved preference
     const token = localStorage.getItem("qualiforge_token");
-    return token ? "app" : "landing";
-  });
+    const savedActive = localStorage.getItem("qualiforge_active_page");
+    if (token && savedActive && VALID_APP_PAGES[savedActive]) {
+      return { view: "app" as const, page: VALID_APP_PAGES[savedActive], batchId: qBatch, machineId: qMachine };
+    }
+    return { view: "landing" as const, page: "quality-dashboard", batchId: qBatch, machineId: qMachine };
+  }
+
+  // Direct hit to any dashboard or nested route: preserve route across browser reload!
+  if (VALID_APP_PAGES[cleanPath]) {
+    return { view: "app" as const, page: VALID_APP_PAGES[cleanPath], batchId: qBatch, machineId: qMachine };
+  }
+
+  return { view: "app" as const, page: "quality-dashboard", batchId: qBatch, machineId: qMachine };
+}
+
+export function App() {
+  const initialRoute = parseInitialRoute();
+
+  // Top-level View State: 'landing' | 'login' | 'register' | 'app'
+  const [currentView, setCurrentView] = useState<"landing" | "login" | "register" | "app">(initialRoute.view);
 
   const [userRole, setUserRole] = useState<"admin" | "quality_engineer" | "operator">(() => {
     const savedRole = localStorage.getItem("qualiforge_role") as any;
     return savedRole || "quality_engineer";
   });
 
-  const [activePage, setActivePage] = useState<string>(() => {
-    const savedRole = localStorage.getItem("qualiforge_role");
-    return savedRole === "operator" ? "production-dashboard" : "quality-dashboard";
-  });
-
+  const [activePage, setActivePage] = useState<string>(initialRoute.page);
   const [activeWorkflowId, setActiveWorkflowId] = useState<string>("");
-  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
-  const [selectedMachineId, setSelectedMachineId] = useState<string>("CNC-01");
+  const [selectedBatchId, setSelectedBatchId] = useState<string>(initialRoute.batchId || "");
+  const [selectedMachineId, setSelectedMachineId] = useState<string>(initialRoute.machineId || "CNC-01");
   const [isRunningPipeline, setIsRunningPipeline] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -72,7 +125,46 @@ export function App() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [pipelineFinishedBanner, setPipelineFinishedBanner] = useState(false);
 
-  // Auto-sync active batch from database
+  // Sync route and browser history back/forward (popstate)
+  useEffect(() => {
+    const onPopState = () => {
+      const r = parseInitialRoute();
+      setCurrentView(r.view);
+      setActivePage(r.page);
+      if (r.batchId) setSelectedBatchId(r.batchId);
+      if (r.machineId) setSelectedMachineId(r.machineId);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  // Update browser URL seamlessly whenever active page or view changes
+  const navigateTo = (page: string, params?: Record<string, string>) => {
+    setActivePage(page);
+    setCurrentView("app");
+    localStorage.setItem("qualiforge_active_page", page);
+
+    const targetUrl = new URL(window.location.origin + "/" + page);
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v) targetUrl.searchParams.set(k, v);
+      });
+    } else {
+      const currentBatch = selectedBatchId || initialRoute.batchId;
+      if (currentBatch && ["inspection", "process-investigation", "process-monitoring", "rca", "capa", "ai-review"].includes(page)) {
+        targetUrl.searchParams.set("batch_id", currentBatch);
+      }
+    }
+    window.history.pushState({ page, view: "app" }, "", targetUrl.pathname + targetUrl.search);
+  };
+
+  const navigateToView = (view: "landing" | "login" | "register") => {
+    setCurrentView(view);
+    const path = view === "landing" ? "/" : "/" + view;
+    window.history.pushState({ view }, "", path);
+  };
+
+  // Auto-sync active batch from database if none was provided in URL
   useEffect(() => {
     api.getBatches().then((batches) => {
       if (Array.isArray(batches) && batches.length > 0) {
@@ -94,16 +186,6 @@ export function App() {
     });
   };
 
-  // Check URL pathname for direct routing simulation (e.g. /login, /register)
-  useEffect(() => {
-    const path = window.location.pathname;
-    if (path === "/login") {
-      setCurrentView("login");
-    } else if (path === "/register") {
-      setCurrentView("register");
-    }
-  }, []);
-
   // Timer while running pipeline
   useEffect(() => {
     let interval: any = null;
@@ -122,27 +204,20 @@ export function App() {
   const handleRoleChange = (newRole: "admin" | "quality_engineer" | "operator") => {
     setUserRole(newRole);
     localStorage.setItem("qualiforge_role", newRole);
-    if (newRole === "operator") {
-      setActivePage("production-dashboard");
-    } else {
-      setActivePage("quality-dashboard");
-    }
+    const target = newRole === "operator" ? "production-dashboard" : "quality-dashboard";
+    navigateTo(target);
   };
 
   const handleLoginSuccess = (role: "admin" | "quality_engineer" | "operator") => {
     setUserRole(role);
     localStorage.setItem("qualiforge_role", role);
-    setCurrentView("app");
-    if (role === "operator") {
-      setActivePage("production-dashboard");
-    } else {
-      setActivePage("quality-dashboard");
-    }
+    const target = role === "operator" ? "production-dashboard" : "quality-dashboard";
+    navigateTo(target);
   };
 
   const handleLogout = () => {
     api.logout();
-    setCurrentView("landing");
+    navigateToView("landing");
   };
 
   const handleRunPipeline = async (batchId?: string) => {
@@ -169,7 +244,7 @@ export function App() {
       setTimeout(() => {
         setShowProgressModal(false);
         setPipelineFinishedBanner(true);
-        setActivePage("ai-review");
+        navigateTo("ai-review");
         setTimeout(() => setPipelineFinishedBanner(false), 8000);
       }, 900);
     } catch (e) {
@@ -191,12 +266,10 @@ export function App() {
       <LandingPage
         onNavigateToLogin={(initialRole) => {
           if (initialRole) setUserRole(initialRole);
-          setCurrentView("login");
+          navigateToView("login");
         }}
         onExplore={() => {
-          // Direct entry to application
-          setCurrentView("app");
-          setActivePage("quality-dashboard");
+          navigateTo(userRole === "operator" ? "production-dashboard" : "quality-dashboard");
         }}
       />
     );
@@ -206,8 +279,8 @@ export function App() {
     return (
       <LoginPage
         onSuccess={handleLoginSuccess}
-        onNavigateToRegister={() => setCurrentView("register")}
-        onNavigateToLanding={() => setCurrentView("landing")}
+        onNavigateToRegister={() => navigateToView("register")}
+        onNavigateToLanding={() => navigateToView("landing")}
         initialRole={userRole === "operator" ? "operator" : "quality_engineer"}
       />
     );
@@ -216,8 +289,8 @@ export function App() {
   if (currentView === "register") {
     return (
       <RegisterPage
-        onNavigateToLogin={() => setCurrentView("login")}
-        onNavigateToLanding={() => setCurrentView("landing")}
+        onNavigateToLogin={() => navigateToView("login")}
+        onNavigateToLanding={() => navigateToView("landing")}
       />
     );
   }
@@ -241,7 +314,7 @@ export function App() {
           </p>
           <div className="pt-2 flex justify-center gap-3">
             <button
-              onClick={() => setActivePage("production-dashboard")}
+              onClick={() => navigateTo("production-dashboard")}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
             >
               Return to Production Workspace
@@ -262,28 +335,37 @@ export function App() {
       case "dashboard":
         return (
           <QualityEngineerDashboard
-            onNavigate={setActivePage}
+            onNavigate={navigateTo}
             onSelectBatch={(bId) => {
               setSelectedBatchId(bId);
-              setActivePage("inspection");
+              navigateTo("inspection", { batch_id: bId });
             }}
           />
         );
       case "production-dashboard":
         return (
           <ProductionDashboard
-            onNavigate={setActivePage}
+            onNavigate={navigateTo}
             onSelectBatch={(bId) => {
               setSelectedBatchId(bId);
-              setActivePage("inspection");
             }}
             onRunAnalysis={(bId) => handleRunPipeline(bId)}
+          />
+        );
+      case "process-investigation":
+        return (
+          <ProcessInvestigationPage
+            initialBatchId={selectedBatchId || "BATCH-0245"}
+            onNavigate={navigateTo}
+            onSelectBatch={(bId) => {
+              setSelectedBatchId(bId);
+            }}
           />
         );
       case "batch-intake":
         return (
           <BatchRegistrationWizard
-            onNavigate={setActivePage}
+            onNavigate={navigateTo}
             onBatchCreated={(bId) => {
               setSelectedBatchId(bId);
             }}
@@ -294,7 +376,7 @@ export function App() {
           <ProductConfigPage
             onNavigate={(page, mId) => {
               if (mId) setSelectedMachineId(mId);
-              setActivePage(page);
+              navigateTo(page);
             }}
           />
         );
@@ -302,16 +384,16 @@ export function App() {
         return (
           <MachineConfigPage
             initialMachineId={selectedMachineId}
-            onNavigate={setActivePage}
+            onNavigate={navigateTo}
           />
         );
       case "batches":
         return (
           <BatchesPage
-            onNavigate={setActivePage}
+            onNavigate={navigateTo}
             onSelectWorkflow={(wfId: string) => {
               setActiveWorkflowId(wfId);
-              setActivePage("ai-review");
+              navigateTo("ai-review");
             }}
           />
         );
@@ -324,7 +406,7 @@ export function App() {
       case "spc-dashboard":
         return <SpcDashboardPage />;
       case "incidents":
-        return <IncidentsPage onNavigate={setActivePage} />;
+        return <IncidentsPage onNavigate={navigateTo} />;
       case "rca":
         return <RcaPage />;
       case "capa":
@@ -344,9 +426,9 @@ export function App() {
         return <TestScenariosPage />;
       default:
         return isQE ? (
-          <QualityEngineerDashboard onNavigate={setActivePage} />
+          <QualityEngineerDashboard onNavigate={navigateTo} />
         ) : (
-          <ProductionDashboard onNavigate={setActivePage} />
+          <ProductionDashboard onNavigate={navigateTo} />
         );
     }
   };
@@ -356,7 +438,7 @@ export function App() {
       {/* Sidebar Navigation */}
       <Sidebar
         activePage={activePage}
-        setActivePage={setActivePage}
+        setActivePage={navigateTo}
         userRole={userRole}
         onRoleChange={handleRoleChange}
         onLogout={handleLogout}
@@ -371,7 +453,7 @@ export function App() {
           activePage={activePage}
           onRunPipeline={() => handleRunPipeline(selectedBatchId)}
           isRunningPipeline={isRunningPipeline}
-          onNavigate={setActivePage}
+          onNavigate={navigateTo}
           userRole={userRole}
           onRoleChange={handleRoleChange}
           onLogout={handleLogout}

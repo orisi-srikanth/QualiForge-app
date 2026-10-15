@@ -199,16 +199,29 @@ class QualityWorkflowOrchestrator:
                         measurements = [{"sample_id": m.component_id, "measured_value": m.value, "unit": m.unit} for m in db_meas]
 
                 if telemetry_records is None:
-                    db_tele = db_enrich.query(ProcessReading).filter(ProcessReading.batch_id == b_rec.id).all()
+                    db_tele = db_enrich.query(ProcessReading).filter(ProcessReading.batch_id == b_rec.id).order_by(ProcessReading.ts.asc()).all()
                     if db_tele:
                         telemetry_records = [
                             {
-                                "timestamp": r.timestamp.isoformat() if r.timestamp else None,
-                                "vibration_mm_s": r.vibration_mm_s,
-                                "tool_wear_cycles": r.tool_wear_cycles,
-                                "spindle_speed_rpm": r.spindle_speed_rpm,
-                                "feed_rate_mm_rev": r.feed_rate_mm_rev,
-                                "temperature_c": r.temperature_c
+                                "timestamp": r.ts.strftime("%Y-%m-%d %H:%M:%S") if hasattr(r.ts, "strftime") else str(r.ts),
+                                "vibration_mm_s": r.vibration,
+                                "vibration": r.vibration,
+                                "machine_vibration_mms": r.vibration,
+                                "tool_wear_cycles": r.tool_usage_cycles,
+                                "tool_usage_cycles": r.tool_usage_cycles,
+                                "spindle_speed_rpm": r.spindle_speed,
+                                "spindle_speed": r.spindle_speed,
+                                "feed_rate_mm_rev": r.feed_rate,
+                                "feed_rate_mmrev": r.feed_rate,
+                                "feed_rate": r.feed_rate,
+                                "temperature_c": r.coolant_temp,
+                                "coolant_temp": r.coolant_temp,
+                                "coolant_temperature_c": r.coolant_temp,
+                                "motor_current_a": r.motor_current,
+                                "motor_current": r.motor_current,
+                                "cycle_time_s": r.cycle_time,
+                                "cycle_time": r.cycle_time,
+                                "pressure": r.pressure
                             }
                             for r in db_tele
                         ]

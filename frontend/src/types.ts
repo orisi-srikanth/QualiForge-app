@@ -419,3 +419,111 @@ export interface TestScenarioResult {
   evidence: string;
   status: "PASS" | "FAIL";
 }
+
+export interface ProcessInvestigationReport {
+  batch_id: string;
+  batch_db_id?: string;
+  product: {
+    id?: string;
+    part_number: string;
+    name: string;
+    material: string;
+    process: string;
+  };
+  machine: {
+    id?: string;
+    code: string;
+    type: string;
+    location: string;
+  };
+  shift: string;
+  batch_status: string;
+  batch_quantity: number;
+  specification: {
+    characteristic: string;
+    unit: string;
+    nominal: number;
+    usl: number;
+    lsl: number;
+    tolerance_plus: number;
+    tolerance_minus: number;
+  };
+  inspection_summary: {
+    total_inspected: number;
+    conforming_count: number;
+    nonconforming_count: number;
+    rejection_rate_percent: number;
+    has_oversized: boolean;
+    has_undersized: boolean;
+    has_visual_defect: boolean;
+    conformance_verdict: string;
+  };
+  nonconforming_samples: Array<{
+    sample_id: string;
+    measured_value: number;
+    unit: string;
+    status: string;
+    deviation_from_limit: number;
+    measured_at?: string;
+    source?: string;
+  }>;
+  conforming_samples: Array<{
+    sample_id: string;
+    measured_value: number;
+    unit: string;
+    status: string;
+    deviation_from_limit: number;
+    measured_at?: string;
+    source?: string;
+  }>;
+  visual_findings: Array<{
+    id: string;
+    defect_detected: boolean;
+    defect_type: string;
+    confidence: number;
+    location: string;
+    model_version?: string;
+    human_status?: string;
+  }>;
+  strategy: {
+    strategy: string;
+    title: string;
+    description: string;
+  };
+  investigation_status: string;
+  hypotheses: Array<{
+    hypothesis_id: string;
+    title: string;
+    category: string;
+    description: string;
+    confidence_score: number;
+    evidence_score: number;
+    status: string;
+    epistemic_label: string;
+    supporting_evidence: string[];
+    contradicting_evidence: string[];
+    missing_evidence: string[];
+    required_confirmation: string;
+  }>;
+  missing_data_sources: string[];
+  verification_steps: string[];
+  recommended_actions: Array<{
+    type: string;
+    action: string;
+    responsible: string;
+    urgency: string;
+  }>;
+  capa_actions: Array<{
+    id: string;
+    action_code: string;
+    type: string;
+    description: string;
+    status: string;
+    due_date: string;
+    responsible_role?: string;
+  }>;
+  incident_id?: string;
+  investigation_timestamp: string;
+  correlation_vs_causation_note: string;
+  epistemic_label: string;
+}

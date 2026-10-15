@@ -620,20 +620,35 @@ def process_inspection_file(
 
             db.commit()
 
-            # Automatic Quality Incident handling (Requirement 4 Check 7)
+            # Automatic Quality Incident handling with dynamic defect classification
             if rep.nonconforming > 0:
+                nonconf_items = [m for m in rep.measurements if not m.is_conforming]
+                has_oversized = any(m.measured_value > batch_spec["usl_mm"] for m in nonconf_items)
+                has_undersized = any(m.measured_value < batch_spec["lsl_mm"] for m in nonconf_items)
+                clean_char = (char.name if char else "dimension").replace("_", " ")
+
+                if has_oversized and has_undersized:
+                    defect_classification = f"Bilateral tolerance violation on {clean_char}"
+                elif has_oversized:
+                    defect_classification = f"Oversized {clean_char}"
+                elif has_undersized:
+                    defect_classification = f"Undersized {clean_char}"
+                else:
+                    defect_classification = f"Out-of-specification {clean_char}"
+
                 inc = db.query(QualityIncident).filter(QualityIncident.batch_id == db_batch.id).first()
                 if not inc:
                     inc = QualityIncident(
                         batch_id=db_batch.id,
-                        title=f"Dimensional Nonconformance: {rep.nonconforming}/{rep.total_inspected} parts exceed engineering specification",
-                        defect_type="Oversized shaft diameter",
+                        title=f"Dimensional Nonconformance: {rep.nonconforming}/{rep.total_inspected} parts exceed engineering specification ({defect_classification})",
+                        defect_type=defect_classification,
                         severity="HIGH",
                         status="open"
                     )
                     db.add(inc)
                 else:
-                    inc.title = f"Dimensional Nonconformance: {rep.nonconforming}/{rep.total_inspected} parts exceed engineering specification"
+                    inc.title = f"Dimensional Nonconformance: {rep.nonconforming}/{rep.total_inspected} parts exceed engineering specification ({defect_classification})"
+                    inc.defect_type = defect_classification
                     inc.status = "open"
                 db.commit()
 

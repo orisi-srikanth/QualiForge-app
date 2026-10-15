@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     # CORS
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://localhost:8000,https://qualitymind.vercel.app,https://quality-mind.vercel.app"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://localhost:8000,https://qualitymind.vercel.app,https://quality-mind.vercel.app,https://quali-forge-app.vercel.app,https://qualiforge-app.vercel.app"
 
     # Universal Multi-Provider LLM & OpenAI-Compatible Routing
     LLM_PROVIDER: str = "none"  # "none", "groq", "openrouter", "gemini", "openai"
