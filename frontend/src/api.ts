@@ -401,7 +401,7 @@ export const api = {
       method: "POST",
       body: formData,
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) {
       const errMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
       throw new Error(errMsg || "Failed to inspect component image");

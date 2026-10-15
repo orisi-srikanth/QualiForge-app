@@ -26,15 +26,16 @@ class YoloDefectDetector:
         conf_threshold: Optional[float] = None,
         auto_load: bool = True
     ):
-        self.model_path = model_path or getattr(settings, "YOLO_MODEL_PATH", None) or os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "models", "agent2", "best.pt")
-        )
+        onnx_cand = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "agent2", "best.onnx"))
+        pt_cand = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "agent2", "best.pt"))
+        default_model = onnx_cand if os.path.exists(onnx_cand) else pt_cand
+        self.model_path = model_path or getattr(settings, "YOLO_MODEL_PATH", None) or default_model
         threshold = conf_threshold if conf_threshold is not None else getattr(settings, "YOLO_CONF_THRESHOLD", 0.25)
         self.validate_conf_threshold(threshold)
         self.conf_threshold = float(threshold)
 
         self.model_name = getattr(settings, "YOLO_MODEL_NAME", "qualiforge-agent2-yolo")
-        self.model_version = getattr(settings, "YOLO_MODEL_VERSION", "trained-best-pt")
+        self.model_version = getattr(settings, "YOLO_MODEL_VERSION", "trained-best-onnx" if self.model_path.endswith(".onnx") else "trained-best-pt")
         self.expected_classes = list(EXPECTED_YOLO_CLASSES)
 
         self.model = None
@@ -70,7 +71,10 @@ class YoloDefectDetector:
             ) from exc
 
         try:
-            loaded_model = YOLO(self.model_path)
+            if self.model_path.endswith(".onnx"):
+                loaded_model = YOLO(self.model_path, task="detect")
+            else:
+                loaded_model = YOLO(self.model_path)
         except Exception as exc:
             raise RuntimeError(
                 f"Failed to load YOLO model weights from '{self.model_path}': {str(exc)}"
