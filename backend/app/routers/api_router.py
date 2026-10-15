@@ -33,4 +33,14 @@ router.include_router(reports_router)
 router.include_router(scenarios_router)
 router.include_router(investigation_router)
 
+@router.get("/health", tags=["System"], summary="API Health Check")
+def api_health_check():
+    return {
+        "status": "HEALTHY",
+        "system": "Agentic AI Manufacturing Quality Inspection & RCA System",
+        "version": "2.0.0",
+        "agents_active": 8,
+        "mode": "HUMAN_IN_THE_LOOP_DECISION_SUPPORT"
+    }
+
 __all__ = ["router"]

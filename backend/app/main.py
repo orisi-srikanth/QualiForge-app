@@ -193,6 +193,7 @@ app.include_router(api_router)
 app.include_router(knowledge_router)
 
 @app.get("/health", tags=["System"], summary="System Health & Readiness Check", description="Returns operational health status, active agents count, and governance mode.")
+@app.get("/api/health", tags=["System"], summary="System Health & Readiness Check", description="Returns operational health status, active agents count, and governance mode.")
 def health_check():
     return {
         "status": "HEALTHY",
