@@ -521,19 +521,16 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                 </div>
               </div>
 
-              {/* Dimensional Engineering Box (Fields 6, 7, 8) */}
+              {/* Dimensional Engineering Box (Fields 6, 7) */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Ruler className="w-4 h-4 text-blue-600" />
-                    Dimensional Tolerancing & Server-Side Limits
-                  </span>
-                  <span className="text-[11px] text-blue-700 bg-blue-100 font-semibold px-2 py-0.5 rounded">
-                    Deterministic Backend Calculation
+                    Dimensional Tolerancing
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Field 6: Nominal Dimension */}
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 block mb-1">
@@ -568,28 +565,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                     {formErrors.tolerance_mm && (
                       <span className="text-[10px] text-rose-600 block mt-0.5">{formErrors.tolerance_mm}</span>
                     )}
-                  </div>
-
-                  {/* Field 8: Read-Only USL */}
-                  <div className="p-2.5 bg-rose-50/60 border border-rose-200 rounded-lg">
-                    <span className="text-[10px] uppercase font-bold text-rose-700 block">
-                      8. USL (Upper Limit)
-                    </span>
-                    <span id="calculated-usl-badge" className="text-sm font-bold font-mono text-rose-800 block mt-1">
-                      {calculatedUsl.toFixed(4)} {formData.unit}
-                    </span>
-                    <span className="text-[9px] text-rose-500 block">Read-Only (Nominal + Tol)</span>
-                  </div>
-
-                  {/* Field 8: Read-Only LSL */}
-                  <div className="p-2.5 bg-rose-50/60 border border-rose-200 rounded-lg">
-                    <span className="text-[10px] uppercase font-bold text-rose-700 block">
-                      8. LSL (Lower Limit)
-                    </span>
-                    <span id="calculated-lsl-badge" className="text-sm font-bold font-mono text-rose-800 block mt-1">
-                      {calculatedLsl.toFixed(4)} {formData.unit}
-                    </span>
-                    <span className="text-[9px] text-rose-500 block">Read-Only (Nominal - Tol)</span>
                   </div>
                 </div>
 
