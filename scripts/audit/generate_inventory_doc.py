@@ -5,7 +5,6 @@ import pandas as pd
 
 def build_inventory():
     inv = []
-    # 1. Normal Production
     b_path = 'backend/data/production/batches.csv'
     m_path = 'backend/data/inspection/measurements.csv'
     p_path = 'backend/data/process/process_readings.csv'
@@ -22,7 +21,6 @@ def build_inventory():
         'description': 'Baseline conforming production runs (batches BATCH-001..025), dimensional checks within +/-0.050mm, stable telemetry.'
     })
 
-    # 2. Dimensional Defects
     n_hold_batches = len(b_df[b_df['status'] == 'QUALITY_HOLD'])
     n_nonconf_meas = len(m_df[m_df['status'] == 'nonconforming'])
     inv.append({
@@ -33,7 +31,6 @@ def build_inventory():
         'description': 'Oversized and undersized journal diameters exceeding USL (50.050mm) or LSL (49.950mm).'
     })
 
-    # 3. Visual Defects
     mvtec_path = 'data/mvtec_manifest.csv'
     mv_len = len(pd.read_csv(mvtec_path)) if os.path.exists(mvtec_path) else 1502
     inv.append({
@@ -51,7 +48,6 @@ def build_inventory():
         'description': 'Read-only external benchmark across metal_nut, screw, transistor, and cable proxy categories.'
     })
 
-    # 4. Machine Anomalies
     n_vib_anom = len(p_df[p_df['vibration'] >= 3.5])
     inv.append({
         'category': 'Machine Anomalies',
@@ -61,7 +57,6 @@ def build_inventory():
         'description': 'CNC turning spindle vibration spikes reaching 3.8 mm/s during BATCH-0245 tool degradation.'
     })
 
-    # 5. Process Drift
     inv.append({
         'category': 'Process Drift',
         'file_paths': 'backend/data/inspection/measurements.csv; production/batches.csv',
@@ -70,7 +65,6 @@ def build_inventory():
         'description': 'Progressive diametrical growth (+0.005 mm per subgroup) modeling thermal expansion and gradual insert flank wear.'
     })
 
-    # 6. Tool Wear
     n_wear = len(p_df[p_df['tool_usage_cycles'] >= 600])
     inv.append({
         'category': 'Tool Wear',
@@ -80,7 +74,6 @@ def build_inventory():
         'description': 'Indexable carbide turning insert cycle counters tracking wear past 600 cycle nominal life.'
     })
 
-    # 7. Historical Incidents
     with open('backend/data/historical_ncrs.json', 'r', encoding='utf-8') as f:
         ncrs = json.load(f)
     inv.append({
@@ -91,7 +84,6 @@ def build_inventory():
         'description': 'Comprehensive incident repository spanning dimensional drift, tool wear, visual scratches, cracks, and decoys.'
     })
 
-    # 8. CAPA Records
     with open('backend/data/capa_records.json', 'r', encoding='utf-8') as f:
         capas = json.load(f)
     inv.append({
@@ -102,7 +94,6 @@ def build_inventory():
         'description': 'Corrective and Preventive Action plans with containment, 5-Why root cause analysis, and permanent verification.'
     })
 
-    # 9. Maintenance Records
     mnt_df = pd.read_csv('backend/data/maintenance_records.csv')
     inv.append({
         'category': 'Maintenance Records',
@@ -112,7 +103,6 @@ def build_inventory():
         'description': 'Preventive lubrication, spindle bearing rebuilds, turret alignments, and gauge recalibrations for CNC-01..05.'
     })
 
-    # 10. KB Documents
     kb_files = glob.glob('backend/data/kb/*.md')
     doc_files = glob.glob('backend/data/knowledge_docs/*')
     inv.append({
@@ -123,7 +113,6 @@ def build_inventory():
         'description': 'Engineering specifications (SPEC-PS-101), machine vibration limits (Okuma LB3000), SOPs, and public NIST SPC reference handbook.'
     })
 
-    # Generate Markdown Table
     md = "# Dataset Inventory & Provenance Mapping\n\n"
     md += "This document inventories all manufacturing datasets required by the QualityMind engineering specifications.\n"
     md += "Per project engineering decision, **Synthetic Machined Shaft Images** serve as the primary computer vision dataset,\n"

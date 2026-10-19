@@ -1,7 +1,3 @@
-"""
-Process Monitoring & Telemetry Anomaly Detection Endpoints (Agent 4)
-Telemetry stream analysis using Isolation Forest, CUSUM drift detection, and statistical Z-score limits.
-"""
 import io
 import os
 import json
@@ -42,7 +38,6 @@ def get_telemetry(
 
         res = process_agent.analyze_telemetry_series(batch_id=batch_id, machine=machine)
 
-        # Format baselines dictionary with units and thresholds
         baselines_payload = {}
         for p_key, meta in OPERATIONAL_THRESHOLDS.items():
             try:
@@ -276,7 +271,6 @@ def update_process_baselines(
     machine_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    # Role enforcement: QE or Admin
     auth_header = request.headers.get("authorization")
     user_role = "quality_engineer"
     if auth_header and auth_header.startswith("Bearer "):
@@ -349,7 +343,6 @@ def update_process_baselines(
         "message": f"Successfully persisted {updated_count} baselines and operational limits for machine {mach.code}."
     }
 
-
 @router.get(
     "/process/changed-vs-unchanged",
     tags=["Process Monitoring"],
@@ -391,12 +384,10 @@ async def upload_process_telemetry(
     if df.empty or len(df) == 0:
         raise HTTPException(status_code=400, detail="Uploaded process telemetry file contains no data rows.")
 
-    # 1. Validate Batch Existence
     b_obj = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
     if not b_obj:
         raise HTTPException(status_code=404, detail=f"Batch '{batch_id}' not found in manufacturing system.")
 
-    # 2. Validate Batch / Machine Association
     m_id = "mach-04" if machine_id in ["CNC-04", "mach-04"] else machine_id
     batch_mach = b_obj.machine.code if b_obj.machine else b_obj.machine_id
     if machine_id and batch_mach and machine_id not in [b_obj.machine_id, batch_mach]:
@@ -408,7 +399,6 @@ async def upload_process_telemetry(
     records = df.to_dict(orient="records")
     cleaned_records, warnings = anomaly_detector.validate_and_clean_telemetry(records)
 
-    # 3. Save Process Readings to Database (avoid unintended duplicate readings)
     existing_ts = set(
         r[0] for r in db.query(ProcessReading.ts).filter(ProcessReading.batch_id == b_obj.id).all()
     )
@@ -443,7 +433,6 @@ async def upload_process_telemetry(
     if duplicate_readings_count > 0:
         warnings.append(f"{duplicate_readings_count} duplicate timestamp readings already existed in database and were safely deduplicated.")
 
-    # 4. Execute Multi-Parameter Anomaly Analysis
     analysis = anomaly_detector.analyze_telemetry_series(
         batch_id=batch_id,
         machine_code=machine_id,
@@ -456,7 +445,6 @@ async def upload_process_telemetry(
         a["batch_id"] = batch_id
         a["machine_id"] = machine_id
 
-    # 5. Persist Detected Anomalies into Database (deduplicate against existing anomalies)
     if anomalies_list:
         existing_anom_keys = set(
             (a.parameter, a.ts, a.type)

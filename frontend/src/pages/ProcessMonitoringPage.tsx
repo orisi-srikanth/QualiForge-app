@@ -27,7 +27,6 @@ export const ProcessMonitoringPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load available batches on mount
   useEffect(() => {
     api.getBatches().then((bList) => {
       setBatches(bList || []);
@@ -70,7 +69,6 @@ export const ProcessMonitoringPage: React.FC = () => {
     }
   }, [selectedMachine, selectedBatch]);
 
-  // Filter data points by time range if requested
   const filteredDataPoints = React.useMemo(() => {
     if (timeFilter === "early") return dataPoints.slice(0, Math.floor(dataPoints.length / 2));
     if (timeFilter === "late") return dataPoints.slice(Math.floor(dataPoints.length / 2));
@@ -104,7 +102,7 @@ export const ProcessMonitoringPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Title & Filter Header */}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-[26px] font-bold text-slate-900 leading-tight">Process Monitoring</h2>
@@ -113,9 +111,8 @@ export const ProcessMonitoringPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Unified Filter Controls Bar - Perfectly Aligned */}
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap bg-white border border-slate-200 rounded-xl p-2 shadow-2xs">
-          {/* Machine Filter */}
+
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
             <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">Machine:</span>
             <select
@@ -130,7 +127,6 @@ export const ProcessMonitoringPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Batch Filter */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
             <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">Batch:</span>
             <select
@@ -150,7 +146,6 @@ export const ProcessMonitoringPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Time Range Filter */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
             <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">Time Window:</span>
             <select
@@ -164,7 +159,6 @@ export const ProcessMonitoringPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Refresh Action */}
           <button
             onClick={loadData}
             title="Refresh Telemetry Stream"
@@ -175,7 +169,6 @@ export const ProcessMonitoringPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Warnings Banner with Summarized Notice and Small Typography */}
       {warnings.length > 0 && (
         <div className="px-3.5 py-2 bg-amber-50/90 border border-amber-200 rounded-lg text-amber-900 text-xs flex items-center justify-between shadow-2xs font-sans">
           <div className="flex items-center gap-2">
@@ -201,7 +194,6 @@ export const ProcessMonitoringPage: React.FC = () => {
         </div>
       )}
 
-      {/* If No Data Points, Render Clean Empty State */}
       {filteredDataPoints.length === 0 ? (
         <div className="p-12 text-center bg-white border border-slate-200 rounded-xl space-y-3 shadow-xs">
           <Activity className="w-10 h-10 text-slate-400 mx-auto" />
@@ -212,7 +204,7 @@ export const ProcessMonitoringPage: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Operational Condition Callout Banner */}
+
       {isAnomalous ? (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3.5 shadow-2xs">
           <div className="p-2 bg-rose-100 text-rose-700 rounded-lg shrink-0 mt-0.5">
@@ -246,9 +238,8 @@ export const ProcessMonitoringPage: React.FC = () => {
         </div>
       )}
 
-      {/* 5 Core Parameter Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {/* 1. Vibration */}
+
         <div className={`p-4 bg-white border rounded-xl shadow-xs ${isAnomalous ? "border-rose-200 bg-rose-50/20" : "border-slate-200"}`}>
           <span className="text-xs text-slate-500 font-semibold block uppercase tracking-wider">1. Vibration</span>
           <span className={`text-2xl font-bold font-mono ${isAnomalous ? "text-rose-700" : "text-slate-900"}`}>
@@ -259,7 +250,6 @@ export const ProcessMonitoringPage: React.FC = () => {
           </span>
         </div>
 
-        {/* 2. Tool Cycles */}
         <div className={`p-4 bg-white border rounded-xl shadow-xs ${isAnomalous ? "border-rose-200 bg-rose-50/20" : "border-slate-200"}`}>
           <span className="text-xs text-slate-500 font-semibold block uppercase tracking-wider">2. Tool Usage</span>
           <span className={`text-2xl font-bold font-mono ${isAnomalous ? "text-rose-700" : "text-slate-900"}`}>
@@ -270,7 +260,6 @@ export const ProcessMonitoringPage: React.FC = () => {
           </span>
         </div>
 
-        {/* 3. Coolant Temperature */}
         <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
           <span className="text-xs text-slate-500 font-semibold block uppercase tracking-wider">3. Coolant Temp</span>
           <span className="text-2xl font-bold font-mono text-slate-900">
@@ -281,7 +270,6 @@ export const ProcessMonitoringPage: React.FC = () => {
           </span>
         </div>
 
-        {/* 4. Spindle Speed */}
         <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
           <span className="text-xs text-slate-500 font-semibold block uppercase tracking-wider">4. Spindle Speed</span>
           <span className="text-2xl font-bold font-mono text-slate-900">
@@ -292,7 +280,6 @@ export const ProcessMonitoringPage: React.FC = () => {
           </span>
         </div>
 
-        {/* 5. Feed Rate */}
         <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
           <span className="text-xs text-slate-500 font-semibold block uppercase tracking-wider">5. Feed Rate</span>
           <span className="text-2xl font-bold font-mono text-slate-900">
@@ -304,7 +291,6 @@ export const ProcessMonitoringPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 5 Parameter Interactive Trend Charts */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900">
@@ -316,7 +302,7 @@ export const ProcessMonitoringPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Chart 1: Vibration vs Trip Threshold */}
+
           <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -355,7 +341,6 @@ export const ProcessMonitoringPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Chart 2: Tool Usage Cycles vs Lockout */}
           <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -394,7 +379,6 @@ export const ProcessMonitoringPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Chart 3: Coolant Temperature */}
           <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -432,7 +416,6 @@ export const ProcessMonitoringPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Chart 4: Spindle Speed */}
           <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -471,7 +454,6 @@ export const ProcessMonitoringPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Chart 5: Feed Rate (Full Width or 5th Grid Item) */}
           <div className="lg:col-span-2 p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -512,7 +494,6 @@ export const ProcessMonitoringPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Changed vs Unchanged Parameters Table */}
       <div className="table-container">
         <div className="card-header-enterprise">
           <div>
@@ -575,7 +556,6 @@ export const ProcessMonitoringPage: React.FC = () => {
         </table>
       </div>
 
-      {/* Abnormal Conditions / Anomalies Registry Table */}
       <div className="table-container">
         <div className="card-header-enterprise">
           <div>

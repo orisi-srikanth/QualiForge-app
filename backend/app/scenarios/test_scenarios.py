@@ -1,8 +1,3 @@
-"""
-Comprehensive Test Suite for the 8 Mandated Evaluation Scenarios (TC-01 to TC-08)
-Executes each scenario end-to-end, documents inputs, initial state, actual outputs,
-agents involved, ML models invoked, evidence, and pass/fail validation.
-"""
 import os
 from typing import Dict, Any, List
 from backend.app.orchestrator.engine import orchestrator
@@ -33,7 +28,6 @@ def run_test_scenario(scenario_id: str) -> Dict[str, Any]:
     return fn()
 
 def _run_tc01() -> Dict[str, Any]:
-    # TC-01: All measurements within specification -> Batch shows no dimensional nonconformance
     conforming_measurements = [
         {"sample_id": "P001", "measured_value": 50.00},
         {"sample_id": "P002", "measured_value": 50.01},
@@ -63,13 +57,12 @@ def _run_tc01() -> Dict[str, Any]:
     }
 
 def _run_tc02() -> Dict[str, Any]:
-    # TC-02: Measurement exceeds USL -> Component flagged as nonconforming
     measurements = [
         {"sample_id": "P001", "measured_value": 50.01},
         {"sample_id": "P002", "measured_value": 50.03},
         {"sample_id": "P003", "measured_value": 50.06},
-        {"sample_id": "P004", "measured_value": 50.08}, # Exceeds USL
-        {"sample_id": "P005", "measured_value": 50.07}, # Exceeds USL
+        {"sample_id": "P004", "measured_value": 50.08},
+        {"sample_id": "P005", "measured_value": 50.07},
     ]
     res = compliance_agent.evaluate_compliance(
         batch_id="BATCH-TC02",
@@ -95,7 +88,6 @@ def _run_tc02() -> Dict[str, Any]:
     }
 
 def _run_tc03() -> Dict[str, Any]:
-    # TC-03: Defect image supplied -> Vision model identifies/localizes supported defect
     sample_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static", "uploads", "samples", "IMG-001.png"))
     if not os.path.exists(sample_path):
         sample_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static", "uploads", "samples", "metal_nut_scratch.png"))
@@ -118,9 +110,7 @@ def _run_tc03() -> Dict[str, Any]:
         "status": "PASS" if passed else "FAIL"
     }
 
-
 def _run_tc04() -> Dict[str, Any]:
-    # TC-04: Machine vibration suddenly increases -> Process anomaly detected
     telemetry = [
         {"timestamp": "02:00", "machine_vibration_mms": 2.1, "tool_usage_cycles": 600, "coolant_temperature_c": 24.0, "spindle_speed_rpm": 1200.0, "feed_rate_mmrev": 0.20, "motor_current_a": 14.5, "cycle_time_s": 45.0},
         {"timestamp": "02:10", "machine_vibration_mms": 2.2, "tool_usage_cycles": 620, "coolant_temperature_c": 24.1, "spindle_speed_rpm": 1200.0, "feed_rate_mmrev": 0.20, "motor_current_a": 14.6, "cycle_time_s": 45.0},
@@ -147,8 +137,7 @@ def _run_tc04() -> Dict[str, Any]:
     }
 
 def _run_tc05() -> Dict[str, Any]:
-    # TC-05: Measurements gradually move toward USL -> Process drift identified
-    drift_data = [50.00, 50.01, 50.02, 50.03, 50.04, 50.06, 50.07, 50.08] # 6+ consecutive points increasing
+    drift_data = [50.00, 50.01, 50.02, 50.03, 50.04, 50.06, 50.07, 50.08]
     res = spc_agent.analyze_process_capability_and_control(
         batch_id="BATCH-TC05",
         values=drift_data,
@@ -173,7 +162,6 @@ def _run_tc05() -> Dict[str, Any]:
     }
 
 def _run_tc06() -> Dict[str, Any]:
-    # TC-06: Similar previous NCR exists -> Relevant historical incident retrieved
     query = "Oversized shaft diameter tool wear CNC-04 1150 cycles"
     matches = vector_store.search(query=query, top_k=2)
     top_match = matches[0] if matches else {}
@@ -192,7 +180,6 @@ def _run_tc06() -> Dict[str, Any]:
     }
 
 def _run_tc07() -> Dict[str, Any]:
-    # TC-07: Multiple potential causes exist -> RCA provides evidence-ranked hypotheses
     res = rca_agent.analyze_incident(
         incident_id="INC-TC07",
         batch_id="BATCH-TC07",
@@ -219,7 +206,6 @@ def _run_tc07() -> Dict[str, Any]:
     }
 
 def _run_tc08() -> Dict[str, Any]:
-    # TC-08: Corrective action completed -> Subsequent production used for effectiveness monitoring
     from backend.app.services.effectiveness import effectiveness_engine
     eff = effectiveness_engine.evaluate_capa_effectiveness("CAPA-2026-001")
     

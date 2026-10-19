@@ -1,15 +1,3 @@
-"""
-Test Suite for Agent 7 (CAPA) Groq LLM Integration
-Verifies:
-  1. Valid structured CAPA output with Groq client (mocked).
-  2. All actions forced to PENDING status requiring Quality Engineer authorization.
-  3. Action validation with ActionItem Pydantic schema.
-  4. Missing GROQ_API_KEY handling and safe fallback.
-  5. Malformed JSON with single-retry recovery.
-  6. Retry limit exhaustion and fallback.
-  7. Timeout, rate limit, and API error handling.
-  8. Zero autonomous machine control actions permitted.
-"""
 import os
 import json
 import pytest
@@ -23,13 +11,11 @@ from backend.app.agents.capa_agent import (
 )
 from backend.app.schemas.schemas import ActionStatus, ActionItem
 
-
 @pytest.fixture(autouse=True)
 def cleanup_groq():
     reset_groq_client()
     yield
     reset_groq_client()
-
 
 def create_mock_completion(content: str):
     choice = MagicMock()
@@ -37,7 +23,6 @@ def create_mock_completion(content: str):
     completion = MagicMock()
     completion.choices = [choice]
     return completion
-
 
 @pytest.fixture
 def sample_rca_dict():
@@ -55,7 +40,6 @@ def sample_rca_dict():
             }
         ]
     }
-
 
 def test_01_valid_groq_capa_drafting(sample_rca_dict):
     valid_capa_json = json.dumps({
@@ -125,9 +109,7 @@ def test_01_valid_groq_capa_drafting(sample_rca_dict):
     assert len(parsed["corrective_actions"]) == 1
     assert len(parsed["preventive_actions"]) == 1
 
-
 def test_02_groq_actions_enforce_pending_status(sample_rca_dict):
-    """Even if model returns status=APPROVED, Agent 7 enforces PENDING."""
     capa_json = json.dumps({
         "containment_actions": [
             {
@@ -136,7 +118,7 @@ def test_02_groq_actions_enforce_pending_status(sample_rca_dict):
                 "description": "Hold batch.",
                 "assigned_role": "Inspector",
                 "due_date": "2026-10-15",
-                "status": "APPROVED",  # Model attempts to auto-approve!
+                "status": "APPROVED",
                 "evidence_required": "Tag photo."
             }
         ],
@@ -156,9 +138,7 @@ def test_02_groq_actions_enforce_pending_status(sample_rca_dict):
     )
 
     assert res["success"] is True
-    # Verify status was overridden to PENDING
     assert res["parsed_data"]["containment_actions"][0]["status"] == ActionStatus.PENDING
-
 
 def test_03_missing_api_key_fallback(sample_rca_dict):
     with patch.dict(os.environ, {"GROQ_API_KEY": ""}, clear=False):
@@ -176,7 +156,6 @@ def test_03_missing_api_key_fallback(sample_rca_dict):
             assert res["success"] is False
             assert res["fallback_used"] is True
             assert res["llm_metadata"]["status"] == "UNCONFIGURED_FALLBACK"
-
 
 def test_04_malformed_json_retry_recovery(sample_rca_dict):
     malformed = '{"containment_actions": [{"id": incomplete...'
@@ -214,7 +193,6 @@ def test_04_malformed_json_retry_recovery(sample_rca_dict):
     assert res["success"] is True
     assert res["llm_metadata"]["attempts"] == 2
 
-
 def test_05_retry_limit_exhaustion(sample_rca_dict):
     broken = "Not JSON at all"
     mock_client = MagicMock()
@@ -228,12 +206,10 @@ def test_05_retry_limit_exhaustion(sample_rca_dict):
         client=mock_client
     )
 
-    # Strictly 2 attempts (initial + 1 retry)
     assert mock_client.chat.completions.create.call_count == 2
     assert res["success"] is False
     assert res["fallback_used"] is True
     assert res["llm_metadata"]["status"] == "VALIDATION_FAILED"
-
 
 def test_06_generate_capa_plan_with_groq(sample_rca_dict):
     valid_json = json.dumps({

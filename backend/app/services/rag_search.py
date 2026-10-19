@@ -1,9 +1,3 @@
-"""
-High-Performance Semantic Vector Store and RAG Retrieval System for QualityMind
-Indexes all technical KB documents and historical NCRs with unified MVTec AD metadata.
-Metadata filters: doc_type, part_number, machine, defect_type, defect_family, proxy_category, provenance.
-Strictly frames matches as historical context, never as proven causation.
-"""
 import os
 import re
 import json
@@ -25,10 +19,8 @@ class ManufacturingVectorStore:
         self.rebuild_index()
 
     def rebuild_index(self):
-        """Loads and indexes all documents from kb/ and historical_ncrs.json with rich metadata."""
         self.documents.clear()
 
-        # 1. Ingest Markdown documents from data/kb
         if self.kb_dir.exists():
             for fname in sorted(os.listdir(self.kb_dir)):
                 if fname.endswith(".md"):
@@ -42,7 +34,6 @@ class ManufacturingVectorStore:
                     except Exception as e:
                         print(f"[VectorStore] Error parsing {fname}: {e}")
 
-        # 2. Ingest structured Historical NCRs
         if self.ncrs_json.exists():
             try:
                 with open(self.ncrs_json, "r", encoding="utf-8") as f:
@@ -76,11 +67,9 @@ class ManufacturingVectorStore:
         self._build_matrix()
 
     def _parse_markdown_doc(self, text: str, fname: str) -> Optional[Dict[str, Any]]:
-        # Extract title
         title_m = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
         title = title_m.group(1).strip() if title_m else fname
 
-        # Extract fields
         rec_id = fname.replace(".md", "")
         if "NCR-" in fname:
             rec_id_m = re.search(r"NCR-\d+", fname)
@@ -148,16 +137,12 @@ class ManufacturingVectorStore:
         proxy_category: Optional[str] = None,
         doc_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Semantic RAG retrieval with defect_type boosting and context-only framing.
-        """
         if not self.documents or self.matrix is None:
             return []
 
         query_vec = self.vectorizer.transform([query])
         similarities = cosine_similarity(query_vec, self.matrix)[0]
 
-        # Apply boosting for matching defect_type or proxy_category
         boosted_scores = []
         for idx, doc in enumerate(self.documents):
             score = float(similarities[idx])
@@ -198,5 +183,4 @@ class ManufacturingVectorStore:
         self._save()
         self._build_matrix()
 
-# Global singleton
 vector_store = ManufacturingVectorStore()

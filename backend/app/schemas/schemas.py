@@ -1,7 +1,3 @@
-"""
-Domain Pydantic Schemas for Agentic AI Manufacturing Quality System
-Strictly enforces the 5 Safety / Certainty Levels required for industrial decision-support.
-"""
 from enum import Enum
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
@@ -28,7 +24,6 @@ class ActionStatus(str, Enum):
     COMPLETED = "COMPLETED"
     VERIFIED = "VERIFIED"
 
-# --- Product & Specification ---
 class ProductSpec(BaseModel):
     product_id: str = "PROD-PS-101"
     name: str = "Precision Shaft"
@@ -44,7 +39,6 @@ class ProductSpec(BaseModel):
     lsl: float = 49.95
     inspection_frequency: str = "100% or 5-sample continuous sub-group"
 
-# --- Production Batch ---
 class ProductionBatch(BaseModel):
     batch_id: str = "BATCH-0245"
     product_id: str = "PROD-PS-101"
@@ -59,7 +53,6 @@ class ProductionBatch(BaseModel):
     status: BatchStatus = BatchStatus.QUALITY_HOLD
     operator: str = "J. Smith (OP-44)"
 
-# --- Agent 1: Data Intake Output Contract (Requirement 3) ---
 class UnitConversionRecord(BaseModel):
     sample_id: str
     original_value: float
@@ -88,7 +81,6 @@ class DataIntakeOutput(BaseModel):
     llm_interpretation: Optional[Dict[str, Any]] = None
     candidate_metadata: Optional[Dict[str, Any]] = None
 
-# --- Inspection Measurement ---
 class MeasurementItem(BaseModel):
     sample_id: str
     measured_value: float
@@ -121,7 +113,6 @@ class InspectionReport(BaseModel):
 
 from pydantic import BaseModel, Field, model_validator
 
-# --- Visual Inspection ---
 class BoundingBox(BaseModel):
     x: int
     y: int
@@ -210,7 +201,6 @@ class VisualDefectPrediction(BaseModel):
                 data["review_status"] = "HUMAN_REVIEW_REQUIRED" if data.get("defect_detected") else "CONFORMING_VERIFIED"
         return data
 
-# --- Process Monitoring & Telemetry ---
 class TelemetryDataPoint(BaseModel):
     timestamp: str
     spindle_speed_rpm: float
@@ -242,7 +232,6 @@ class ProcessMonitoringReport(BaseModel):
     drift_detected: bool
     certainty: CertaintyLevel = CertaintyLevel.STATISTICAL_FINDING
 
-# --- SPC (Statistical Process Control) ---
 class NelsonRuleViolation(BaseModel):
     rule_number: int
     rule_name: str
@@ -255,21 +244,21 @@ class SPCReport(BaseModel):
     sample_size: int
     mean: Optional[float] = None
     std_dev: Optional[float] = None
-    ucl: Optional[float] = None  # Statistical Upper Control Limit (Mean + 3 sigma)
-    lcl: Optional[float] = None  # Statistical Lower Control Limit (Mean - 3 sigma)
-    cl: Optional[float] = None   # Center Line (Mean)
+    ucl: Optional[float] = None
+    lcl: Optional[float] = None
+    cl: Optional[float] = None
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     range_value: Optional[float] = None
     chart_type: str = "I-MR"
     review_status: str = "HUMAN_REVIEW_REQUIRED"
     autonomous_actions_prohibited: bool = True
-    usl: Optional[float] = None  # Engineering Upper Specification Limit
-    lsl: Optional[float] = None  # Engineering Lower Specification Limit
-    cp: Optional[float] = None   # Capability index Cp = (USL - LSL) / (6 * sigma)
-    cpk: Optional[float] = None  # Process capability Cpk = min((USL - mean)/(3*sigma), (mean - LSL)/(3*sigma))
-    pp: Optional[float] = None   # Performance Pp
-    ppk: Optional[float] = None  # Performance Ppk
+    usl: Optional[float] = None
+    lsl: Optional[float] = None
+    cp: Optional[float] = None
+    cpk: Optional[float] = None
+    pp: Optional[float] = None
+    ppk: Optional[float] = None
     capability_assessment: str
     chart_data: List[Dict[str, Any]]
     nelson_violations: List[NelsonRuleViolation]
@@ -335,13 +324,12 @@ class CapabilityResponse(BaseModel):
     future_guarantee_disclaimer: str
     label: str = "[STATISTICAL_FINDING]"
 
-# --- RCA (Root Cause Analysis) ---
 class HypothesisEvidence(BaseModel):
     hypothesis_id: str
     rank: int = 1
     title: str
     description: str
-    category: str  # Machine, Method, Material, Manpower, Measurement, Milieu (6M)
+    category: str
     confidence_score: float
     evidence_score: Optional[float] = None
     score_breakdown: Optional[Dict[str, Any]] = None
@@ -383,7 +371,7 @@ class HistoricalIncident(BaseModel):
     disclaimer: str = "Historical context only. Previous incident similarity does not establish current root cause."
 
 class HypothesisActionRequest(BaseModel):
-    decision: str  # CONFIRM, REJECT, COMMENT, REQUEST_REANALYSIS
+    decision: str
     comment: Optional[str] = None
 
 class RCARequest(BaseModel):
@@ -426,10 +414,9 @@ class RCAReport(BaseModel):
     certainty: CertaintyLevel = CertaintyLevel.HYPOTHESIS
     llm_metadata: Optional[Dict[str, Any]] = None
 
-# --- CAPA (Corrective and Preventive Action) ---
 class ActionItem(BaseModel):
     action_id: str
-    type: str  # Immediate Containment, Potential Corrective Action, Preventive Action
+    type: str
     description: str
     assigned_role: str
     due_date: str
@@ -457,26 +444,23 @@ class CAPAReport(BaseModel):
     effectiveness_result: Optional[str] = None
     llm_metadata: Optional[Dict[str, Any]] = None
 
-# --- Quality Reviewer / Critic ---
 class CriticReview(BaseModel):
     verified_spec_references: bool
     validated_calculations: bool
     cv_predictions_verified: bool
     unsupported_causal_claims_detected: bool
     review_comments: List[str]
-    critic_verdict: str  # APPROVED, CONDITIONAL_APPROVAL, REASSESSMENT_REQUIRED
+    critic_verdict: str
     certainty: CertaintyLevel = CertaintyLevel.STATISTICAL_FINDING
 
-# --- Human Approval ---
 class HumanApprovalRequest(BaseModel):
     approved_by: str
-    decision: str  # ACCEPT_FINDINGS, REJECT_FINDINGS, REQUEST_REASSESSMENT
+    decision: str
     engineering_comments: str
     confirmed_root_cause: Optional[str] = None
     approved_capa_ids: List[str] = []
-    disposition: str  # QUARANTINE_BATCH, REWORK_WINDOW, SCRAP, RELEASE_WITH_DEVIATION
+    disposition: str
 
-# --- Full Agent Execution State ---
 class AgentStepLog(BaseModel):
     step_number: int
     agent_name: str
@@ -488,7 +472,6 @@ class AgentStepLog(BaseModel):
     duration_ms: int
     timestamp: str
 
-# --- RAG Knowledge Base Schemas ---
 class KnowledgeStatusResponse(BaseModel):
     status: str
     collection_name: str

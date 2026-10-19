@@ -1,24 +1,7 @@
-"""
-Independent Verification & Validation Audit Script: Real-Data Migration & Computer Vision
-Module: scripts/audit/verify_real_data_and_cv.py
-
-AUDIT MANDATE:
-Evaluates:
-- 2.1 Synthetic-image purge scan across codebase
-- 2.3 Split and leakage audit: SHA-256 collision check across train/val/test splits (ZERO leakage)
-      Verifies PatchCore memory bank uses ONLY train/good
-      Verifies threshold calibration uses ONLY held-out good validation images
-- 2.4 ONNX vs PyTorch logit parity (max abs diff < 1e-3)
-      CPU latency benchmark per image (< 2.0 s)
-      Agent 2 output JSON shape and contract (uncertain, out_of_domain, skipped)
-      IMG-001 held-out test provenance verification
-      CV Model card disclosures and citations
-"""
 import os
 import sys
 from pathlib import Path
 
-# Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -36,12 +19,8 @@ def banner(title: str):
 
 results = {}
 
-# -----------------------------------------------------------------------------
-# 2.1 SYNTHETIC-IMAGE PURGE SCAN
-# -----------------------------------------------------------------------------
 banner("2.1 Synthetic-Image Purge Scan")
 
-# Scan disk for any synthetic images or old generator files
 suspicious_patterns = ["sample_crack.jpg", "sample_dent.jpg"]
 found_stale_files = []
 
@@ -59,9 +38,6 @@ assert len(found_stale_files) == 0, f"Found stale synthetic images: {found_stale
 print("PASS: Zero legacy synthetic image files found on disk.")
 results["2.1_synthetic_purge"] = "PASS"
 
-# -----------------------------------------------------------------------------
-# 2.3 SPLIT INTEGRITY & LEAKAGE AUDIT (SHA-256 Collision Check)
-# -----------------------------------------------------------------------------
 banner("2.3 Split Integrity & Leakage Audit")
 
 SPLITS_PATH = Path("data/splits.json")
@@ -70,7 +46,6 @@ assert SPLITS_PATH.exists(), f"Splits file {SPLITS_PATH} missing!"
 with open(SPLITS_PATH, "r", encoding="utf-8") as f:
     splits_data = json.load(f)
 
-# Collect all image file paths per split
 train_paths = [x["path"] if isinstance(x, dict) else x for x in splits_data.get("train", [])]
 val_paths = [x["path"] if isinstance(x, dict) else x for x in splits_data.get("val", [])]
 test_paths = [x["path"] if isinstance(x, dict) else x for x in splits_data.get("test", [])]
@@ -78,7 +53,6 @@ test_paths = [x["path"] if isinstance(x, dict) else x for x in splits_data.get("
 print(f"Split counts -> Train: {len(train_paths)}, Val: {len(val_paths)}, Test: {len(test_paths)}")
 assert len(train_paths) > 0 and len(val_paths) > 0 and len(test_paths) > 0, "Empty splits detected!"
 
-# Verify set intersection of paths is completely empty
 train_set = set(train_paths)
 val_set = set(val_paths)
 test_set = set(test_paths)
@@ -92,7 +66,6 @@ assert len(path_leak_train_test) == 0, f"Path leakage train/test: {len(path_leak
 assert len(path_leak_val_test) == 0, f"Path leakage val/test: {len(path_leak_val_test)}"
 print("PASS: Path-level split isolation confirmed (0 path collisions).")
 
-# SHA-256 Content Hash Collision Check (Sample verification)
 def compute_sha256(filepath: str) -> str:
     h = hashlib.sha256()
     with open(filepath, "rb") as f:
@@ -104,7 +77,6 @@ train_hashes = {}
 val_hashes = {}
 test_hashes = {}
 
-# Check existing files
 sample_check_limit = 100
 for p in train_paths[:sample_check_limit]:
     if os.path.exists(p):
@@ -127,7 +99,6 @@ assert len(hash_leak_train_test) == 0, f"Content hash collision train/test: {len
 assert len(hash_leak_val_test) == 0, f"Content hash collision val/test: {len(hash_leak_val_test)}"
 print(f"PASS: SHA-256 cryptographic hash collision check confirmed zero leakage across splits.")
 
-# Verify PatchCore Memory Bank composition
 banks_path = Path("backend/models/patchcore_banks.pt")
 if banks_path.exists():
     import torch
@@ -138,7 +109,6 @@ if banks_path.exists():
         print(f"  Category '{cat}' memory bank vectors: {bank.shape}")
     print("PASS: PatchCore anomaly memory banks contain valid embedded normal feature vectors.")
 
-# Verify Calibration Thresholds
 thresh_path = Path("backend/models/thresholds.json")
 assert thresh_path.exists(), "thresholds.json missing"
 with open(thresh_path, "r", encoding="utf-8") as f:
@@ -151,9 +121,6 @@ print("PASS: Threshold calibration present for all 4 approved categories.")
 
 results["2.3_split_leakage"] = "PASS"
 
-# -----------------------------------------------------------------------------
-# 2.4 ONNX VS PYTORCH PARITY & INFERENCE BENCHMARK
-# -----------------------------------------------------------------------------
 banner("2.4 ONNX vs PyTorch Parity, Latency & Agent 2 Contract")
 
 onnx_path = Path("backend/models/cv_model.onnx")
@@ -186,16 +153,13 @@ class DefectClassifier(nn.Module):
         x = torch.flatten(x, 1)
         return self.classifier(x)
 
-# Load PyTorch Model
 pt_model = DefectClassifier(num_classes=8)
 pt_state = torch.load(pt_path, map_location="cpu", weights_only=True)
 pt_model.load_state_dict(pt_state)
 pt_model.eval()
 
-# Load ONNX Session
 ort_session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
 
-# Test deterministic synthetic dummy tensor parity
 dummy_input = np.random.RandomState(42).randn(1, 3, 224, 224).astype(np.float32)
 
 with torch.no_grad():
@@ -209,7 +173,6 @@ print(f"PyTorch vs ONNX Max Abs Logit Difference: {max_abs_diff:.6e}")
 assert max_abs_diff < 1e-3, f"ONNX parity violation: {max_abs_diff} >= 1e-3"
 print("PASS: ONNX vs PyTorch logit parity strictly within 1e-3.")
 
-# CPU Latency Benchmark (10 iterations)
 times = []
 for _ in range(10):
     t0 = time.perf_counter()
@@ -221,7 +184,6 @@ print(f"ONNX CPU Inference Latency per image: {mean_latency_ms:.2f} ms (Target: 
 assert mean_latency_ms < 2000.0, f"Inference latency too high: {mean_latency_ms} ms"
 print("PASS: CPU Latency target satisfied.")
 
-# Verify Agent 2 JSON Output Shape & Contract
 from backend.app.cv_model.defect_detector import vision_model
 
 img001_path = Path("backend/app/static/uploads/samples/IMG-001.png")
@@ -230,9 +192,6 @@ assert img001_path.exists(), "IMG-001.png missing in static samples!"
 res_img001 = vision_model.inspect_image(str(img001_path), category="metal_nut")
 print(f"IMG-001 Inspection Result: {json.dumps(res_img001, indent=2)}")
 
-# Verify required keys in Agent 2 contract:
-# image_id, source "MVTec AD (proxy part)", category, defect_detected, anomaly_score,
-# defect_type, raw_class, confidence, location, bbox, model_version, label MODEL_PREDICTION
 expected_keys = [
     "source", "category", "defect_detected", "anomaly_score",
     "defect_type", "confidence", "location", "bbox", "model_version", "label"
@@ -245,8 +204,6 @@ assert res_img001["label"] == "MODEL_PREDICTION", "Label must be MODEL_PREDICTIO
 assert res_img001["defect_detected"] is True, "IMG-001 (scratch) must be detected as defect"
 print("PASS: Agent 2 output schema and contract validated on IMG-001.")
 
-# Test Contract: Non-MVTec Image -> out_of_domain
-# Create a blank noise image temporarily
 import tempfile
 from PIL import Image
 
@@ -262,7 +219,6 @@ finally:
     if os.path.exists(tmp_path):
         os.remove(tmp_path)
 
-# Verify Model Card Exists and Discloses Proxy Parts and CC BY-NC-SA 4.0
 card_path = Path("docs/cv_model_card.md")
 assert card_path.exists(), "docs/cv_model_card.md missing!"
 with open(card_path, "r", encoding="utf-8") as f:
@@ -275,9 +231,6 @@ print("PASS: CV Model Card contains mandatory proxy disclosures and academic cit
 
 results["2.4_cv_evaluation"] = "PASS"
 
-# -----------------------------------------------------------------------------
-# SUMMARY
-# -----------------------------------------------------------------------------
 banner("OVERALL REAL-DATA & CV VERIFICATION SUMMARY")
 all_passed = all(v == "PASS" for v in results.values())
 for k, v in results.items():

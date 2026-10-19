@@ -1,17 +1,3 @@
-"""
-Test Suite for Functional Requirement 16: Quality Dashboard
-Verifies:
-1. Ten required items returned with explicit definitions
-2. Independent SQL recomputation matches API for full dataset and filtered range
-3. Rates sum to 100% and accepted + nonconforming == inspected
-4. No hardcoded data; accurate data sources
-5. Date range filtering (partial range, single day, empty range, reversed range 400, invalid date 422)
-6. Live behavior on data insertion/mutation
-7. Cross-page API consistency (Pareto, Process Monitoring, SPC, CAPA, Incidents)
-8. Epistemic wording, disclaimers, and human decision-support notices
-9. RBAC: unauthenticated gets 401, all roles (operator, QE, admin) get 200
-10. Query performance & robustness (< 100ms)
-"""
 import pytest
 import sqlite3
 import time
@@ -52,80 +38,55 @@ def operator_headers(operator_token):
 def admin_headers(admin_token):
     return {"Authorization": f"Bearer {admin_token}"}
 
-
-# ---------------------------------------------------------------------------
-# CHECK 1 & 3: Ten Required Items Present & Data Sources
-# ---------------------------------------------------------------------------
 def test_ten_dashboard_items_present_and_defined(client, qe_headers):
-    """Confirm the dashboard API returns all 10 items, each with clear data structures."""
     res = client.get("/api/dashboard/summary", headers=qe_headers)
     assert res.status_code == 200
     data = res.json()
 
-    # 1. Production Batches
     assert "production_batches" in data
     assert "total_count" in data["production_batches"]
     assert "status_split" in data["production_batches"]
     assert isinstance(data["production_batches"]["status_split"], dict)
 
-    # 2. Inspection Quantity
     assert "inspection_quantity" in data
     assert "total_inspected_parts" in data["inspection_quantity"]
     assert "accepted_parts" in data["inspection_quantity"]
     assert "nonconforming_parts" in data["inspection_quantity"]
 
-    # 3. Acceptance Rate
     assert "acceptance_rate_percent" in data
     assert isinstance(data["acceptance_rate_percent"], (int, float))
 
-    # 4. Rejection Rate
     assert "rejection_rate_percent" in data
     assert isinstance(data["rejection_rate_percent"], (int, float))
 
-    # 5. Active Quality Incidents
     assert "active_quality_incidents" in data
     assert isinstance(data["active_quality_incidents"], int)
 
-    # 6. Top Defect Categories
     assert "top_defect_categories" in data
     assert isinstance(data["top_defect_categories"], list)
 
-    # 7. Machine Anomalies
     assert "machine_anomalies_detected" in data
     assert isinstance(data["machine_anomalies_detected"], int)
 
-    # 8. Open CAPAs
     assert "open_capas" in data
     assert isinstance(data["open_capas"], int)
 
-    # 9. Overdue CAPAs
     assert "overdue_capas" in data
     assert isinstance(data["overdue_capas"], int)
 
-    # 10. Process-Control Status
     assert "process_control_status" in data
     assert "status" in data["process_control_status"]
     assert "reason" in data["process_control_status"]
     assert "notice" in data["process_control_status"]
 
-
-# ---------------------------------------------------------------------------
-# CHECK 2: Independent SQL Recomputation
-# ---------------------------------------------------------------------------
 def test_independent_sql_recomputation_full_and_filtered(client, qe_headers):
-    """
-    Write SQL directly on the SQLite tables without application code,
-    and compare side-by-side with API responses.
-    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # --- A. Full Dataset Recomputation ---
     res_full = client.get("/api/dashboard/summary", headers=qe_headers)
     assert res_full.status_code == 200
     app_full = res_full.json()
 
-    # 1. Batches
     c.execute("SELECT count(*) FROM batches")
     sql_batches_count = c.fetchone()[0]
     c.execute("SELECT status, count(*) FROM batches GROUP BY status")
@@ -133,7 +94,6 @@ def test_independent_sql_recomputation_full_and_filtered(client, qe_headers):
     assert app_full["production_batches"]["total_count"] == sql_batches_count
     assert app_full["production_batches"]["status_split"] == sql_batches_split
 
-    # 2, 3, 4. Inspection Quantity & Rates
     c.execute("SELECT count(*) FROM measurements")
     sql_inspected = c.fetchone()[0]
     c.execute("SELECT count(*) FROM measurements WHERE status IN ('conforming', 'rejected_conforming')")
@@ -152,12 +112,10 @@ def test_independent_sql_recomputation_full_and_filtered(client, qe_headers):
     assert abs(app_full["rejection_rate_percent"] - sql_rej_rate) <= 0.02
     assert round(app_full["acceptance_rate_percent"] + app_full["rejection_rate_percent"], 1) == 100.0
 
-    # 5. Active Incidents
     c.execute("SELECT count(*) FROM quality_incidents WHERE lower(status) != 'closed'")
     sql_active_incidents = c.fetchone()[0]
     assert app_full["active_quality_incidents"] == sql_active_incidents
 
-    # 8 & 9. Open and Overdue CAPAs
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     c.execute("SELECT count(*) FROM capa_actions WHERE status IN ('proposed', 'approved', 'in_progress', 'pending')")
     sql_open_capas = c.fetchone()[0]
@@ -166,7 +124,6 @@ def test_independent_sql_recomputation_full_and_filtered(client, qe_headers):
     assert app_full["open_capas"] == sql_open_capas
     assert app_full["overdue_capas"] == sql_overdue_capas
 
-    # --- B. Filtered Range Recomputation (2026-10-01 to 2026-10-11) ---
     s_date = "2026-10-01"
     e_date = "2026-10-11"
     res_filt = client.get(f"/api/dashboard/summary?start_date={s_date}&end_date={e_date}", headers=qe_headers)
@@ -183,19 +140,12 @@ def test_independent_sql_recomputation_full_and_filtered(client, qe_headers):
 
     conn.close()
 
-
-# ---------------------------------------------------------------------------
-# CHECK 4: Filters (Exclusion, Single Day, Empty, Reversed 400, Invalid 422)
-# ---------------------------------------------------------------------------
 def test_filters_and_boundary_conditions(client, qe_headers):
-    """Test date filters across normal, single day, empty, reversed, and invalid formats."""
-    # 1. Single day filter
     res_day = client.get("/api/dashboard/summary?start_date=2026-10-10&end_date=2026-10-10", headers=qe_headers)
     assert res_day.status_code == 200
     data_day = res_day.json()
     assert data_day["filter_applied"]["is_filtered"] is True
 
-    # 2. Empty range (no records exist)
     res_empty = client.get("/api/dashboard/summary?start_date=2020-01-01&end_date=2020-01-02", headers=qe_headers)
     assert res_empty.status_code == 200
     data_empty = res_empty.json()
@@ -205,39 +155,29 @@ def test_filters_and_boundary_conditions(client, qe_headers):
     assert data_empty["rejection_rate_percent"] == 0.0
     assert data_empty["process_control_status"]["status"] == "NO_DATA"
 
-    # 3. Reversed range -> HTTP 400
     res_rev = client.get("/api/dashboard/summary?start_date=2026-10-15&end_date=2026-10-01", headers=qe_headers)
     assert res_rev.status_code == 400
     assert "Reversed date range" in res_rev.json()["detail"]
 
-    # 4. Invalid date format -> HTTP 422
     res_inv = client.get("/api/dashboard/summary?start_date=invalid-date", headers=qe_headers)
     assert res_inv.status_code == 422
     assert "Invalid start_date format" in res_inv.json()["detail"]
 
-
-# ---------------------------------------------------------------------------
-# CHECK 5: Live Behavior (Add Measurement, Close Incident, Overdue CAPA)
-# ---------------------------------------------------------------------------
 def test_live_behavior_mutations(client, qe_headers):
-    """Verify that numbers change dynamically upon DB insertions/updates."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # 1. Baseline state
     res1 = client.get("/api/dashboard/summary", headers=qe_headers)
     d1 = res1.json()
     base_inspected = d1["inspection_quantity"]["total_inspected_parts"]
     base_overdue = d1["overdue_capas"]
 
-    # Insert a dummy measurement
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     c.execute("""
         INSERT INTO measurements (id, batch_id, characteristic_id, component_id, value, measured_at, status)
         VALUES ('TEST-MEAS-001', 'BATCH-0245', 'char-01', 'P999', 50.01, ?, 'conforming')
     """, (now_str,))
     
-    # Insert a dummy overdue CAPA
     c.execute("""
         INSERT INTO capa_actions (id, incident_id, action_code, type, description, due_date, status, created_at)
         VALUES ('TEST-CAPA-OVERDUE-01', 'inc-ncr-019', 'CAPA-OVERDUE-999', 'corrective', 'Test overdue', '2026-01-01', 'in_progress', ?)
@@ -245,33 +185,24 @@ def test_live_behavior_mutations(client, qe_headers):
     conn.commit()
 
     try:
-        # Check that dashboard dynamically reflects changes
         res2 = client.get("/api/dashboard/summary", headers=qe_headers)
         d2 = res2.json()
         assert d2["inspection_quantity"]["total_inspected_parts"] == base_inspected + 1
         assert d2["overdue_capas"] == base_overdue + 1
     finally:
-        # Clean up
         c.execute("DELETE FROM measurements WHERE id = 'TEST-MEAS-001'")
         c.execute("DELETE FROM capa_actions WHERE id = 'TEST-CAPA-OVERDUE-01'")
         conn.commit()
         conn.close()
 
-
-# ---------------------------------------------------------------------------
-# CHECK 6: Consistency with Other Pages
-# ---------------------------------------------------------------------------
 def test_cross_page_consistency(client, qe_headers):
-    """Cross-check dashboard values against Pareto, Process Monitoring, CAPA, and Incidents APIs."""
     dash_res = client.get("/api/dashboard/summary", headers=qe_headers).json()
 
-    # 1. Pareto API
     pareto_res = client.get("/api/pareto?dimension=defect_type").json()
     assert len(dash_res["top_defect_categories"]) > 0
     assert dash_res["top_defect_categories"][0]["defect"] == pareto_res["items"][0]["category"]
     assert dash_res["top_defect_categories"][0]["count"] == pareto_res["items"][0]["count"]
 
-    # 2. CAPA API
     capa_res = client.get("/api/capa/actions").json()
     capa_list = capa_res.get("actions", capa_res) if isinstance(capa_res, dict) else capa_res
     if isinstance(capa_list, dict):
@@ -281,21 +212,14 @@ def test_cross_page_consistency(client, qe_headers):
     assert dash_res["open_capas"] == open_capas_api
     assert dash_res["overdue_capas"] == overdue_capas_api
 
-    # 3. Incidents API
     inc_res = client.get("/api/incidents").json()
     active_inc_api = sum(1 for i in inc_res if str(i.get("status", "")).strip().lower() != "closed")
     assert dash_res["active_quality_incidents"] == active_inc_api
 
-    # 4. Process Monitoring API
     proc_res = client.get("/api/process/anomalies").json()
     assert dash_res["machine_anomalies_detected"] == len(proc_res)
 
-
-# ---------------------------------------------------------------------------
-# CHECK 7: Wording & Governance Notices
-# ---------------------------------------------------------------------------
 def test_epistemic_wording_and_notices(client, qe_headers):
-    """Verify rates labelled as recorded results, process-control notice, and governance banner."""
     res = client.get("/api/dashboard/summary", headers=qe_headers).json()
 
     assert "Recorded Sample Result" in res["acceptance_rate_label"]
@@ -304,32 +228,20 @@ def test_epistemic_wording_and_notices(client, qe_headers):
     assert "Decision-support only. Final product disposition is a human decision." in res["governance_notice"]
     assert "Synthetic demonstration dataset" in res["synthetic_data_note"]
 
-
-# ---------------------------------------------------------------------------
-# CHECK 8: RBAC Authentication & Robustness
-# ---------------------------------------------------------------------------
 def test_rbac_unauthenticated_401_and_roles(client, operator_headers, qe_headers, admin_headers):
-    """Auth is removed: unauthenticated calls get 200, as do all roles."""
-    # Unauthenticated
     unauth_res = client.get("/api/dashboard/summary")
     assert unauth_res.status_code == 200
 
-    # Operator
     op_res = client.get("/api/dashboard/summary", headers=operator_headers)
     assert op_res.status_code == 200
 
-    # Quality Engineer
     qe_res = client.get("/api/dashboard/summary", headers=qe_headers)
     assert qe_res.status_code == 200
 
-    # Admin
     admin_res = client.get("/api/dashboard/summary", headers=admin_headers)
     assert admin_res.status_code == 200
 
-
 def test_performance_under_100ms(client, qe_headers):
-    """Verify that dashboard summary query executes well under 100ms."""
-    # Warm up cache
     client.get("/api/dashboard/summary", headers=qe_headers)
     start = time.perf_counter()
     res = client.get("/api/dashboard/summary", headers=qe_headers)

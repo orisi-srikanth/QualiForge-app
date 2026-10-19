@@ -1,15 +1,8 @@
-"""
-Process Capability & Performance Engine (Cp, Cpk, Pp, Ppk)
-Strictly adheres to AIAG SPC guidelines, ISO 21747, and IATF 16949 with mandatory guardrails.
-Refuses computation when n < 5 and issues strong warnings when n < 30.
-Evaluates statistical control, normality, drift, outliers, variance, and heterogeneous data sources.
-"""
 from typing import List, Dict, Any, Optional
 import numpy as np
 from scipy import stats
 from backend.app.core.guardrails import EpistemicLabel
 
-# Standard SPC constants for X-bar / R charts (subgroup size n = 2..10)
 SPC_CONSTANTS = {
     2: {"A2": 1.880, "D3": 0.0, "D4": 3.267, "d2": 1.128},
     3: {"A2": 1.023, "D3": 0.0, "D4": 2.574, "d2": 1.693},
@@ -23,7 +16,6 @@ SPC_CONSTANTS = {
 }
 
 class FlexibleStatus(str):
-    """String subclass that allows case-insensitive and backward-compatible status checks."""
     def __eq__(self, other):
         if isinstance(other, str):
             if other.lower() == self.lower():
@@ -35,7 +27,6 @@ class FlexibleStatus(str):
         return super().__eq__(other)
 
 class ProcessCapabilityEngine:
-    """Computes short-term capability (Cp/Cpk) and long-term performance (Pp/Ppk) with statistical guardrails."""
 
     @staticmethod
     def calculate_capability(
@@ -50,9 +41,6 @@ class ProcessCapabilityEngine:
         batch_ids: Optional[List[str]] = None,
         alpha: float = 0.05
     ) -> Dict[str, Any]:
-        """
-        Calculates Cp, Cpk, Pp, Ppk with full assumption checks and sample size guardrails.
-        """
         n = len(values) if values is not None else 0
         warnings: List[str] = []
 
@@ -98,9 +86,6 @@ class ProcessCapabilityEngine:
             "label": EpistemicLabel.STATISTICAL_FINDING.value
         }
 
-        # -------------------------------------------------------------
-        # Guardrail 1: Sample Size Sufficiency (< 5 points -> Refusal)
-        # -------------------------------------------------------------
         if n < 5:
             base_response["status"] = FlexibleStatus("insufficient_data")
             base_response["assessment"] = "Insufficient Data for Capability Assessment"
@@ -112,9 +97,6 @@ class ProcessCapabilityEngine:
 
         vals = np.array(values, dtype=float)
 
-        # -------------------------------------------------------------
-        # Guardrail 2: Preliminary Sample Size Warning (5 <= n < 30)
-        # -------------------------------------------------------------
         if n < 30:
             base_response["status"] = FlexibleStatus("preliminary")
             warnings.append(
@@ -122,9 +104,6 @@ class ProcessCapabilityEngine:
                 f"Capability indices are preliminary and exhibit wide confidence intervals; do not use for long-term capability certification."
             )
 
-        # -------------------------------------------------------------
-        # Guardrail 3: Zero or Near-Zero Variance Check
-        # -------------------------------------------------------------
         var_sample = float(np.var(vals, ddof=1))
         if var_sample < 1e-12:
             base_response["status"] = "zero_variance"
@@ -139,9 +118,6 @@ class ProcessCapabilityEngine:
             )
             return base_response
 
-        # -------------------------------------------------------------
-        # Guardrail 4: Specification Limits Check
-        # -------------------------------------------------------------
         if usl is None and lsl is None:
             base_response["status"] = "missing_spec_limits"
             base_response["assessment"] = "Specification Limits Missing"
@@ -163,13 +139,9 @@ class ProcessCapabilityEngine:
         elif lsl is not None and usl is None:
             warnings.append("ONE-SIDED SPECIFICATION: Lower specification limit (LSL) only; two-sided Cp and Pp are not applicable.")
 
-        # -------------------------------------------------------------
-        # Central Moments & Variance Estimations
-        # -------------------------------------------------------------
         mean_val = float(np.mean(vals))
-        s_overall = float(np.std(vals, ddof=1))  # Overall standard deviation (n-1)
+        s_overall = float(np.std(vals, ddof=1))
 
-        # Within-subgroup variation
         if subgroup_size > 1 and n >= subgroup_size:
             k = subgroup_size
             d2 = SPC_CONSTANTS.get(k, {}).get("d2", 1.128)
@@ -194,10 +166,6 @@ class ProcessCapabilityEngine:
             )
             return base_response
 
-        # -------------------------------------------------------------
-        # Assumption Checks
-        # -------------------------------------------------------------
-        # (a) Statistical Control / Stability
         if is_in_control is False or (out_of_control_violations and len(out_of_control_violations) > 0):
             rule_details = ", ".join(out_of_control_violations) if out_of_control_violations else "Special cause variation detected"
             warnings.append(
@@ -208,7 +176,6 @@ class ProcessCapabilityEngine:
         else:
             base_response["stability_test"] = {"is_in_control": True, "violations": []}
 
-        # (b) Normality Check (Shapiro-Wilk)
         norm_result = {"test": "Shapiro-Wilk", "statistic": None, "p_value": None, "alpha": alpha, "is_normal": True}
         if n >= 3:
             try:
@@ -225,7 +192,6 @@ class ProcessCapabilityEngine:
                 pass
         base_response["normality_test"] = norm_result
 
-        # (c) Process Drift / Trending Check (OLS slope test)
         trend_result = {"is_trending": False, "slope": None, "p_value": None, "alpha": alpha}
         if n >= 4:
             try:
@@ -233,7 +199,6 @@ class ProcessCapabilityEngine:
                 slope, intercept, r_value, p_value, std_err = stats.linregress(x_idx, vals)
                 trend_result["slope"] = round(float(slope), 5)
                 trend_result["p_value"] = round(float(p_value), 4)
-                # Significant trend if p < alpha and magnitude is meaningful (> 0.0005 per piece)
                 if p_value < alpha and abs(slope) > 0.0005:
                     trend_result["is_trending"] = True
                     warnings.append(
@@ -244,7 +209,6 @@ class ProcessCapabilityEngine:
                 pass
         base_response["trend_test"] = trend_result
 
-        # (d) Outliers Check (Points beyond 3 standard deviations from mean)
         outlier_indices = [int(i) for i, x in enumerate(vals) if abs(x - mean_val) > 3.0 * s_overall]
         base_response["outliers"] = outlier_indices
         if outlier_indices:
@@ -253,7 +217,6 @@ class ProcessCapabilityEngine:
                 f"(sample indices: {outlier_indices})."
             )
 
-        # (e) Heterogeneous Data Source (Multiple Machines or Batches)
         if machine_ids and len(set(machine_ids)) > 1:
             unique_machines = sorted(list(set(machine_ids)))
             warnings.append(
@@ -267,12 +230,8 @@ class ProcessCapabilityEngine:
                 f"({', '.join(unique_batches)}). Process capability requires homogeneous rational subgrouping."
             )
 
-        # -------------------------------------------------------------
-        # Capability Indices Computation
-        # -------------------------------------------------------------
         tolerance = round(usl - lsl, 4) if (usl is not None and lsl is not None) else None
 
-        # Short-term Capability (Cp & Cpk)
         if not is_one_sided:
             cp = round(tolerance / (6.0 * sigma_within), 4)
             cpu = round((usl - mean_val) / (3.0 * sigma_within), 4)
@@ -289,7 +248,6 @@ class ProcessCapabilityEngine:
                 cpl = round((mean_val - lsl) / (3.0 * sigma_within), 4)
                 cpk = cpl
 
-        # Long-term Performance (Pp & Ppk)
         if not is_one_sided:
             pp = round(tolerance / (6.0 * s_overall), 4)
             ppu = round((usl - mean_val) / (3.0 * s_overall), 4)
@@ -306,13 +264,10 @@ class ProcessCapabilityEngine:
                 ppl = round((mean_val - lsl) / (3.0 * s_overall), 4)
                 ppk = ppl
 
-        # -------------------------------------------------------------
-        # 95% Confidence Interval for Cpk (Bissell / Chou Approximation)
-        # -------------------------------------------------------------
         cpk_ci_95 = None
         if cpk is not None and n > 1:
             se_cpk = float(np.sqrt((1.0 / (9.0 * n)) + ((cpk ** 2) / (2.0 * (n - 1)))))
-            z_crit = 1.95996  # 95% two-sided normal quantile
+            z_crit = 1.95996
             ci_lower = round(cpk - z_crit * se_cpk, 4)
             ci_upper = round(cpk + z_crit * se_cpk, 4)
             ci_note = (
@@ -329,9 +284,6 @@ class ProcessCapabilityEngine:
                 "note": ci_note
             }
 
-        # -------------------------------------------------------------
-        # Interpretation Bands (AIAG / IATF Standard)
-        # -------------------------------------------------------------
         if cpk is not None:
             if cpk < 1.00:
                 interpretation_band = "Incapable (< 1.00)"
@@ -349,7 +301,6 @@ class ProcessCapabilityEngine:
             interpretation_band = "Undefined"
             assessment = "Process capability cannot be assessed without specification limits."
 
-        # Assemble Complete Response
         base_response.update({
             "mean": round(mean_val, 4),
             "std_dev": round(s_overall, 6),

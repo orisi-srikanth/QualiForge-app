@@ -63,7 +63,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
   const [machines, setMachines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // RBAC Persona State
   const [activeRole, setActiveRole] = useState<Role>("quality_engineer");
   const [roleTokens, setRoleTokens] = useState<Record<Role, string>>({
     admin: "",
@@ -71,28 +70,23 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
     operator: "",
   });
 
-  // Filter & Search State
   const [searchQuery, setSearchQuery] = useState("");
   const [filterProduct, setFilterProduct] = useState("");
   const [filterMachine, setFilterMachine] = useState("");
   const [filterShift, setFilterShift] = useState("");
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [formData, setFormData] = useState<BatchFormData>(INITIAL_FORM);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  // Alerts & Notifications
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // AI Workflow Execution State
   const [runningAnalysisBatch, setRunningAnalysisBatch] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any | null>(null);
 
-  // Load all data
   const loadData = async () => {
     try {
       setLoading(true);
@@ -106,7 +100,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
       setProducts(prodsRes);
       setMachines(machsRes);
 
-      // Default product and machine for new batches
       if (prodsRes.length > 0 && !formData.product_id) {
         setFormData((prev) => ({
           ...prev,
@@ -130,7 +123,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
     loadData();
   }, []);
 
-  // Validation function
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -174,7 +166,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
     return Object.keys(errors).length === 0;
   };
 
-  // Open Create Modal
   const handleOpenCreate = () => {
     const defaultProduct = products.length > 0 ? (products[0].product_id || products[0].part_number) : "";
     const defaultMachine = machines.length > 0 ? (machines[0].code || machines[0].machine_id) : "";
@@ -198,9 +189,8 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
     setIsModalOpen(true);
   };
 
-  // Open Edit Modal
   const handleOpenEdit = (b: ProductionBatch) => {
-    // Format dates to YYYY-MM-DDTHH:mm if available
+
     let sTime = "";
     if (b.start_time) {
       try {
@@ -238,7 +228,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
     setIsModalOpen(true);
   };
 
-  // Submit Modal
   const handleSubmitModal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -270,7 +259,7 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
       }
 
       setIsModalOpen(false);
-      // Reload batches
+
       const updated = await api.getBatches();
       setBatches(updated);
     } catch (err: any) {
@@ -280,7 +269,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
     }
   };
 
-  // Delete Batch
   const handleDeleteBatch = async (batchId: string) => {
     if (!window.confirm(`Are you sure you want to delete batch ${batchId}? This cannot be undone.`)) {
       return;
@@ -298,11 +286,9 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
     }
   };
 
-  // Success / error flash state for row
   const [flashSuccessBatch, setFlashSuccessBatch] = useState<string | null>(null);
   const [flashErrorBatch, setFlashErrorBatch] = useState<string | null>(null);
 
-  // Run AI Analysis Workflow
   const handleRunAiAnalysis = async (batchId: string) => {
     try {
       setRunningAnalysisBatch(batchId);
@@ -319,7 +305,7 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
       setSuccessMessage(`Analysis completed successfully for batch ${batchId}. Navigating to AI Review...`);
       setFlashSuccessBatch(batchId);
       setTimeout(() => setFlashSuccessBatch(null), 1200);
-      // Refresh list to pick up any status changes
+
       const updated = await api.getBatches();
       setBatches(updated);
 
@@ -353,12 +339,11 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
         return;
       }
     } catch {
-      // If no workflow found yet, run analysis
+
     }
     handleRunAiAnalysis(batchId);
   };
 
-  // Filter batches locally for search and selected dropdowns
   const filteredBatches = batches.filter((b) => {
     const q = searchQuery.toLowerCase();
     const matchSearch =
@@ -377,7 +362,7 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
 
   return (
     <div className="space-y-6">
-      {/* Header and Persona Controls */}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-[26px] font-bold text-slate-900 leading-tight">Production Batches & Traceability</h2>
@@ -387,7 +372,7 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Persona RBAC Switcher */}
+
           <div className="segmented-control">
             <span className="text-[12px] font-semibold text-slate-500 px-2 flex items-center gap-1.5 whitespace-nowrap">
               <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
@@ -405,7 +390,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
             ))}
           </div>
 
-          {/* New Batch Button */}
           <button
             onClick={handleOpenCreate}
             className="btn-primary"
@@ -414,7 +398,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
             <span>New Batch</span>
           </button>
 
-          {/* Refresh Button */}
           <button
             onClick={loadData}
             title="Refresh Batches"
@@ -425,7 +408,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
         </div>
       </div>
 
-      {/* Global Toast / Feedback Messages */}
       {errorMessage && (
         <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[13.5px] flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2.5">
@@ -450,7 +432,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
         </div>
       )}
 
-      {/* Filter and Search Bar Styled as Table Control Buttons */}
       <div className="bg-white border border-[#D0D5DD] rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-1 min-w-[260px]">
           <div className="relative w-full max-w-sm">
@@ -466,7 +447,7 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Product Filter Button */}
+
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/90 hover:bg-slate-100/80 border border-slate-300 rounded-lg shadow-2xs transition-all">
             <Filter className="w-3.5 h-3.5 text-blue-600 shrink-0" />
             <span className="text-xs font-semibold text-slate-600">Product:</span>
@@ -484,7 +465,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
             </select>
           </div>
 
-          {/* Machine Filter Button */}
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/90 hover:bg-slate-100/80 border border-slate-300 rounded-lg shadow-2xs transition-all">
             <Cpu className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
             <span className="text-xs font-semibold text-slate-600">Machine:</span>
@@ -502,7 +482,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
             </select>
           </div>
 
-          {/* Shift Filter Button */}
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/90 hover:bg-slate-100/80 border border-slate-300 rounded-lg shadow-2xs transition-all">
             <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span className="text-xs font-semibold text-slate-600">Shift:</span>
@@ -534,7 +513,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
         </div>
       </div>
 
-      {/* Production Batches Table */}
       <div className="table-container">
         <div className="px-5 py-3.5 border-b border-[#E3E8EF] bg-[#F4F6FA] flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -578,7 +556,7 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                     key={b.batch_id}
                     className={`table-row ${isSuccessFlash ? "row-flash-success" : ""} ${isErrorFlash ? "row-flash-error animate-shake" : ""} ${isRunning ? "row-processing" : ""}`}
                   >
-                    {/* Batch ID */}
+
                     <td className="px-4 py-3.5 font-semibold">
                       <span
                         onClick={() => handleInspectBatchAnalysis(b.batch_id)}
@@ -589,30 +567,25 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                       </span>
                     </td>
 
-                    {/* Product */}
                     <td className="px-4 py-3.5">
                       <div className="font-semibold text-slate-900 leading-tight">{b.part_number}</div>
                       <div className="text-[13px] text-[#475467] truncate max-w-[180px]">{b.material || "Precision Component"}</div>
                     </td>
 
-                    {/* Machine */}
                     <td className="px-4 py-3.5">
                       <span className="machine-chip">
                         {b.machine}
                       </span>
                     </td>
 
-                    {/* Shift */}
                     <td className="px-4 py-3.5 font-medium text-slate-700 whitespace-nowrap">
                       {b.shift}
                     </td>
 
-                    {/* Quantity */}
                     <td className="px-4 py-3.5 font-tabular font-semibold text-slate-800 whitespace-nowrap">
                       {b.quantity} pcs
                     </td>
 
-                    {/* Production Times */}
                     <td className="px-4 py-3.5 text-[13px] text-slate-600 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-slate-700 font-tabular">
                         <Clock className="w-3.5 h-3.5 text-emerald-600" />
@@ -626,12 +599,10 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                       )}
                     </td>
 
-                    {/* Material Lot */}
                     <td className="px-4 py-3.5 font-mono text-[13px] text-slate-600 whitespace-nowrap">
                       {b.material_lot}
                     </td>
 
-                    {/* Operator / Process Ref */}
                     <td className="px-4 py-3.5 text-slate-700">
                       {b.operator || b.operator_ref ? (
                         <div className="flex items-center gap-1.5 text-[13px] whitespace-nowrap">
@@ -643,7 +614,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                       )}
                     </td>
 
-                    {/* Status Badge */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={pillClass}>
                         {isHold ? (
@@ -657,10 +627,9 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                       </span>
                     </td>
 
-                    {/* Actions */}
                     <td className="px-4 py-3.5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
-                        {/* Run Analysis Button */}
+
                         <button
                           onClick={() => handleRunAiAnalysis(b.batch_id)}
                           disabled={isRunning}
@@ -680,7 +649,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                           )}
                         </button>
 
-                        {/* Edit Button */}
                         <button
                           onClick={() => handleOpenEdit(b)}
                           className="btn-icon edit"
@@ -689,7 +657,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                           <Edit2 className="w-4 h-4" />
                         </button>
 
-                        {/* Delete Button (Allowed for Admin) */}
                         <button
                           onClick={() => handleDeleteBatch(b.batch_id)}
                           className="btn-icon delete"
@@ -715,7 +682,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
         </div>
       </div>
 
-      {/* Modal: Create / Edit Batch with 8 Core Fields */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full overflow-hidden border border-[#E3E8EF] animate-in fade-in zoom-in-95 duration-150">
@@ -738,7 +704,7 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
 
             <form onSubmit={handleSubmitModal} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Batch Number */}
+
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Batch Number <span className="text-rose-500">*</span>
@@ -758,7 +724,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   )}
                 </div>
 
-                {/* Product */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Product (Part Number) <span className="text-rose-500">*</span>
@@ -782,7 +747,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   )}
                 </div>
 
-                {/* Machine */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Manufacturing Machine <span className="text-rose-500">*</span>
@@ -806,7 +770,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   )}
                 </div>
 
-                {/* Shift */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Production Shift <span className="text-rose-500">*</span>
@@ -827,7 +790,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   )}
                 </div>
 
-                {/* Quantity */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Batch Quantity (pcs) <span className="text-rose-500">*</span>
@@ -848,7 +810,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   )}
                 </div>
 
-                {/* Production Start Time */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Production Start Time <span className="text-rose-500">*</span>
@@ -866,7 +827,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   )}
                 </div>
 
-                {/* Production End Time */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Production End Time <span className="text-slate-400 font-normal">(Optional)</span>
@@ -884,7 +844,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   )}
                 </div>
 
-                {/* Material Lot */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Material Heat / Lot Number <span className="text-rose-500">*</span>
@@ -903,7 +862,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   )}
                 </div>
 
-                {/* Operator / Process Reference */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Operator / Process Reference <span className="text-slate-400 font-normal">(Optional)</span>
@@ -918,7 +876,6 @@ export const BatchesPage: React.FC<Props> = ({ onNavigate, onSelectWorkflow }) =
                   <p className="text-[11px] text-slate-400 mt-1">Accepted empty if not applicable.</p>
                 </div>
 
-                {/* Status */}
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-700 mb-1">
                     Initial Batch Status

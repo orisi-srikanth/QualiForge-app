@@ -1,9 +1,3 @@
-"""
-Independent Verification Script: MVTec AD Dataset Disk Count vs Manifest Audit
-Strictly read-only. Accesses only metal_nut, screw, transistor, cable.
-Checks file counts on disk, compares with data/mvtec_manifest.csv,
-and validates ground-truth mask pairing and shapes.
-"""
 import os
 import csv
 from pathlib import Path
@@ -21,7 +15,6 @@ def audit_dataset():
     print(f"Target Source Path: {MVTEC_ROOT}")
     assert MVTEC_ROOT.exists(), f"Source path {MVTEC_ROOT} does not exist!"
 
-    # 1. Read manifest
     manifest_rows = []
     if MANIFEST_PATH.exists():
         with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
@@ -47,7 +40,6 @@ def audit_dataset():
         cat_dir = MVTEC_ROOT / cat
         assert cat_dir.exists(), f"Category directory {cat_dir} missing!"
 
-        # Train good
         train_good_dir = cat_dir / "train" / "good"
         train_good_files = [f for f in train_good_dir.glob("*.png") if f.is_file()]
         disk_count = len(train_good_files)
@@ -56,7 +48,6 @@ def audit_dataset():
         match_str = "OK" if disk_count == man_count else "MISMATCH"
         print(f"{cat:<12} | {'train':<6} | {'good':<24} | {disk_count:<10} | {man_count:<10} | {'N/A':<8} | {match_str}")
 
-        # Test subfolders
         test_dir = cat_dir / "test"
         for sub in sorted(test_dir.iterdir()):
             if not sub.is_dir():
@@ -67,7 +58,6 @@ def audit_dataset():
             total_disk_images += disk_count
             man_count = manifest_by_cat_defect.get((cat, "test", defect_name), 0)
 
-            # Check masks if defect
             mask_count_str = "N/A"
             if defect_name != "good":
                 mask_dir = cat_dir / "ground_truth" / defect_name
@@ -77,7 +67,6 @@ def audit_dataset():
                 if len(mask_files) != disk_count:
                     all_mask_checks_passed = False
 
-                # Sample check mask validity
                 for mf in mask_files[:2]:
                     try:
                         with Image.open(mf) as m_img:

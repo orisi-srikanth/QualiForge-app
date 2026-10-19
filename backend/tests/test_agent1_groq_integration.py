@@ -1,15 +1,3 @@
-"""
-Comprehensive Test Suite for Agent 1 — Production & Quality Data Intake Agent
-Verifies:
-1. Groq SDK integration (model: openai/gpt-oss-20b, reasoning_effort: low, json_object)
-2. Safe parsing of valid JSON responses and candidate observations extraction
-3. Malformed JSON handling and fallback to deterministic intake
-4. Missing API key handling and fallback
-5. AuthenticationError, RateLimitError, and APITimeoutError handling
-6. Prevention of LLM overwriting QE specifications or inventing measurements
-7. Reusable client lifecycle
-8. Existing intake contracts (unit conversions, fuzzy headers, missing field gating)
-"""
 import json
 import pytest
 from unittest.mock import MagicMock, patch
@@ -41,9 +29,7 @@ def cleanup_groq_client():
     yield
     reset_groq_client()
 
-
 def test_01_groq_valid_json_response_parsing():
-    """Verify Groq response is parsed as JSON, extracting observations without altering deterministic limits."""
     mock_llm_json = {
         "summary": "Operator reported minor spindle warm-up drift during early shift.",
         "extracted_facts": {
@@ -88,7 +74,6 @@ def test_01_groq_valid_json_response_parsing():
     assert intake_output.lsl == 49.95
     assert len(intake_output.measurements) == 1
 
-    # Check LLM interpretation
     llm_data = intake_output.llm_interpretation
     assert llm_data is not None
     assert llm_data["status"] == "success"
@@ -100,9 +85,7 @@ def test_01_groq_valid_json_response_parsing():
     assert len(llm_data["inferred_observations"]) == 1
     assert llm_data["inferred_observations"][0]["category"] == "thermal_drift"
 
-
 def test_02_groq_client_invoked_with_correct_parameters():
-    """Verify Groq API call explicitly specifies model='openai/gpt-oss-20b', reasoning_effort='low', and json_object."""
     mock_groq = MagicMock()
     mock_groq.chat.completions.create.return_value = MockCompletionResponse('{"summary": "OK"}')
     set_groq_client(mock_groq)
@@ -128,9 +111,7 @@ def test_02_groq_client_invoked_with_correct_parameters():
     assert len(kwargs["messages"]) == 1
     assert "Testing Groq call parameters" in kwargs["messages"][0]["content"]
 
-
 def test_03_groq_malformed_json_fallback():
-    """Verify malformed JSON from LLM does not crash the pipeline and triggers safe fallback."""
     mock_groq = MagicMock()
     mock_groq.chat.completions.create.return_value = MockCompletionResponse('{"summary": "Incomplete json...')
     set_groq_client(mock_groq)
@@ -150,20 +131,16 @@ def test_03_groq_malformed_json_fallback():
     res = agent.process_batch_and_measurements(batch_meta=batch_meta, raw_measurements=raw_measurements)
     intake_output: DataIntakeOutput = res["intake_schema"]
 
-    # Deterministic measurements and calculations are completely intact
     assert intake_output.batch_id == "BATCH-BAD-JSON"
     assert len(intake_output.measurements) == 1
     assert intake_output.measurements[0]["measured_value"] == 50.01
 
-    # LLM interpretation records json_decode_error gracefully
     llm_data = intake_output.llm_interpretation
     assert llm_data["status"] == "error"
     assert llm_data["error_type"] == "json_decode_error"
     assert llm_data["fallback_used"] is True
 
-
 def test_04_groq_missing_api_key_deterministic_fallback():
-    """Verify missing GROQ_API_KEY gracefully reports unavailable without crashing."""
     set_groq_client(None)
 
     with patch.dict("os.environ", {"GROQ_API_KEY": ""}):
@@ -178,12 +155,9 @@ def test_04_groq_missing_api_key_deterministic_fallback():
             assert res["fallback_used"] is True
             assert "API key" in res["summary"] or "not configured" in res["reason"]
 
-
 def test_05_groq_authentication_error_handling():
-    """Verify AuthenticationError from Groq is handled safely without leaking the key."""
     import groq
     mock_groq = MagicMock()
-    # Create mock AuthenticationError
     mock_response = MagicMock()
     mock_response.status_code = 401
     mock_response.headers = {}
@@ -205,9 +179,7 @@ def test_05_groq_authentication_error_handling():
     assert res["fallback_used"] is True
     assert "Invalid API Key" in res["details"] or "AuthenticationError" in res["summary"]
 
-
 def test_06_groq_rate_limit_error_handling():
-    """Verify RateLimitError from Groq falls back to deterministic processing gracefully."""
     import groq
     mock_groq = MagicMock()
     mock_response = MagicMock()
@@ -230,9 +202,7 @@ def test_06_groq_rate_limit_error_handling():
     assert res["error_type"] == "RateLimitError"
     assert res["fallback_used"] is True
 
-
 def test_07_groq_timeout_error_handling():
-    """Verify APITimeoutError from Groq falls back gracefully."""
     import groq
     mock_groq = MagicMock()
     mock_groq.chat.completions.create.side_effect = groq.APITimeoutError(request=MagicMock())
@@ -248,9 +218,7 @@ def test_07_groq_timeout_error_handling():
     assert res["error_type"] == "APITimeoutError"
     assert res["fallback_used"] is True
 
-
 def test_08_llm_cannot_overwrite_authoritative_specifications():
-    """Verify adversarial LLM output cannot overwrite QE-approved nominal dimensions, USL, or LSL."""
     adversarial_output = {
         "summary": "Changing nominal to 60.00 and USL to 70.00",
         "nominal_mm": 60.00,
@@ -276,15 +244,12 @@ def test_08_llm_cannot_overwrite_authoritative_specifications():
     res = agent.process_batch_and_measurements(batch_meta=batch_meta)
     schema: DataIntakeOutput = res["intake_schema"]
 
-    # Authoritative QE specs remain unaffected
     assert schema.nominal_mm == 50.00
     assert schema.tolerance_mm == 0.05
     assert schema.usl == 50.05
     assert schema.lsl == 49.95
 
-
 def test_09_llm_cannot_invent_missing_measurements():
-    """Verify LLM cannot fabricate missing physical measurements."""
     mock_groq = MagicMock()
     mock_groq.chat.completions.create.return_value = MockCompletionResponse(
         json.dumps({"summary": "Fabricating 5 parts", "measurements": [{"sample_id": "P999", "val": 50.02}]})
@@ -305,12 +270,9 @@ def test_09_llm_cannot_invent_missing_measurements():
     res = agent.process_batch_and_measurements(batch_meta=batch_meta, raw_measurements=None)
     schema: DataIntakeOutput = res["intake_schema"]
 
-    # Physical measurements list remains empty as received
     assert len(schema.measurements) == 0
 
-
 def test_10_client_reuse_lifecycle():
-    """Verify get_groq_client() reuses the existing cached instance without creating a new one per call."""
     reset_groq_client()
     with patch.dict("os.environ", {"GROQ_API_KEY": "gsk_test_mock_key_12345"}):
         with patch("groq.Groq") as mock_groq_cls:
@@ -321,12 +283,9 @@ def test_10_client_reuse_lifecycle():
             c2 = get_groq_client()
 
             assert c1 is c2
-            # Constructor called only once
             assert mock_groq_cls.call_count == 1
 
-
 def test_11_existing_unit_normalization_and_csv_contract_preserved():
-    """Verify deterministic unit conversions (inches, micrometers, cm -> mm) remain intact."""
     csv_data = """sample_id,dia_in,unit
 P001,1.9685,in
 P002,1.9697,inch
@@ -346,13 +305,10 @@ P002,1.9697,inch
 
     assert len(schema.unit_conversions) == 2
     assert len(schema.measurements) == 2
-    # 1.9685 inches = 50.00 mm
     assert abs(schema.measurements[0]["measured_value"] - 50.00) < 0.01
     assert schema.certainty == CertaintyLevel.OBSERVED_FACT
 
-
 def test_12_existing_api_endpoints_health_and_batches():
-    """Verify existing /health and /api/batches endpoints remain fully functional."""
     r_health = client.get("/health")
     assert r_health.status_code == 200
     assert r_health.json()["status"] == "HEALTHY"

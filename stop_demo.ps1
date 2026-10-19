@@ -1,6 +1,3 @@
-# =============================================================================
-# QualityMind Demo Shutdown Script (Windows, No Docker)
-# =============================================================================
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Set-Location $ScriptDir
@@ -9,7 +6,6 @@ Write-Host "====================================================================
 Write-Host "  STOPPING QUALITYMIND SERVICES (NATIVE RUNTIMES)" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 
-# 1. Stop recorded PIDs if file exists
 if (Test-Path "$ScriptDir/.demo_pids") {
     $pidsToKill = Get-Content "$ScriptDir/.demo_pids"
     foreach ($p in $pidsToKill) {
@@ -23,7 +19,6 @@ if (Test-Path "$ScriptDir/.demo_pids") {
     Remove-Item "$ScriptDir/.demo_pids" -Force -ErrorAction SilentlyContinue
 }
 
-# 2. Kill any processes still listening on port 8000 (Backend)
 $port8000 = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
 if ($port8000) {
     foreach ($pid8000 in $port8000) {
@@ -38,7 +33,6 @@ if ($port8000) {
     Write-Host "  Port 8000 is free." -ForegroundColor Gray
 }
 
-# 3. Kill any processes still listening on port 5173 (Frontend Vite)
 $port5173 = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
 if ($port5173) {
     foreach ($pid5173 in $port5173) {
@@ -53,7 +47,6 @@ if ($port5173) {
     Write-Host "  Port 5173 is free." -ForegroundColor Gray
 }
 
-# 4. Final verification
 Start-Sleep -Seconds 1
 $check8000 = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
 $check5173 = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue

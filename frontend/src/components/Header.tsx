@@ -76,7 +76,7 @@ export const Header: React.FC<Props> = ({
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-3.5">
       <div className="flex items-center justify-between gap-4">
-        {/* Left: Sidebar Toggle, Page Title & Purpose */}
+
         <div className="flex items-center gap-3 min-w-0">
           {onToggleSidebar && (
             <button
@@ -104,15 +104,13 @@ export const Header: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Right: Facility chip, Role switcher, User profile */}
         <div className="flex items-center gap-3 shrink-0">
-          {/* Facility Indicator */}
+
           <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-xs text-slate-600 font-medium">
             <Factory className="w-3.5 h-3.5 text-slate-500" />
             <span>Plant 01 &bull; Cell CNC-04</span>
           </div>
 
-          {/* Quick Role Toggle for Evaluation */}
           {onRoleChange && (
             <button
               onClick={() => onRoleChange(isQE ? "operator" : "quality_engineer")}
@@ -125,7 +123,6 @@ export const Header: React.FC<Props> = ({
             </button>
           )}
 
-          {/* Overflow Menu */}
           <div className="relative">
             <button
               onClick={() => setShowMoreMenu(!showMoreMenu)}

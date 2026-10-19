@@ -1,20 +1,3 @@
-"""
-Test Suite for Kilo Gateway + NVIDIA Nemotron Integration for Agent 6 (RCA)
-Covers all 12 verification areas specified in the task:
-  1. Valid structured RCA response.
-  2. Supporting and contradicting evidence.
-  3. Unsupported evidence IDs.
-  4. Fabricated or missing source references.
-  5. Unsupported causal claims.
-  6. Malformed JSON and Pydantic validation failure with single-retry recovery.
-  7. Gateway timeout, rate limiting, authentication failure, and unavailable model.
-  8. Missing API key.
-  9. Retry limit and invalid-response fallback.
- 10. Human approval and batch-disposition safety.
- 11. Agent 7, Agent 8, and PDF report compatibility.
- 12. Regression verification.
-All tests use mock gateway calls and do not burn live API credits.
-"""
 import os
 import json
 import pytest
@@ -36,14 +19,11 @@ from backend.app.agents.capa_agent import capa_agent
 from backend.app.agents.reviewer_agent import reviewer_agent
 from backend.app.services.pdf_report import pdf_report_generator
 
-
 @pytest.fixture(autouse=True)
 def cleanup_kilo_client():
-    """Ensure mock client does not leak across test boundaries."""
     reset_kilo_client()
     yield
     reset_kilo_client()
-
 
 @pytest.fixture
 def sample_evidence_payload():
@@ -87,7 +67,6 @@ def sample_evidence_payload():
         ]
     }
 
-
 def create_mock_completion_choice(content: str):
     choice = MagicMock()
     choice.message.content = content
@@ -95,10 +74,6 @@ def create_mock_completion_choice(content: str):
     completion.choices = [choice]
     return completion
 
-
-# ---------------------------------------------------------------------------
-# 1. Valid structured RCA response
-# ---------------------------------------------------------------------------
 def test_01_valid_structured_rca_response(sample_evidence_payload):
     valid_json_output = json.dumps({
         "hypotheses": [
@@ -156,10 +131,6 @@ def test_01_valid_structured_rca_response(sample_evidence_payload):
     assert res["llm_metadata"]["model"] == "nvidia/nemotron-3-ultra-550b-a55b:free"
     assert res["requires_reassessment"] is False
 
-
-# ---------------------------------------------------------------------------
-# 2. Supporting and contradicting evidence
-# ---------------------------------------------------------------------------
 def test_02_supporting_and_contradicting_evidence(sample_evidence_payload):
     json_output = json.dumps({
         "hypotheses": [
@@ -186,16 +157,11 @@ def test_02_supporting_and_contradicting_evidence(sample_evidence_payload):
     res = rca_agent.reason_with_kilo(sample_evidence_payload, client=mock_client)
     assert res["success"] is True
     hyp = res["hypotheses"][0]
-    # Verify non-empty supporting and contradicting evidence
     assert len(hyp.supporting_evidence) > 0
     assert "Vibration spiked" in hyp.supporting_evidence[0]
     assert len(hyp.contradicting_evidence) > 0
     assert "Spindle speed remained stable" in hyp.contradicting_evidence[0]
 
-
-# ---------------------------------------------------------------------------
-# 3. Unsupported evidence IDs
-# ---------------------------------------------------------------------------
 def test_03_unsupported_evidence_ids(sample_evidence_payload):
     json_output = json.dumps({
         "hypotheses": [
@@ -211,7 +177,7 @@ def test_03_unsupported_evidence_ids(sample_evidence_payload):
                 "required_confirmation": "Lab refractometer titration",
                 "sources": [
                     "measurements:P003",
-                    "telemetry:uncalibrated_refractometer_sensor_99"  # Unsupported source!
+                    "telemetry:uncalibrated_refractometer_sensor_99"
                 ]
             }
         ],
@@ -222,17 +188,10 @@ def test_03_unsupported_evidence_ids(sample_evidence_payload):
 
     res = rca_agent.reason_with_kilo(sample_evidence_payload, client=mock_client)
     assert res["success"] is True
-    # Unsupported source detected and captured
     assert "telemetry:uncalibrated_refractometer_sensor_99" in res["unsupported_sources_detected"]
-    # Filtered out from validated hypothesis sources
     assert "telemetry:uncalibrated_refractometer_sensor_99" not in res["hypotheses"][0].sources
-    # Detection of unsupported source forces reassessment recommendation
     assert res["requires_reassessment"] is True
 
-
-# ---------------------------------------------------------------------------
-# 4. Fabricated or missing source references
-# ---------------------------------------------------------------------------
 def test_04_fabricated_source_references(sample_evidence_payload):
     json_output = json.dumps({
         "hypotheses": [
@@ -247,8 +206,8 @@ def test_04_fabricated_source_references(sample_evidence_payload):
                 "contradicting_evidence": ["No recent fixture maintenance on record"],
                 "required_confirmation": "Inspect fixture clamps",
                 "sources": [
-                    "kb_document:NCR-FABRICATED-777",  # Fabricated historical incident
-                    "maintenance_record:FAKE-MAINT-999"  # Fabricated maintenance log
+                    "kb_document:NCR-FABRICATED-777",
+                    "maintenance_record:FAKE-MAINT-999"
                 ]
             }
         ],
@@ -264,10 +223,6 @@ def test_04_fabricated_source_references(sample_evidence_payload):
     assert res["requires_reassessment"] is True
     assert "Unsupported sources detected" in (res["reassessment_reason"] or "")
 
-
-# ---------------------------------------------------------------------------
-# 5. Unsupported causal claims
-# ---------------------------------------------------------------------------
 def test_05_unsupported_causal_claims(sample_evidence_payload):
     json_output = json.dumps({
         "hypotheses": [
@@ -282,7 +237,7 @@ def test_05_unsupported_causal_claims(sample_evidence_payload):
                 "contradicting_evidence": ["No contradicting facts"],
                 "required_confirmation": "None needed",
                 "sources": ["process_reading:02:20"],
-                "epistemic_label": "CONFIRMED_ROOT_CAUSE"  # LLM attempts to assert confirmed cause!
+                "epistemic_label": "CONFIRMED_ROOT_CAUSE"
             }
         ],
         "requires_reassessment": False
@@ -293,17 +248,11 @@ def test_05_unsupported_causal_claims(sample_evidence_payload):
     res = rca_agent.reason_with_kilo(sample_evidence_payload, client=mock_client)
     assert res["success"] is True
     hyp = res["hypotheses"][0]
-    # Epistemic safety override: LLM cannot assert confirmed cause
     assert hyp.epistemic_label == "HYPOTHESIS"
     assert hyp.certainty == CertaintyLevel.HYPOTHESIS
-    # Causal claim detected and disclaimer appended
     assert "HYP-01" in res["unsupported_causal_claims_detected"]
     assert "association, not proven causation" in hyp.description
 
-
-# ---------------------------------------------------------------------------
-# 6. Malformed JSON and single-retry recovery
-# ---------------------------------------------------------------------------
 def test_06_malformed_json_and_single_retry_recovery(sample_evidence_payload):
     malformed_raw = '{"hypotheses": [{"hypothesis_id": "HYP-01", "title": "Incomplete'
     valid_raw = json.dumps({
@@ -331,27 +280,20 @@ def test_06_malformed_json_and_single_retry_recovery(sample_evidence_payload):
     ]
 
     res = rca_agent.reason_with_kilo(sample_evidence_payload, client=mock_client)
-    # Exactly one retry triggered
     assert mock_client.chat.completions.create.call_count == 2
     assert res["success"] is True
     assert res["llm_metadata"]["attempts"] == 2
     assert res["hypotheses"][0].title == "Recovered Tool Wear"
 
-
-# ---------------------------------------------------------------------------
-# 7. Gateway timeout, rate limiting, authentication failure, and model check
-# ---------------------------------------------------------------------------
 def test_07_gateway_errors_handling(sample_evidence_payload):
     mock_client = MagicMock()
 
-    # 7a: Timeout Error
     mock_client.chat.completions.create.side_effect = APITimeoutError(request=None)
     res_timeout = rca_agent.reason_with_kilo(sample_evidence_payload, client=mock_client)
     assert res_timeout["success"] is False
     assert res_timeout["fallback_used"] is True
     assert res_timeout["llm_metadata"]["status"] == "GATEWAY_APITIMEOUTERROR"
 
-    # 7b: Rate Limit Error
     mock_client.chat.completions.create.side_effect = RateLimitError(
         message="429 Too Many Requests", response=MagicMock(), body=None
     )
@@ -359,7 +301,6 @@ def test_07_gateway_errors_handling(sample_evidence_payload):
     assert res_rate["success"] is False
     assert res_rate["llm_metadata"]["status"] == "GATEWAY_RATELIMITERROR"
 
-    # 7c: Authentication Error
     mock_client.chat.completions.create.side_effect = AuthenticationError(
         message="401 Invalid Token", response=MagicMock(), body=None
     )
@@ -367,7 +308,6 @@ def test_07_gateway_errors_handling(sample_evidence_payload):
     assert res_auth["success"] is False
     assert res_auth["llm_metadata"]["status"] == "GATEWAY_AUTHENTICATIONERROR"
 
-    # 7d: Unavailable Model
     mock_model_obj = MagicMock()
     mock_model_obj.id = "openai/gpt-4o"
     mock_client.models.list.return_value = MagicMock(data=[mock_model_obj])
@@ -378,10 +318,6 @@ def test_07_gateway_errors_handling(sample_evidence_payload):
     assert res_avail["available"] is False
     assert "nvidia/nemotron-3-ultra-550b-a55b:free" not in res_avail["matching_nemotron_models"]
 
-
-# ---------------------------------------------------------------------------
-# 8. Missing API key
-# ---------------------------------------------------------------------------
 def test_08_missing_api_key_handling(sample_evidence_payload):
     with patch.dict(os.environ, {"KILO_API_KEY": ""}, clear=False):
         with patch("backend.app.core.config.settings.KILO_API_KEY", ""):
@@ -394,27 +330,18 @@ def test_08_missing_api_key_handling(sample_evidence_payload):
             assert "KILO_API_KEY" in res["error"]
             assert res["llm_metadata"]["status"] == "UNCONFIGURED_FALLBACK"
 
-
-# ---------------------------------------------------------------------------
-# 9. Retry limit and invalid-response fallback
-# ---------------------------------------------------------------------------
 def test_09_retry_limit_and_fallback(sample_evidence_payload):
     broken_content = "This is not JSON at all."
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = create_mock_completion_choice(broken_content)
 
     res = rca_agent.reason_with_kilo(sample_evidence_payload, client=mock_client)
-    # Stopped at max 2 calls (initial + 1 retry)
     assert mock_client.chat.completions.create.call_count == 2
     assert res["success"] is False
     assert res["fallback_used"] is True
     assert res["llm_metadata"]["status"] == "VALIDATION_FAILED_REASSESSMENT_REQUIRED"
     assert res["llm_metadata"]["requires_reassessment"] is True
 
-
-# ---------------------------------------------------------------------------
-# 10. Human approval and batch-disposition safety
-# ---------------------------------------------------------------------------
 def test_10_human_approval_safety(sample_evidence_payload):
     valid_json = json.dumps({
         "hypotheses": [
@@ -443,7 +370,6 @@ def test_10_human_approval_safety(sample_evidence_payload):
     )
     report = out["report"]
 
-    # Verify Agent 6 safety assertions
     assert report.autonomous_actions_prohibited is True
     assert report.review_status == "HUMAN_REVIEW_REQUIRED"
     assert report.certainty == CertaintyLevel.HYPOTHESIS
@@ -451,10 +377,6 @@ def test_10_human_approval_safety(sample_evidence_payload):
     assert report.llm_metadata["provider"] == "kilo_gateway"
     assert "tool_kilo_nemotron_rca_synthesis" in out["log"].tool_calls
 
-
-# ---------------------------------------------------------------------------
-# 11. Agent 7, Agent 8, and PDF report compatibility
-# ---------------------------------------------------------------------------
 def test_11_downstream_agent_and_pdf_compatibility():
     valid_json = json.dumps({
         "hypotheses": [
@@ -484,7 +406,6 @@ def test_11_downstream_agent_and_pdf_compatibility():
     )
     report = out["report"]
 
-    # 1. Agent 7 (CAPA) generates plan from RCA report
     capa_out = capa_agent.generate_capa_plan(
         incident_id="INC-COMPAT-01",
         batch_id="BATCH-0245",
@@ -497,7 +418,6 @@ def test_11_downstream_agent_and_pdf_compatibility():
     assert len(capa_report.preventive_actions) > 0
     assert capa_report.approval_status == "PENDING_ENGINEER_APPROVAL"
 
-    # 2. Agent 8 (Reviewer) critiques report
     critique_out = reviewer_agent.review_workflow(
         intake_data={"batch_data": {"nominal_mm": 50.0, "tolerance_mm": 0.05}},
         compliance_data={"report": {"usl": 50.05, "lsl": 49.95}},
@@ -511,7 +431,6 @@ def test_11_downstream_agent_and_pdf_compatibility():
     assert "review" in critique_out
     assert critique_out["review"].critic_verdict in ["APPROVED", "CONDITIONAL_APPROVAL", "REASSESS"]
 
-    # 3. PDF generator creates valid PDF bytes
     state_mock = {
         "batch_id": "BATCH-0245",
         "rca_report": report.model_dump(),
@@ -523,10 +442,6 @@ def test_11_downstream_agent_and_pdf_compatibility():
     assert len(pdf_bytes) > 1000
     assert pdf_bytes.startswith(b"%PDF")
 
-
-# ---------------------------------------------------------------------------
-# 12. Model availability verification check
-# ---------------------------------------------------------------------------
 def test_12_model_availability_live_check_function():
     mock_client = MagicMock()
     mock_m1 = MagicMock()

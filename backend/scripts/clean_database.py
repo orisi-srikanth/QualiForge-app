@@ -11,10 +11,8 @@ if not os.path.exists(db_path):
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
-# Enable foreign keys during cleanup or disable temporarily to clean in safe order
 cur.execute("PRAGMA foreign_keys = OFF;")
 
-# 1. Transactional & Demo Tables to Completely Clear
 tables_to_clear = [
     "effectiveness_checks",
     "capa_actions",
@@ -42,15 +40,12 @@ for t in tables_to_clear:
     cur.execute(f'DELETE FROM "{t}"')
     print(f"Deleted {before_cnt} records from {t}")
 
-# 2. Clean ad-hoc test products while preserving master catalog
 cur.execute("DELETE FROM products WHERE id NOT IN ('prod-ps-101', 'prod-bh-202', 'prod-fb-303');")
 print("Cleaned non-master products.")
 
-# 3. Reset CAPA sequence counter
 cur.execute("UPDATE capa_sequences SET last_seq = 0 WHERE year = 2026;")
 print("Reset capa_sequences counter to 0.")
 
-# 4. Commit and vacuum
 conn.commit()
 cur.execute("VACUUM;")
 cur.execute("PRAGMA foreign_keys = ON;")

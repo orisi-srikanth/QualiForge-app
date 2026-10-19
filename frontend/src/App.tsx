@@ -85,7 +85,7 @@ function parseInitialRoute() {
     return { view: "landing" as const, page: "quality-dashboard", batchId: qBatch, machineId: qMachine };
   }
   if (cleanPath === "") {
-    // Root "/" - check if user already has an active session / saved preference
+
     const token = localStorage.getItem("qualiforge_token");
     const savedActive = localStorage.getItem("qualiforge_active_page");
     if (token && savedActive && VALID_APP_PAGES[savedActive]) {
@@ -94,7 +94,6 @@ function parseInitialRoute() {
     return { view: "landing" as const, page: "quality-dashboard", batchId: qBatch, machineId: qMachine };
   }
 
-  // Direct hit to any dashboard or nested route: preserve route across browser reload!
   if (VALID_APP_PAGES[cleanPath]) {
     return { view: "app" as const, page: VALID_APP_PAGES[cleanPath], batchId: qBatch, machineId: qMachine };
   }
@@ -105,7 +104,6 @@ function parseInitialRoute() {
 export function App() {
   const initialRoute = parseInitialRoute();
 
-  // Top-level View State: 'landing' | 'login' | 'register' | 'app'
   const [currentView, setCurrentView] = useState<"landing" | "login" | "register" | "app">(initialRoute.view);
 
   const [userRole, setUserRole] = useState<"admin" | "quality_engineer" | "operator">(() => {
@@ -125,7 +123,6 @@ export function App() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [pipelineFinishedBanner, setPipelineFinishedBanner] = useState(false);
 
-  // Sync route and browser history back/forward (popstate)
   useEffect(() => {
     const onPopState = () => {
       const r = parseInitialRoute();
@@ -138,7 +135,6 @@ export function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  // Update browser URL seamlessly whenever active page or view changes
   const navigateTo = (page: string, params?: Record<string, string>) => {
     setActivePage(page);
     setCurrentView("app");
@@ -164,7 +160,6 @@ export function App() {
     window.history.pushState({ view }, "", path);
   };
 
-  // Auto-sync active batch from database if none was provided in URL
   useEffect(() => {
     api.getBatches().then((batches) => {
       if (Array.isArray(batches) && batches.length > 0) {
@@ -173,7 +168,6 @@ export function App() {
     }).catch(() => {});
   }, []);
 
-  // Collapsible Sidebar State (persisted in localStorage)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     return localStorage.getItem("qualiforge_sidebar_collapsed") === "true";
   });
@@ -186,7 +180,6 @@ export function App() {
     });
   };
 
-  // Timer while running pipeline
   useEffect(() => {
     let interval: any = null;
     if (isRunningPipeline) {
@@ -260,7 +253,6 @@ export function App() {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  // -------------------- RENDER PUBLIC VIEWS --------------------
   if (currentView === "landing") {
     return (
       <LandingPage
@@ -295,11 +287,10 @@ export function App() {
     );
   }
 
-  // -------------------- AUTHENTICATED APPLICATION SHELL --------------------
   const isQE = userRole === "quality_engineer" || userRole === "admin";
 
   const renderCurrentPage = () => {
-    // Quality Engineer only pages check
+
     const qeOnlyPages = ["spc-dashboard", "incidents", "rca", "capa", "product-config", "machine-config"];
     if (!isQE && qeOnlyPages.includes(activePage)) {
       return (
@@ -435,7 +426,7 @@ export function App() {
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans antialiased text-slate-900">
-      {/* Sidebar Navigation */}
+
       <Sidebar
         activePage={activePage}
         setActivePage={navigateTo}
@@ -446,9 +437,8 @@ export function App() {
         onToggleCollapse={handleToggleSidebar}
       />
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* Top Header */}
+
         <Header
           activePage={activePage}
           onRunPipeline={() => handleRunPipeline(selectedBatchId)}
@@ -461,7 +451,6 @@ export function App() {
           onToggleSidebar={handleToggleSidebar}
         />
 
-        {/* Pipeline Success Toast Banner */}
         {pipelineFinishedBanner && (
           <div className="bg-emerald-50 border-b border-emerald-200 text-emerald-800 px-6 py-2.5 flex items-center justify-between text-xs font-semibold shadow-2xs animate-in fade-in duration-200">
             <div className="flex items-center gap-2">
@@ -477,7 +466,6 @@ export function App() {
           </div>
         )}
 
-        {/* Main Page View */}
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           <div className="max-w-[1500px] mx-auto pb-12">
             {renderCurrentPage()}
@@ -485,7 +473,6 @@ export function App() {
         </main>
       </div>
 
-      {/* Full Analysis Stepper Modal */}
       {showProgressModal && (
         <div
           role="region"
@@ -498,7 +485,7 @@ export function App() {
           }`}
         >
           <div className={`bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden ${isMinimized ? "w-full" : "w-full max-w-lg"}`}>
-            {/* Modal Header */}
+
             <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
@@ -523,7 +510,6 @@ export function App() {
               </div>
             </div>
 
-            {/* Modal Body */}
             {!isMinimized && (
               <div className="p-6 space-y-4">
                 <div className="space-y-2">

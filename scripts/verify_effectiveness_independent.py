@@ -1,8 +1,3 @@
-"""
-Independent verification script for Functional Requirement 15 (Effectiveness Monitoring).
-Directly queries SQLite database with sqlite3 (zero imports from app codebase)
-and performs statistical verification using scipy.stats.
-"""
 import sqlite3
 import math
 from scipy import stats
@@ -12,7 +7,6 @@ def run_independent_verification():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # 1. Query baseline (before) batch
     cursor.execute("""
         SELECT b.id, b.batch_number, b.machine_id, b.product_id, b.scenario_label,
                COUNT(m.id) as inspected,
@@ -24,7 +18,6 @@ def run_independent_verification():
     """)
     pre_row = cursor.fetchone()
 
-    # 2. Query verified (after) batch
     cursor.execute("""
         SELECT b.id, b.batch_number, b.machine_id, b.product_id, b.scenario_label,
                COUNT(m.id) as inspected,
@@ -53,13 +46,11 @@ def run_independent_verification():
     print(f"\nPre-intervention rejection rate:  {d1} / {n1} * 100 = {rate1:.2f}%")
     print(f"Post-intervention rejection rate: {d2} / {n2} * 100 = {rate2:.2f}%")
 
-    # 3. Two-proportion z-test (pooled p-bar)
     p_pool = (d1 + d2) / (n1 + n2)
     se_pool = math.sqrt(p_pool * (1.0 - p_pool) * (1.0 / n1 + 1.0 / n2))
     z_stat = (p1 - p2) / se_pool
     p_value = 2.0 * (1.0 - stats.norm.cdf(abs(z_stat)))
 
-    # 95% Confidence Interval for difference
     se_diff = math.sqrt((p1 * (1.0 - p1) / n1) + (p2 * (1.0 - p2) / n2))
     z_crit = stats.norm.ppf(0.975)
     diff = p1 - p2
@@ -73,7 +64,6 @@ def run_independent_verification():
     print(f"P-value: {p_value:.4e}")
     print(f"95% Confidence Interval for Difference: [{ci_lower:.2f}%, {ci_upper:.2f}%]")
 
-    # Check CAPAAction and EffectivenessCheck in DB
     cursor.execute("""
         SELECT a.action_code, a.type, a.status, a.completion_date, a.effectiveness_result,
                e.rejection_rate_before, e.rejection_rate_after, e.test_used, e.p_value, e.conclusion_label

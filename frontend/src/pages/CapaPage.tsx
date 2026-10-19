@@ -10,8 +10,6 @@ import {
   BarChart2, BarChart3, Activity
 } from "lucide-react";
 
-// Demo personas tokens
-// Pre-computed standard mock tokens for UI persona testing
 const QE_TOKEN = "demo_qe_token";
 const OP_TOKEN = "demo_op_token";
 
@@ -20,27 +18,21 @@ export const CapaPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Persona switcher: 'quality_engineer' or 'operator'
   const [currentPersona, setCurrentPersona] = useState<"quality_engineer" | "operator">("quality_engineer");
 
-  // View state: 'table' or 'board'
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
-  // Filters
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [onlyOverdue, setOnlyOverdue] = useState<boolean>(false);
 
-  // Recurrence alert state
   const [recurrenceAlert, setRecurrenceAlert] = useState<any>(null);
 
-  // Effectiveness Modal State
   const [selectedActionForEffectiveness, setSelectedActionForEffectiveness] = useState<CAPAActionRecord | null>(null);
   const [effectivenessData, setEffectivenessData] = useState<any>(null);
   const [loadingEffectiveness, setLoadingEffectiveness] = useState(false);
   const [effectivenessError, setEffectivenessError] = useState<string | null>(null);
 
-  // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createFormData, setCreateFormData] = useState({
     type: "containment",
@@ -86,7 +78,6 @@ export const CapaPage: React.FC = () => {
     }
   };
 
-  // Load CAPA actions
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -94,7 +85,6 @@ export const CapaPage: React.FC = () => {
       const res = await api.listCapaActions();
       setActions(res.actions || []);
 
-      // Check recurrence only if actions exist
       if (res.actions && res.actions.length > 0) {
         const rec = await api.checkCapaRecurrence("CNC-04", "Oversized shaft diameter").catch(() => null);
         if (rec && rec.recurrence_detected) {
@@ -112,7 +102,6 @@ export const CapaPage: React.FC = () => {
     loadData();
   }, []);
 
-  // Filtered actions
   const filteredActions = useMemo(() => {
     return actions.filter((act) => {
       if (selectedType !== "all" && act.type.toLowerCase() !== selectedType.toLowerCase()) return false;
@@ -122,7 +111,6 @@ export const CapaPage: React.FC = () => {
     });
   }, [actions, selectedType, selectedStatus, onlyOverdue]);
 
-  // Statistics
   const stats = useMemo(() => {
     const total = actions.length;
     const open = actions.filter((a) => ["proposed", "approved", "in_progress"].includes(a.status)).length;
@@ -131,7 +119,6 @@ export const CapaPage: React.FC = () => {
     return { total, open, overdue, completed };
   }, [actions]);
 
-  // Handle Create Action
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isQE) {
@@ -155,7 +142,6 @@ export const CapaPage: React.FC = () => {
     }
   };
 
-  // Handle Approve Action
   const handleApproveSubmit = async () => {
     if (!actionToApprove) return;
     try {
@@ -172,7 +158,6 @@ export const CapaPage: React.FC = () => {
     }
   };
 
-  // Handle Reject Action
   const handleRejectSubmit = async () => {
     if (!actionToReject || !rejectionReason.trim()) {
       alert("Please enter a rejection reason.");
@@ -188,7 +173,6 @@ export const CapaPage: React.FC = () => {
     }
   };
 
-  // Handle Advance Status
   const handleStatusAdvance = async () => {
     if (!actionToAdvance || !targetStatus) return;
     try {
@@ -206,7 +190,6 @@ export const CapaPage: React.FC = () => {
     }
   };
 
-  // Handle Upload Evidence
   const handleEvidenceUploadSubmit = async () => {
     if (!actionForEvidence || !evidenceFile) {
       alert("Please select a file to upload.");
@@ -222,7 +205,6 @@ export const CapaPage: React.FC = () => {
     }
   };
 
-  // Open Audit History
   const openAuditHistory = async (actionCode: string) => {
     setSelectedActionForAudit(actionCode);
     setLoadingAudit(true);
@@ -270,7 +252,7 @@ export const CapaPage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Top Header & Persona Switcher */}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
           <div className="flex items-center gap-2">
@@ -284,7 +266,6 @@ export const CapaPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Persona Switcher Badge & Actions */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
             <button
@@ -341,7 +322,6 @@ export const CapaPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Recurrence Detection Alert Banner */}
       {recurrenceAlert && (
         <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
@@ -361,7 +341,6 @@ export const CapaPage: React.FC = () => {
         </div>
       )}
 
-      {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
           <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Actions</span>
@@ -391,9 +370,8 @@ export const CapaPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter and View Toolbar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Tier switcher tabs */}
+
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 overflow-x-auto">
           {[
             { id: "all", label: "All Tiers" },
@@ -415,7 +393,6 @@ export const CapaPage: React.FC = () => {
           ))}
         </div>
 
-        {/* Status filter & Overdue filter & View toggle */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-slate-500 font-medium">Status:</span>
@@ -463,7 +440,6 @@ export const CapaPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content: Table or Board */}
       {loading ? (
         <div className="bg-white p-12 text-center rounded-xl border border-slate-200 space-y-3">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600" />
@@ -484,7 +460,7 @@ export const CapaPage: React.FC = () => {
           </button>
         </div>
       ) : viewMode === "table" ? (
-        /* TABLE VIEW */
+
         <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -605,10 +581,9 @@ export const CapaPage: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Controls */}
                     <td className="p-3.5 pr-5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
-                        {/* Approve button (only for proposed) */}
+
                         {act.status === "proposed" && (
                           <button
                             onClick={() => {
@@ -632,7 +607,6 @@ export const CapaPage: React.FC = () => {
                           </button>
                         )}
 
-                        {/* Reject button (only for proposed) */}
                         {act.status === "proposed" && (
                           <button
                             onClick={() => {
@@ -655,7 +629,6 @@ export const CapaPage: React.FC = () => {
                           </button>
                         )}
 
-                        {/* Advance to In-Progress */}
                         {act.status === "approved" && (
                           <button
                             onClick={() => {
@@ -674,7 +647,6 @@ export const CapaPage: React.FC = () => {
                           </button>
                         )}
 
-                        {/* Advance to Completed */}
                         {act.status === "in_progress" && (
                           <button
                             onClick={() => {
@@ -694,7 +666,6 @@ export const CapaPage: React.FC = () => {
                           </button>
                         )}
 
-                        {/* Upload Evidence button */}
                         <button
                           onClick={() => {
                             if (!isQE) {
@@ -710,7 +681,6 @@ export const CapaPage: React.FC = () => {
                           <Upload className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* Audit Trail */}
                         <button
                           onClick={() => openAuditHistory(act.action_code)}
                           className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors"
@@ -719,7 +689,6 @@ export const CapaPage: React.FC = () => {
                           <History className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* Effectiveness Check Modal */}
                         <button
                           onClick={() => openEffectivenessModal(act)}
                           className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded transition-colors"
@@ -737,7 +706,7 @@ export const CapaPage: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* KANBAN BOARD VIEW */
+
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {[
             { id: "proposed", title: "Proposed", color: "border-amber-400 bg-amber-50/20" },
@@ -787,7 +756,6 @@ export const CapaPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Card Quick Actions */}
                       <div className="pt-2 flex items-center justify-between gap-1 border-t border-slate-100">
                         <div className="flex items-center gap-1.5">
                           <button
@@ -834,7 +802,6 @@ export const CapaPage: React.FC = () => {
         </div>
       )}
 
-      {/* CREATE ACTION MODAL */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 space-y-4">
@@ -848,7 +815,6 @@ export const CapaPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Safety Guardrail Notice */}
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-1">
               <span className="font-bold flex items-center gap-1.5">
                 <ShieldAlert className="w-4 h-4 text-blue-600" />
@@ -952,7 +918,6 @@ export const CapaPage: React.FC = () => {
         </div>
       )}
 
-      {/* APPROVAL MODAL */}
       {actionToApprove && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
@@ -1005,7 +970,6 @@ export const CapaPage: React.FC = () => {
         </div>
       )}
 
-      {/* REJECTION MODAL */}
       {actionToReject && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
@@ -1045,7 +1009,6 @@ export const CapaPage: React.FC = () => {
         </div>
       )}
 
-      {/* STATUS ADVANCE MODAL (In Progress / Completed) */}
       {actionToAdvance && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
@@ -1095,7 +1058,6 @@ export const CapaPage: React.FC = () => {
         </div>
       )}
 
-      {/* EVIDENCE UPLOAD MODAL */}
       {actionForEvidence && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
@@ -1133,7 +1095,6 @@ export const CapaPage: React.FC = () => {
         </div>
       )}
 
-      {/* AUDIT HISTORY MODAL */}
       {selectedActionForAudit && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 space-y-4">
@@ -1179,11 +1140,10 @@ export const CapaPage: React.FC = () => {
         </div>
       )}
 
-      {/* EFFECTIVENESS MONITORING MODAL (FR-15 / AGENT 7) */}
       {selectedActionForEffectiveness && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-5">
-            {/* Modal Header */}
+
             <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div>
                 <div className="flex items-center gap-2">
@@ -1210,7 +1170,6 @@ export const CapaPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Modal Content States */}
             {loadingEffectiveness ? (
               <div className="py-16 text-center space-y-3">
                 <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
@@ -1254,7 +1213,7 @@ export const CapaPage: React.FC = () => {
               </div>
             ) : effectivenessData ? (
               <div className="space-y-4">
-                {/* 1. Before & After Comparison Table */}
+
                 <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
                   <div className="p-3 bg-slate-100/80 border-b border-slate-200 flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -1314,14 +1273,13 @@ export const CapaPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. Visual Comparison Chart */}
                 <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-2">
                   <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
                     <span>Rejection Rate Comparison (Target: &lt; 1.5%)</span>
                     <span className="text-[11px] text-slate-400">Problem Statement Benchmark (8.2% vs 1.1%)</span>
                   </div>
                   <div className="space-y-2 pt-1">
-                    {/* Before Bar */}
+
                     <div className="space-y-0.5">
                       <div className="flex justify-between text-[11px] text-slate-600">
                         <span>Pre-Action Baseline</span>
@@ -1334,7 +1292,7 @@ export const CapaPage: React.FC = () => {
                         />
                       </div>
                     </div>
-                    {/* After Bar */}
+
                     <div className="space-y-0.5">
                       <div className="flex justify-between text-[11px] text-slate-600">
                         <span>Post-Action Subsequent Production</span>
@@ -1350,7 +1308,6 @@ export const CapaPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 3. Statistical Test Findings Card */}
                 <div className="p-4 bg-purple-50/50 border border-purple-200 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
@@ -1400,7 +1357,6 @@ export const CapaPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 4. Small-Sample Warning (if applicable) */}
                 {effectivenessData.is_small_sample && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-800">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -1411,7 +1367,6 @@ export const CapaPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* 5. Plain-Language Association vs Causation Caution */}
                 <div className="p-4 bg-sky-50/80 border border-sky-200 rounded-xl space-y-2 text-xs">
                   <div className="flex items-center gap-1.5 font-bold text-sky-950">
                     <ShieldCheck className="w-4 h-4 text-sky-600" />
@@ -1427,7 +1382,6 @@ export const CapaPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 6. Agent 7 Defect Recurrence Detector */}
                 <div className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${
                   effectivenessData.recurrence_detected
                     ? "bg-rose-50 border-rose-200 text-rose-900"
@@ -1448,7 +1402,6 @@ export const CapaPage: React.FC = () => {
               </div>
             ) : null}
 
-            {/* Modal Footer */}
             <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
               <button
                 onClick={() => openEffectivenessModal(selectedActionForEffectiveness)}

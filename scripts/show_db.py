@@ -1,14 +1,8 @@
-"""
-Database Viewer Script for QualityMind (No Container Required)
-Connects directly to the active database (PostgreSQL or SQLite fallback).
-Prints table inventories, record counts, and executes key demonstration queries.
-"""
 
 import sys
 import os
 from pathlib import Path
 
-# Ensure root directory is in python path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -25,7 +19,6 @@ def main():
     is_sqlite = db_url.startswith("sqlite")
     db_type = "SQLite (Local File Fallback)" if is_sqlite else "PostgreSQL (Production/Local)"
     
-    # Hide sensitive credentials if PostgreSQL
     masked_url = db_url
     if "@" in masked_url:
         prefix = masked_url.split("@")[0].split(":")[0]
@@ -58,7 +51,6 @@ def main():
                 print(f"{t:<28} | ERROR ({e})")
         print("-" * 50)
 
-        # Demo Query 1: Golden Anchor Batch BATCH-0245
         print("\n[2] GOLDEN ANCHOR BATCH (BATCH-0245) SUMMARY:")
         print("-" * 80)
         q_batch = text("""
@@ -75,7 +67,6 @@ def main():
             print(f"Batch Quantity : {batch_row[4]}")
             print(f"Status         : {batch_row[5]}")
 
-            # Demo Query 2: Anchor Measurements P001-P005
             print("\n[3] ANCHOR MEASUREMENTS (P001 - P005):")
             print("-" * 80)
             q_meas = text(f"""
@@ -90,7 +81,6 @@ def main():
             for r in rows:
                 print(f"{r[0]:<15} | {r[1]:<15.2f} | {r[2]:<15.2f} | {r[3]:<15}")
 
-            # Demo Query 3: Process Telemetry Readings
             print("\n[4] CNC-04 PROCESS READINGS SUMMARY (BATCH-0245):")
             print("-" * 80)
             q_proc = text(f"""
@@ -107,7 +97,6 @@ def main():
                 for pr in p_rows:
                     print(f"{pr[0]:<15.1f} | {pr[1]:<15.2f} | {pr[2]:<15.1f} | {pr[3]:<18.2f} | {pr[4]:<12}")
 
-            # Demo Query 4: Quality Incident and Root Cause
             print("\n[5] QUALITY INCIDENT & RCA HYPOTHESES:")
             print("-" * 80)
             q_inc = text(f"""
@@ -124,7 +113,6 @@ def main():
                 print(f"Severity      : {inc_row[3]}")
                 print(f"Status        : {inc_row[4]}")
 
-                # Hypotheses
                 q_hypo = text(f"""
                     SELECT rank, title, evidence_score, label
                     FROM rca_hypotheses

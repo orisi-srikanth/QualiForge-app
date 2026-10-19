@@ -1,8 +1,3 @@
-"""
-Products, Machines & Manufacturing Batches Endpoints
-Catalog of parts, engineering specifications, CNC machining cells, and batch records.
-Enforces IATF 16949 / ISO 9001 Section 8.5.6 Control of Changes and Section 8.5.2 Traceability.
-"""
 from typing import List, Dict, Any, Optional, Tuple, Union
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -18,25 +13,13 @@ router = APIRouter()
 
 VALID_UNITS = {"mm", "cm", "in", "µm", "um", "m", "deg", "rad", "bar", "psi"}
 
-
-# --- RBAC Helper Dependencies ---
 def require_admin_or_qe_write(user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)):
-    """Auth-free dependency: Allows all users to write products and batches."""
     return user or {"id": "usr-default", "name": "Quality Engineer", "role": "admin"}
-
 
 def require_admin_delete(user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)):
-    """Auth-free dependency: Allows all users to delete products or machines."""
     return user or {"id": "usr-default", "name": "Quality Engineer", "role": "admin"}
 
-
-# --- Specification Calculation Helper ---
 def compute_spec_limits(nominal: float, tol_plus: float, tol_minus: float) -> Tuple[float, float]:
-    """
-    Calculates engineering specification limits strictly on the backend.
-    Never trusts client-provided LSL or USL.
-    Enforces non-negative tolerances and strictly positive tolerance band (USL > LSL).
-    """
     if tol_plus < 0 or tol_minus < 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -51,8 +34,6 @@ def compute_spec_limits(nominal: float, tol_plus: float, tol_minus: float) -> Tu
         )
     return lsl, usl
 
-
-# --- Pydantic Schemas ---
 class CharacteristicCreatePayload(BaseModel):
     name: str = Field(..., description="Characteristic parameter, e.g. shaft_diameter", json_schema_extra={"example": "shaft_diameter"})
     unit: str = Field("mm", description="Measurement unit (e.g. mm, in, µm)", json_schema_extra={"example": "mm"})
@@ -85,7 +66,6 @@ class CharacteristicCreatePayload(BaseModel):
                     detail="Tolerances must be non-negative (tol_minus >= 0)."
                 )
         return data
-
 
 class CharacteristicUpdatePayload(BaseModel):
     name: Optional[str] = None
@@ -120,7 +100,6 @@ class CharacteristicUpdatePayload(BaseModel):
                 )
         return data
 
-
 class ProductCreatePayload(BaseModel):
     name: str = Field(..., description="Product designation", json_schema_extra={"example": "Precision Shaft"})
     part_number: str = Field(..., description="Unique engineering part number", json_schema_extra={"example": "PS-2026-101"})
@@ -129,7 +108,6 @@ class ProductCreatePayload(BaseModel):
     family: str = Field("Precision Shafts", description="Product family category", json_schema_extra={"example": "Precision Shafts"})
     machine_id: Optional[str] = Field("CNC-04", description="Assigned CNC machine code or ID", json_schema_extra={"example": "CNC-04"})
 
-    # Characteristic fields (optional or embedded)
     inspection_parameter: Optional[str] = Field("shaft_diameter", description="Critical inspection parameter", json_schema_extra={"example": "shaft_diameter"})
     unit: Optional[str] = Field("mm", description="Measurement unit", json_schema_extra={"example": "mm"})
     nominal: Optional[float] = Field(50.00, description="Nominal dimension", json_schema_extra={"example": 50.00})
@@ -142,14 +120,12 @@ class ProductCreatePayload(BaseModel):
     @classmethod
     def validate_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            # Check unit if provided
             unit = data.get("unit")
             if unit is not None and unit not in VALID_UNITS:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"Unknown measurement unit '{unit}'. Permitted units: {sorted(list(VALID_UNITS))}."
                 )
-            # Check tolerances if provided
             tp = data.get("tol_plus")
             tm = data.get("tol_minus")
             if tp is not None and float(tp) < 0:
@@ -163,7 +139,6 @@ class ProductCreatePayload(BaseModel):
                     detail="Tolerances must be non-negative (tol_minus >= 0)."
                 )
         return data
-
 
 class ProductUpdatePayload(BaseModel):
     name: Optional[str] = None
@@ -203,21 +178,16 @@ class ProductUpdatePayload(BaseModel):
                 )
         return data
 
-
 class MachineCreatePayload(BaseModel):
     code: str = Field(..., description="Unique machine cell identifier, e.g. CNC-04", json_schema_extra={"example": "CNC-04"})
     type: str = Field(..., description="Machine type and model", json_schema_extra={"example": "Okuma LB3000-EX II CNC Lathe"})
     location: str = Field(..., description="Plant floor location cell", json_schema_extra={"example": "Cell B - Turning & Grinding"})
-
 
 class MachineUpdatePayload(BaseModel):
     code: Optional[str] = Field(None, description="Updated machine identifier")
     type: Optional[str] = Field(None, description="Updated machine type/name")
     location: Optional[str] = Field(None, description="Updated cell location")
 
-
-
-# --- Batch Validation Helpers & Schemas ---
 VALID_SHIFTS = {"morning", "evening", "night"}
 
 def parse_datetime_str(val: Optional[Union[str, datetime]]) -> Optional[datetime]:
@@ -251,7 +221,6 @@ def validate_and_normalize_shift(shift_raw: str) -> str:
         )
     return clean.capitalize()
 
-
 class BatchCreatePayload(BaseModel):
     batch_number: Optional[str] = Field(None, description="Unique production batch identifier, e.g. BATCH-0245", json_schema_extra={"example": "BATCH-0245"})
     batch_id: Optional[str] = Field(None, description="Batch number alias", json_schema_extra={"example": "BATCH-0245"})
@@ -268,7 +237,6 @@ class BatchCreatePayload(BaseModel):
     operator: Optional[str] = Field(None, description="Operator reference alias", json_schema_extra={"example": "OP-44"})
     status: Optional[str] = Field("QUALITY_HOLD", description="Quality disposition status", json_schema_extra={"example": "QUALITY_HOLD"})
 
-
 class BatchUpdatePayload(BaseModel):
     product_id: Optional[str] = None
     part_number: Optional[str] = None
@@ -283,11 +251,8 @@ class BatchUpdatePayload(BaseModel):
     operator: Optional[str] = None
     status: Optional[str] = None
 
-
 CreateBatchPayload = BatchCreatePayload
 
-
-# --- Helper Function to Serialize DB Product to Schema ---
 def serialize_product(p: Product) -> ProductSpec:
     char = p.characteristics[0] if p.characteristics else None
     mach_code = p.machine.code if p.machine else (p.machine_id or "CNC-04")
@@ -314,16 +279,10 @@ def serialize_product(p: Product) -> ProductSpec:
         inspection_frequency=char.inspection_frequency if char else "100% Critical Feature"
     )
 
-
-# ==============================================================================
-# Products API Endpoints
-# ==============================================================================
-
 @router.get("/products", tags=["Products & Machines"], summary="List registered product specifications", description="Retrieves catalog of manufactured products, nominal dimensions, tolerances, and inspection parameters.")
 def get_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
     return [serialize_product(p) for p in products]
-
 
 @router.post("/products", tags=["Products & Machines"], status_code=status.HTTP_201_CREATED, summary="Create new product specification", description="Configures product, part number, manufacturing process, assigned machine, and inspection characteristics. Enforces uniqueness and server-side limit calculation.")
 def create_product(
@@ -331,7 +290,6 @@ def create_product(
     user: Dict[str, Any] = Depends(require_admin_or_qe_write),
     db: Session = Depends(get_db)
 ):
-    # 1. Uniqueness check for part_number
     existing = db.query(Product).filter(Product.part_number == payload.part_number.strip()).first()
     if existing:
         raise HTTPException(
@@ -339,14 +297,12 @@ def create_product(
             detail=f"Product with part number '{payload.part_number}' already exists."
         )
 
-    # 2. Resolve machine foreign key if provided
     mach_id = None
     if payload.machine_id:
         mach = db.query(Machine).filter((Machine.code == payload.machine_id) | (Machine.id == payload.machine_id)).first()
         if mach:
             mach_id = mach.id
 
-    # 3. Create Product
     prod = Product(
         name=payload.name.strip(),
         part_number=payload.part_number.strip(),
@@ -358,7 +314,6 @@ def create_product(
     db.add(prod)
     db.flush()
 
-    # 4. Create Characteristic with deterministic server-side limits
     char_data = payload.characteristic
     if char_data:
         lsl, usl = compute_spec_limits(char_data.nominal, char_data.tol_plus, char_data.tol_minus)
@@ -397,14 +352,12 @@ def create_product(
     db.refresh(prod)
     return serialize_product(prod)
 
-
 @router.get("/products/{product_id}", tags=["Products & Machines"], summary="Read product specification details", description="Retrieves product by ID or part number.")
 def get_product(product_id: str, db: Session = Depends(get_db)):
     prod = db.query(Product).filter((Product.id == product_id) | (Product.part_number == product_id)).first()
     if not prod:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product '{product_id}' not found.")
     return serialize_product(prod)
-
 
 @router.put("/products/{product_id}", tags=["Products & Machines"], summary="Update product and engineering tolerances", description="Updates specification parameters and recalculates LSL/USL deterministically on the backend.")
 def update_product(
@@ -417,7 +370,6 @@ def update_product(
     if not prod:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product '{product_id}' not found.")
 
-    # Check part_number uniqueness if changing
     if payload.part_number and payload.part_number.strip() != prod.part_number:
         conflict = db.query(Product).filter(Product.part_number == payload.part_number.strip(), Product.id != prod.id).first()
         if conflict:
@@ -437,7 +389,6 @@ def update_product(
         if mach:
             prod.machine_id = mach.id
 
-    # Update characteristic if tolerance or nominal updated
     char = prod.characteristics[0] if prod.characteristics else None
     if char and (payload.nominal is not None or payload.tol_plus is not None or payload.tol_minus is not None or payload.unit or payload.inspection_parameter or payload.inspection_frequency):
         nom = payload.nominal if payload.nominal is not None else char.nominal
@@ -478,7 +429,6 @@ def update_product(
     db.refresh(prod)
     return serialize_product(prod)
 
-
 @router.delete("/products/{product_id}", tags=["Products & Machines"], summary="Delete product specification", description="Deletes product if no active batches are associated. Safely blocked if batches exist (IATF 16949 Section 8.5.2).")
 def delete_product(
     product_id: str,
@@ -489,7 +439,6 @@ def delete_product(
     if not prod:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product '{product_id}' not found.")
 
-    # Guard: check if manufacturing batches exist for this product
     batch_count = db.query(Batch).filter(Batch.product_id == prod.id).count()
     if batch_count > 0:
         raise HTTPException(
@@ -500,11 +449,6 @@ def delete_product(
     db.delete(prod)
     db.commit()
     return {"status": "DELETED", "product_id": prod.id, "part_number": prod.part_number}
-
-
-# ==============================================================================
-# Inspection Characteristics Endpoints
-# ==============================================================================
 
 @router.get("/products/{product_id}/characteristics", tags=["Products & Machines"], summary="Get product inspection characteristics and tolerance limits", description="Retrieves dimensional tolerances, nominal values, and engineering limits for specified product ID.")
 def get_product_characteristics(product_id: str, db: Session = Depends(get_db)):
@@ -534,7 +478,6 @@ def get_product_characteristics(product_id: str, db: Session = Depends(get_db)):
         }
         for c in chars
     ]
-
 
 @router.post("/products/{product_id}/characteristics", tags=["Products & Machines"], status_code=status.HTTP_201_CREATED, summary="Add inspection characteristic to product", description="Adds characteristic, validates units and tolerances, and computes LSL and USL.")
 def add_product_characteristic(
@@ -576,7 +519,6 @@ def add_product_characteristic(
         "usl": char.usl,
         "inspection_frequency": char.inspection_frequency
     }
-
 
 @router.put("/characteristics/{characteristic_id}", tags=["Products & Machines"], summary="Update inspection characteristic", description="Updates tolerances and recalculates LSL/USL on backend.")
 def update_characteristic(
@@ -625,11 +567,6 @@ def update_characteristic(
         "inspection_frequency": char.inspection_frequency
     }
 
-
-# ==============================================================================
-# Machines API Endpoints
-# ==============================================================================
-
 @router.get("/machines", tags=["Products & Machines"], summary="List factory floor CNC machine cells", description="Retrieves registered CNC machining cells, assigned lines, and active health indicators.")
 def get_machines(db: Session = Depends(get_db)):
     machines = db.query(Machine).all()
@@ -654,7 +591,6 @@ def get_machines(db: Session = Depends(get_db)):
         }
         for m in machines
     ]
-
 
 @router.post("/machines", tags=["Products & Machines"], status_code=status.HTTP_201_CREATED, summary="Register factory floor CNC machine cell", description="Creates new CNC machine registration.")
 def create_machine(
@@ -690,7 +626,6 @@ def create_machine(
         "location": mach.location
     }
 
-
 @router.get("/machines/{machine_id}", tags=["Products & Machines"], summary="Read machine details", description="Retrieves machine by ID or code.")
 def get_machine(machine_id: str, db: Session = Depends(get_db)):
     mach = db.query(Machine).filter((Machine.id == machine_id) | (Machine.code == machine_id)).first()
@@ -705,7 +640,6 @@ def get_machine(machine_id: str, db: Session = Depends(get_db)):
         "location": mach.location,
         "status": "OPERATIONAL"
     }
-
 
 @router.put("/machines/{machine_id}", tags=["Products & Machines"], summary="Update factory floor CNC machine cell", description="Updates machine type, model, or cell location.")
 def update_machine(
@@ -732,12 +666,6 @@ def update_machine(
         "type": mach.type,
         "location": mach.location
     }
-
-
-
-# ==============================================================================
-# Production Batches Endpoints
-# ==============================================================================
 
 def serialize_batch(b: Batch, db: Optional[Session] = None) -> Dict[str, Any]:
     m_count = 0
@@ -774,7 +702,6 @@ def serialize_batch(b: Batch, db: Optional[Session] = None) -> Dict[str, Any]:
         "nonconforming_count": nonconf_count
     }
 
-
 @router.get("/batches", tags=["Batches"], summary="List production manufacturing batches", description="Retrieves active and historical batches with filters for product, machine, shift, date range, and pagination.")
 def get_batches(
     product: Optional[str] = Query(None, description="Filter by product ID, part number, or name"),
@@ -807,14 +734,12 @@ def get_batches(
     batches = query.order_by(Batch.start_time.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return [serialize_batch(b, db) for b in batches]
 
-
 @router.post("/batches", tags=["Batches"], status_code=status.HTTP_201_CREATED, summary="Register new manufacturing batch", description="Ingests new batch record with foreign key validation, quantity rules, shift verification, and time-ordering checks. Authenticated for operator and quality_engineer roles.")
 def create_batch(
     payload: BatchCreatePayload,
     user: Dict[str, Any] = Depends(require_authenticated_user),
     db: Session = Depends(get_db)
 ):
-    # 1. Batch number uniqueness check
     b_num = (payload.batch_number or payload.batch_id or "").strip()
     if not b_num:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'batch_number' is required.")
@@ -826,7 +751,6 @@ def create_batch(
             detail=f"Batch number '{b_num}' already exists in production records."
         )
 
-    # 2. Foreign Key: Product validation
     p_ref = (payload.product_id or payload.part_number or "").strip()
     if not p_ref:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Product reference ('product_id' or 'part_number') is required.")
@@ -837,7 +761,6 @@ def create_batch(
             detail=f"Referenced product '{p_ref}' does not exist in master product catalog."
         )
 
-    # 3. Foreign Key: Machine validation
     m_ref = (payload.machine or payload.machine_id or "").strip()
     if not m_ref:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Machine reference ('machine' or 'machine_id') is required.")
@@ -848,17 +771,14 @@ def create_batch(
             detail=f"Referenced machine '{m_ref}' does not exist in factory machine catalog."
         )
 
-    # 4. Quantity validation (> 0)
     if payload.quantity <= 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Batch quantity must be strictly positive (quantity > 0), received {payload.quantity}."
         )
 
-    # 5. Shift validation
     norm_shift = validate_and_normalize_shift(payload.shift)
 
-    # 6. Datetime and time-ordering validation
     start_dt = parse_datetime_str(payload.start_time) if payload.start_time else datetime.now(timezone.utc)
     end_dt = parse_datetime_str(payload.end_time) if payload.end_time else None
     if end_dt and end_dt < start_dt:
@@ -867,12 +787,10 @@ def create_batch(
             detail=f"Invalid time ordering: production end time ({end_dt}) cannot be earlier than start time ({start_dt})."
         )
 
-    # 7. Material Lot validation
     mat_lot = (payload.material_lot or "").strip()
     if not mat_lot:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Field 'material_lot' is required.")
 
-    # 8. Operator reference (optional, accepted empty)
     op_ref = (payload.operator_ref or payload.operator or "").strip() or None
 
     batch = Batch(
@@ -892,14 +810,12 @@ def create_batch(
     db.refresh(batch)
     return serialize_batch(batch, db)
 
-
 @router.get("/batches/{batch_id}", tags=["Batches"], summary="Read production batch details", description="Retrieves batch record by batch number or ID.")
 def get_batch(batch_id: str, db: Session = Depends(get_db)):
     batch = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Batch '{batch_id}' not found.")
     return serialize_batch(batch, db)
-
 
 @router.put("/batches/{batch_id}", tags=["Batches"], summary="Update production batch record", description="Updates batch parameters with validation. Blocks reassigning product or machine if inspection measurements already exist.")
 def update_batch(
@@ -912,7 +828,6 @@ def update_batch(
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Batch '{batch_id}' not found.")
 
-    # Safety check: if measurements exist, disallow changing product or machine
     m_count = db.query(Measurement).filter(Measurement.batch_id == batch.id).count()
     if m_count > 0:
         if payload.product_id or payload.part_number:
@@ -930,7 +845,6 @@ def update_batch(
                     detail=f"Cannot reassign machine for batch '{batch.batch_number}': {m_count} physical inspection measurements are already linked (IATF 16949 Section 8.5.2 Traceability Requirement)."
                 )
 
-    # Update product if allowed
     if payload.product_id or payload.part_number:
         p_ref = (payload.product_id or payload.part_number).strip()
         prod = db.query(Product).filter((Product.id == p_ref) | (Product.part_number == p_ref)).first()
@@ -938,7 +852,6 @@ def update_batch(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Referenced product '{p_ref}' not found.")
         batch.product_id = prod.id
 
-    # Update machine if allowed
     if payload.machine or payload.machine_id:
         m_ref = (payload.machine or payload.machine_id).strip()
         mach = db.query(Machine).filter((Machine.id == m_ref) | (Machine.code == m_ref)).first()
@@ -975,7 +888,6 @@ def update_batch(
     db.commit()
     db.refresh(batch)
     return serialize_batch(batch, db)
-
 
 @router.delete("/batches/{batch_id}", tags=["Batches"], summary="Delete production batch record", description="Permanently deletes batch if no measurements are linked. Restricted to Administrator role.")
 def delete_batch(

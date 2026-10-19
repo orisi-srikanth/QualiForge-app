@@ -27,12 +27,11 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Load available batches
   useEffect(() => {
     api.getBatches().then((bList) => {
       if (Array.isArray(bList) && bList.length > 0) {
         setBatches(bList);
-        // If initialBatchId is not set, default to first batch
+
         if (!selectedBatchId) {
           const firstId = bList[0].batch_number || bList[0].batch_id || "";
           setSelectedBatchId(firstId);
@@ -41,7 +40,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
     }).catch(() => {});
   }, []);
 
-  // Fetch or refresh process investigation report
   const fetchInvestigation = async (bId: string, force: boolean = false) => {
     if (!bId) return;
     setLoading(true);
@@ -74,7 +72,7 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
 
   const handleBatchSelect = (bId: string) => {
     setSelectedBatchId(bId);
-    // Update browser URL query parameter seamlessly
+
     const url = new URL(window.location.href);
     url.searchParams.set("batch_id", bId);
     window.history.pushState(null, "", url.pathname + url.search);
@@ -82,7 +80,7 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto font-sans antialiased text-slate-800">
-      {/* -------------------- HEADER / OPERATIONAL CALLOUT -------------------- */}
+
       <div className="p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -103,7 +101,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
           </p>
         </div>
 
-        {/* Batch Selector & Actions */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           <div className="relative">
             <select
@@ -140,7 +137,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* -------------------- ERROR / LOADING STATES -------------------- */}
       {loading ? (
         <div className="p-16 text-center text-xs text-slate-500 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
@@ -167,7 +163,7 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
         </div>
       ) : (
         <>
-          {/* -------------------- INSUFFICIENT PROCESS EVIDENCE ALERT -------------------- */}
+
           {report.investigation_status === "INSUFFICIENT_PROCESS_EVIDENCE" && (
             <div className="p-5 bg-amber-50 border-2 border-amber-300 rounded-2xl shadow-xs space-y-3">
               <div className="flex items-center gap-2.5 text-amber-900">
@@ -208,9 +204,8 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
             </div>
           )}
 
-          {/* -------------------- 1. METADATA & CONTEXT CARDS -------------------- */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Batch & Product */}
+
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-2xs">
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Production Batch</div>
               <div className="mt-1 font-mono font-extrabold text-base text-slate-900">{report.batch_id}</div>
@@ -222,7 +217,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Machine Cell & Shift */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-2xs">
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Machine Cell</div>
               <div className="mt-1 font-mono font-extrabold text-base text-slate-900">{report.machine.code}</div>
@@ -234,7 +228,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Specification Nominal & Limits */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-2xs">
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Specification Limits</div>
               <div className="mt-1 font-mono font-extrabold text-base text-slate-900">
@@ -250,7 +243,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Conformance Summary */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-2xs">
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Inspection Status</div>
               <div className="mt-1 flex items-center gap-2">
@@ -274,7 +266,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* -------------------- 2. INVESTIGATION STRATEGY CALLOUT -------------------- */}
           <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
@@ -296,7 +287,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
             </p>
           </div>
 
-          {/* -------------------- 3. NONCONFORMING SAMPLES & MEASUREMENT EVIDENCE -------------------- */}
           {report.nonconforming_samples.length > 0 && (
             <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -352,7 +342,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
             </div>
           )}
 
-          {/* -------------------- 4. EVIDENCE-RANKED ROOT-CAUSE HYPOTHESES -------------------- */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -406,9 +395,8 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Evidence Comparison Grid: Supporting vs Contradicting */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                    {/* Supporting Evidence */}
+
                     <div className="p-3.5 bg-emerald-50/50 rounded-xl border border-emerald-200 space-y-2">
                       <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -425,7 +413,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
                       )}
                     </div>
 
-                    {/* Contradicting Evidence */}
                     <div className="p-3.5 bg-rose-50/50 rounded-xl border border-rose-200 space-y-2">
                       <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
                         <X className="w-3.5 h-3.5 text-rose-600" />
@@ -443,7 +430,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Missing Evidence & Required Physical Confirmation */}
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
                     <div className="flex items-center gap-1.5 text-slate-700 font-bold">
                       <HelpCircle className="w-3.5 h-3.5 text-blue-600" />
@@ -464,9 +450,8 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* -------------------- 5. RECOMMENDED ACTIONS & CAPA INTEGRATION -------------------- */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recommended Containment & Corrective Actions */}
+
             <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -507,7 +492,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Existing CAPA Workflow Linkage */}
             <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -558,7 +542,6 @@ export const ProcessInvestigationPage: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* Correlation vs Causation Note */}
               <div className="p-3 bg-slate-100 rounded-xl text-[11px] text-slate-600 leading-relaxed border border-slate-200">
                 <span className="font-bold text-slate-800">Causation Audit Note:</span>{" "}
                 {report.correlation_vs_causation_note}

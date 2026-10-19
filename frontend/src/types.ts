@@ -1,4 +1,4 @@
-export type CertaintyLevel = 
+export type CertaintyLevel =
   | "Observed Fact"
   | "Model Prediction"
   | "Statistical Finding"
@@ -332,13 +332,13 @@ export interface CAPAActionRecord {
   action_code: string;
   incident_id: string;
   hypothesis_id?: string | null;
-  type: string; // containment, corrective, preventive
+  type: string;
   description: string;
   suggested_role?: string | null;
   responsible_role?: string | null;
   assigned_role: string;
   due_date: string;
-  status: string; // proposed, approved, in_progress, completed, verified, rejected
+  status: string;
   evidence?: string;
   evidence_file_path?: string | null;
   completion_date?: string | null;

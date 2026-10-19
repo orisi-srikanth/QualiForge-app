@@ -1,15 +1,3 @@
-"""
-Agent 1: Production & Quality Data Intake Agent (Requirement 3)
-Fast, deterministic processing paired with forced Pydantic JSON schema validation
-and Groq LLM (model: openai/gpt-oss-20b, reasoning_effort='low') interpretation.
-Performs:
-- Fuzzy column-name mapping (Diameter, Dia_mm, Shaft_OD, etc.)
-- Deterministic engineering unit normalization (inches -> * 25.4, µm -> / 1000, cm -> * 10)
-- Missing field identification and 'needs_info' gating
-- Schema validation via DataIntakeOutput
-- Interpretation of unstructured production/operator notes using Groq openai/gpt-oss-20b
-- Safe fallback to deterministic logic when Groq is unavailable or offline
-"""
 import io
 import json
 import logging
@@ -26,15 +14,9 @@ from backend.app.core.config import settings
 
 logger = logging.getLogger("qualiforge.agent1")
 
-# Module-level cached Groq client (avoids re-instantiating client per request)
 _cached_groq_client: Optional[Any] = None
 
 def get_groq_client(force_refresh: bool = False) -> Optional[Any]:
-    """
-    Returns a reusable Groq client initialized with GROQ_API_KEY from environment.
-    Never exposes, logs, or returns the raw API key.
-    Reuses existing client across requests to prevent redundant client instantiation.
-    """
     global _cached_groq_client
     if _cached_groq_client is not None and not force_refresh:
         return _cached_groq_client
@@ -75,15 +57,12 @@ def get_groq_client(force_refresh: bool = False) -> Optional[Any]:
         return None
 
 def set_groq_client(client: Optional[Any]) -> None:
-    """Injects a mock or custom Groq client for unit testing."""
     global _cached_groq_client
     _cached_groq_client = client
 
 def reset_groq_client() -> None:
-    """Resets cached Groq client."""
     global _cached_groq_client
     _cached_groq_client = None
-
 
 class ProductionDataIntakeAgent(BaseQualityAgent):
     def __init__(self):
@@ -100,17 +79,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
         warnings: Optional[List[str]] = None,
         client: Optional[Any] = None
     ) -> Dict[str, Any]:
-        """
-        Uses Groq API with model 'openai/gpt-oss-20b' and reasoning_effort='low'
-        to interpret unstructured production notes, operator observations, or intake warnings.
-
-        Strict constraints:
-        - Used only for non-authoritative interpretation and candidate observations.
-        - Never fabricates missing measurements, tolerances, or machine baselines.
-        - Cannot overwrite QE-approved specs or deterministic batch limits.
-        - Distinguishes facts from inferences.
-        - Returns structured dictionary with 'status', 'summary', 'extracted_facts', 'inferred_observations'.
-        """
         active_client = client or get_groq_client()
         if not active_client:
             return {
@@ -225,7 +193,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
         start = time.time()
         tool_calls = ["tool_validate_batch_schema", "tool_deterministic_unit_normalization"]
 
-        # 1. Check Missing Critical Fields
         required_fields = ["batch_id", "part_number", "machine", "quantity", "nominal_mm", "tolerance_mm"]
         missing_fields = []
         for field in required_fields:
@@ -238,7 +205,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
             needs_info = True
             warnings.append(f"CRITICAL INTAKE ERROR: Missing required batch fields: {missing_fields}. Pipeline requires clarification.")
 
-        # 2. Extract and sanitize batch attributes
         batch_id = str(batch_meta.get("batch_id", "BATCH-0245"))
         part_number = str(batch_meta.get("part_number", "PS-2026-101"))
         machine = str(batch_meta.get("machine", "CNC-04"))
@@ -251,7 +217,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
         usl = round(nominal_mm + tolerance_mm, 4)
         lsl = round(nominal_mm - tolerance_mm, 4)
 
-        # 3. Deterministic Measurement Extraction & Unit Normalization
         parsed_measurements = []
         unit_conversions = []
 
@@ -259,7 +224,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
             tool_calls.append("tool_parse_csv_stream")
             df = pd.read_csv(io.StringIO(csv_content))
             
-            # Fuzzy column header detection
             col_map = {}
             for col in df.columns:
                 c_lower = col.lower().strip()
@@ -274,7 +238,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
             id_col = col_map.get("sample_id", df.columns[0])
             unit_col = col_map.get("unit")
 
-            # Detect unit from column header
             header_unit = "mm"
             if "inch" in str(val_col).lower() or '"' in str(val_col):
                 header_unit = "in"
@@ -288,7 +251,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
                 raw_val = float(row.get(val_col, 50.00))
                 row_unit = str(row.get(unit_col, header_unit)).lower().strip() if unit_col else header_unit
 
-                # Deterministic unit normalization
                 converted_val = raw_val
                 if row_unit in ["in", "inch", '"']:
                     converted_val = round(raw_val * 25.4, 4)
@@ -343,7 +305,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
         else:
             parsed_measurements = []
 
-        # 4. Interpret Unstructured Production Notes via Groq (openai/gpt-oss-20b)
         notes_str = (
             production_notes
             or batch_meta.get("notes")
@@ -365,7 +326,6 @@ class ProductionDataIntakeAgent(BaseQualityAgent):
             else:
                 tool_calls.append("tool_groq_intake_fallback")
 
-        # 5. Enforce Pydantic DataIntakeOutput Contract
         intake_output = DataIntakeOutput(
             batch_id=batch_id,
             part_number=part_number,

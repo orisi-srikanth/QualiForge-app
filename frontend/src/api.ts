@@ -4,8 +4,6 @@ import {
   WorkflowState, TestScenarioResult, AgentStepLog
 } from "./types";
 
-// Resolve API Base URL:
-// Prioritizes VITE_API_BASE_URL if configured; otherwise defaults to same-origin "/api"
 const rawApiUrl = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
 const API_BASE = rawApiUrl
   ? (rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`)
@@ -149,7 +147,6 @@ export const api = {
     if (!res.ok) throw new Error(data.detail || "Failed to save machine baselines");
     return data;
   },
-
 
   createProduct: async (productData: any, _token?: string): Promise<ProductSpec> => {
     const res = await fetch(`${API_BASE}/products`, {
@@ -458,7 +455,6 @@ export const api = {
     return data;
   },
 
-
   getSpcAnalysis: async (batchId: string = ""): Promise<{
     report: SPCReport;
     log: any;
@@ -547,12 +543,10 @@ export const api = {
     return res.json();
   },
 
-
   getWorkflowTrace: async (workflowId: string): Promise<AgentStepLog[]> => {
     const res = await fetch(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/trace`);
     return res.json();
   },
-
 
   runLangGraphPipeline: async (batchId: string = ""): Promise<any> => {
     const res = await fetch(`${API_BASE}/orchestrator/langgraph-run?batch_id=${encodeURIComponent(batchId)}`, {
@@ -623,7 +617,6 @@ export const api = {
     }
     return data;
   },
-
 
   getAllTestScenarios: async (): Promise<TestScenarioResult[]> => {
     const res = await fetch(`${API_BASE}/scenarios/all`);

@@ -1,8 +1,3 @@
-"""
-Agent 4: Process Monitoring & Anomaly Detection Agent
-Analyzes machine telemetry using Scikit-Learn Isolation Forest and rolling Z-score statistical baselines.
-Identifies abnormal parameters, machine vibration spikes, tool wear thresholds, and process drift.
-"""
 import time
 import os
 import numpy as np
@@ -19,7 +14,6 @@ class ProcessMonitoringAnomalyAgent(BaseQualityAgent):
             role="Analyze machine and process information to identify abnormal manufacturing conditions",
             certainty_level=CertaintyLevel.STATISTICAL_FINDING
         )
-        # Standard baselines for CNC Lathe Machining Precision Shaft
         self.baselines = {
             "vibration_mms": {"mean": 2.1, "std": 0.25, "warn_limit": 3.0, "trip_limit": 3.5},
             "tool_usage_cycles": {"nominal_max": 800, "trip_limit": 1000},
@@ -38,13 +32,11 @@ class ProcessMonitoringAnomalyAgent(BaseQualityAgent):
         start = time.time()
         tool_calls = ["tool_fit_isolation_forest", "tool_rolling_zscore_detector", "tool_evaluate_process_drift"]
 
-        # If records not passed, check SQLite database first
         if not telemetry_records:
             try:
                 from backend.app.database.session import SessionLocal
                 from backend.app.database.models import ProcessReading, Batch
                 db = SessionLocal()
-                # Find batch id
                 b_obj = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
                 if b_obj:
                     q = db.query(ProcessReading).filter(ProcessReading.batch_id == b_obj.id).order_by(ProcessReading.ts.asc()).all()
@@ -107,7 +99,6 @@ class ProcessMonitoringAnomalyAgent(BaseQualityAgent):
                 )
             }
 
-        # Fetch active machine's certified baselines & thresholds from SQLite DB
         custom_baselines = {}
         custom_thresholds = {}
         missing_params = []
@@ -142,7 +133,6 @@ class ProcessMonitoringAnomalyAgent(BaseQualityAgent):
         except Exception:
             pass
 
-        # Run multi-parameter hybrid detector
         analysis_res = anomaly_detector.analyze_telemetry_series(
             batch_id=batch_id,
             machine_code=machine,
@@ -173,7 +163,6 @@ class ProcessMonitoringAnomalyAgent(BaseQualityAgent):
                 pt_flags.append(f"Vibration critical: {vib:.2f} mm/s (trip: {crit_vib_thresh} mm/s)")
             if tool_cyc >= crit_tool_thresh:
                 pt_flags.append(f"Tool cycles exceeded: {tool_cyc} cycles")
-
 
             analyzed_data_points.append(
                 TelemetryDataPoint(

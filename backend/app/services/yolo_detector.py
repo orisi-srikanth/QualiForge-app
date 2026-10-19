@@ -1,8 +1,3 @@
-"""
-QualiForge Agent 2: YOLO Defect Detection Service
-Loads trained YOLO weights (best.pt) detecting ['scratch', 'crack', 'dent'].
-Provides pixel-coordinate bounding boxes, confidence scoring, model metadata, and annotation generation.
-"""
 import os
 import cv2
 from pathlib import Path
@@ -13,12 +8,7 @@ from backend.app.core.config import settings
 
 EXPECTED_YOLO_CLASSES: List[str] = ["scratch", "crack", "dent"]
 
-
 class YoloDefectDetector:
-    """
-    Dedicated YOLO Defect Detection Service for Agent 2 (Visual Quality Inspection).
-    Strictly detects trained surface defects: scratch, crack, dent.
-    """
 
     def __init__(
         self,
@@ -46,16 +36,10 @@ class YoloDefectDetector:
 
     @staticmethod
     def validate_conf_threshold(thresh: float) -> None:
-        """Validates that confidence threshold is within valid probability bounds [0.0, 1.0]."""
         if not isinstance(thresh, (int, float)) or thresh < 0.0 or thresh > 1.0:
             raise ValueError(f"Invalid confidence threshold: {thresh}. Must be a float between 0.0 and 1.0.")
 
     def load_model(self) -> None:
-        """
-        Loads the trained YOLO model weights once.
-        Strictly validates that weights exist and match expected classes.
-        Does NOT silently fall back to any other model.
-        """
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(
                 f"Trained YOLO model weights file not found at: '{self.model_path}'. "
@@ -80,7 +64,6 @@ class YoloDefectDetector:
                 f"Failed to load YOLO model weights from '{self.model_path}': {str(exc)}"
             ) from exc
 
-        # Validate trained classes
         names = getattr(loaded_model, "names", None)
         if isinstance(names, dict):
             actual_classes = list(names.values())
@@ -105,17 +88,12 @@ class YoloDefectDetector:
         save_annotated: bool = True,
         output_dir: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Executes YOLO inference on a stored or staged part image.
-        Returns defect classifications, confidence scores, and pixel bounding boxes.
-        """
         if not self.is_loaded or self.model is None:
             self.load_model()
 
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Inspection image file not found at: '{image_path}'")
 
-        # Validate image decoding and retrieve dimensions
         try:
             with Image.open(image_path) as img:
                 img.verify()
@@ -127,7 +105,6 @@ class YoloDefectDetector:
         thresh = conf_threshold if conf_threshold is not None else self.conf_threshold
         self.validate_conf_threshold(thresh)
 
-        # Execute YOLO inference
         try:
             results = self.model.predict(source=image_path, conf=thresh, verbose=False)
             res = results[0]
@@ -142,7 +119,6 @@ class YoloDefectDetector:
                 conf = float(box.conf[0])
                 xyxy = [float(coord) for coord in box.xyxy[0].tolist()]
 
-                # Bounding box coordinates: x1, y1 top-left, x2, y2 bottom-right in pixels
                 x1 = max(0.0, min(float(img_w), xyxy[0]))
                 y1 = max(0.0, min(float(img_h), xyxy[1]))
                 x2 = max(0.0, min(float(img_w), xyxy[2]))
@@ -193,11 +169,8 @@ class YoloDefectDetector:
             "annotated_url": f"/uploads/annotated/{annotated_filename}" if annotated_filename else None
         }
 
-
-# Global singleton instance loaded lazily on first inference to conserve startup memory (<120MB)
 try:
     auto_load_flag = os.environ.get("YOLO_AUTO_LOAD", "false").lower() in ("true", "1")
     yolo_defect_detector = YoloDefectDetector(auto_load=auto_load_flag)
 except Exception:
-    # Allow deferred initialization if weights path is configured later or under test mock
     yolo_defect_detector = YoloDefectDetector(auto_load=False)

@@ -1,8 +1,3 @@
-"""
-Computer Vision Inference Engine for Industrial Surface Inspection
-Delegates to the Two-Stage MVTec Inspection Engine (PatchCore + MobileNetV3-Small)
-providing anomaly localization, classification, Grad-CAM, and annotated overlays.
-"""
 import os
 from typing import Dict, Any, Optional
 from backend.app.cv_model.defect_detector import vision_model, UNIFIED_CLASSES
@@ -25,6 +20,5 @@ class VisionInferenceEngine:
             output_annotated_dir=output_dir
         )
 
-# Global singleton
 vision_engine = VisionInferenceEngine()
 vision_inference = vision_engine

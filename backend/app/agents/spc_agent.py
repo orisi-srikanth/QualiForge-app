@@ -1,9 +1,3 @@
-"""
-Agent 5: Statistical Process Control (SPC) Agent
-Calculates statistical control limits (UCL, CL, LCL), identifies Nelson rule violations,
-and computes process capability indices (Cp, Cpk, Pp, Ppk).
-Strictly separates Engineering Specification Limits (USL/LSL) from Statistical Control Limits (UCL/LCL).
-"""
 import time
 import numpy as np
 from typing import Dict, Any, List
@@ -130,7 +124,6 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
             )
             return {"report": report, "log": log_entry}
 
-        # Descriptive Statistics
         mean = float(np.mean(data))
         min_val = float(np.min(data))
         max_val = float(np.max(data))
@@ -178,7 +171,6 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
             )
             return {"report": report, "log": log_entry}
 
-        # Control Chart Selection & Statistical Limits Computation
         spc_constants_subgroup = {
             2: {"A2": 1.880, "D3": 0.0, "D4": 3.267, "d2": 1.128},
             3: {"A2": 1.023, "D3": 0.0, "D4": 2.574, "d2": 1.693},
@@ -218,11 +210,9 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
             lcl = round(mean - 3.0 * sigma_within, 4)
             eval_data = data
 
-        # Nelson Rules Evaluation
         violations: List[NelsonRuleViolation] = []
         n_eval = len(eval_data)
 
-        # Rule 1: Beyond 3 sigma (outside UCL or LCL)
         rule1_hits = [i for i, x in enumerate(eval_data) if x > ucl or x < lcl]
         if rule1_hits:
             violations.append(
@@ -235,7 +225,6 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
                 )
             )
 
-        # Rule 2: 8 consecutive points on one side of center line (shift)
         if n_eval >= 8:
             r2_indices = []
             for i in range(n_eval - 7):
@@ -253,7 +242,6 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
                     )
                 )
 
-        # Rule 3: 6 points in a row steadily increasing or decreasing (drift/wear)
         if n_eval >= 6:
             r3_indices = []
             for i in range(n_eval - 5):
@@ -273,7 +261,6 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
                     )
                 )
 
-        # Rule 5: 2 out of 3 consecutive points beyond 2-sigma on same side
         if n_eval >= 3 and sigma_within > 0:
             r5_indices = []
             for i in range(n_eval - 2):
@@ -293,7 +280,6 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
                     )
                 )
 
-        # Rule 6: 4 out of 5 consecutive points beyond 1-sigma on same side
         if n_eval >= 5 and sigma_within > 0:
             r6_indices = []
             for i in range(n_eval - 4):
@@ -313,7 +299,6 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
                     )
                 )
 
-        # Compute process capability through ProcessCapabilityEngine
         rule_desc_list = [f"Rule {v.rule_number}: {v.rule_name}" for v in violations]
         cap_res = capability_engine.calculate_capability(
             values=clean_vals,
@@ -331,7 +316,6 @@ class StatisticalProcessControlAgent(BaseQualityAgent):
         ppk = cap_res.get("ppk")
         cap_assessment = cap_res.get("assessment") or "Capability assessment unavailable"
 
-        # Prepare rich chart data series
         chart_data = []
         for i, val in enumerate(data):
             val_f = float(round(float(val), 4))

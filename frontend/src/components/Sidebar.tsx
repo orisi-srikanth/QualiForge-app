@@ -88,10 +88,10 @@ export const Sidebar: React.FC<Props> = ({
         isCollapsed ? "w-[76px]" : "w-[272px]"
       }`}
     >
-      {/* -------------------- BRAND HEADER & TOGGLE OPTION -------------------- */}
+
       <div className="border-b border-slate-800 shrink-0 bg-slate-950/80 transition-all">
         {isCollapsed ? (
-          // Collapsed Brand Header: Compact Icon + Toggle Expand Button
+
           <div className="py-3.5 px-2 flex flex-col items-center gap-2.5">
             <button
               onClick={onToggleCollapse}
@@ -116,7 +116,7 @@ export const Sidebar: React.FC<Props> = ({
             )}
           </div>
         ) : (
-          // Expanded Brand Header: Full Logo, Title, and Collapse Button
+
           <div className="px-4 py-3.5">
             <div className="flex items-center justify-between gap-2">
               <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 shadow-sm flex items-center justify-center flex-1">
@@ -148,7 +148,6 @@ export const Sidebar: React.FC<Props> = ({
         )}
       </div>
 
-      {/* -------------------- ROLE PILL BANNER -------------------- */}
       <div className={`border-b border-slate-800 text-xs transition-all ${
         isCollapsed ? "py-2 px-2 flex justify-center bg-slate-800/40" : "px-4 py-2.5 bg-slate-800/60 flex items-center justify-between"
       }`}>
@@ -189,11 +188,10 @@ export const Sidebar: React.FC<Props> = ({
         )}
       </div>
 
-      {/* -------------------- NAVIGATION LINKS -------------------- */}
       <nav className={`flex-1 overflow-y-auto ${isCollapsed ? "py-4 px-2 space-y-4" : "px-3 py-4 space-y-6"}`}>
         {navSections.map((sec, idx) => (
           <div key={idx} className={idx > 0 && !isCollapsed ? "mt-5" : ""}>
-            {/* Category title only visible when expanded */}
+
             {!isCollapsed && (
               <div className="px-3 mb-2 text-[11px] font-bold text-slate-400 tracking-[0.08em] uppercase">
                 {sec.title}
@@ -206,7 +204,7 @@ export const Sidebar: React.FC<Props> = ({
                 const isActive = activePage === item.id;
 
                 if (isCollapsed) {
-                  // COLLAPSED: ONLY LOGO / ICON FOR EACH AGENT VISIBLE
+
                   return (
                     <div key={item.id} className="relative group flex justify-center">
                       <button
@@ -220,7 +218,6 @@ export const Sidebar: React.FC<Props> = ({
                         <Icon className="w-5 h-5 shrink-0" />
                       </button>
 
-                      {/* Tooltip on Hover */}
                       <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 hidden group-hover:flex flex-col bg-slate-950 text-white px-3 py-2 rounded-lg shadow-2xl z-50 pointer-events-none whitespace-nowrap border border-slate-700">
                         <span className="text-xs font-bold text-white leading-tight">{item.label}</span>
                         <span className="text-[10px] text-slate-400 leading-tight mt-0.5">{item.purpose}</span>
@@ -229,7 +226,6 @@ export const Sidebar: React.FC<Props> = ({
                   );
                 }
 
-                // EXPANDED: FULL LABEL + ICON + PURPOSE
                 return (
                   <button
                     key={item.id}
@@ -253,7 +249,6 @@ export const Sidebar: React.FC<Props> = ({
         ))}
       </nav>
 
-      {/* -------------------- USER SESSION FOOTER -------------------- */}
       <div className={`border-t border-slate-800 bg-slate-950/40 transition-all ${isCollapsed ? "p-2 flex flex-col items-center gap-2" : "p-3"}`}>
         {isCollapsed ? (
           <>

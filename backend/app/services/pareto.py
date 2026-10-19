@@ -1,8 +1,3 @@
-"""
-Pareto Analysis Service (80/20 Rule)
-Calculates defect and root-cause frequency distributions with cumulative percentages.
-Supports dimensions: defect_type, machine, product_family, root_cause, rejection_reason.
-"""
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
@@ -10,14 +5,9 @@ from backend.app.db.models import QualityIncident, RCAHypothesis, Batch, Product
 from backend.app.core.guardrails import EpistemicLabel
 
 class ParetoService:
-    """Computes Pareto distributions and isolates the vital few across 5 dimensions."""
 
     @staticmethod
     def _parse_date_bounds(start_date: Optional[str], end_date: Optional[str]):
-        """
-        Parses and validates inclusive start and end date bounds.
-        Raises ValueError for invalid formats (mapped to 422) or reversed ranges (mapped to 400).
-        """
         dt_start = None
         dt_end = None
 
@@ -57,10 +47,6 @@ class ParetoService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Aggregates quality events by dimension and calculates cumulative percentages.
-        Dimensions supported: defect_type, machine, product_family, root_cause, rejection_reason.
-        """
         dt_start, dt_end = ParetoService._parse_date_bounds(start_date, end_date)
 
         query = db.query(QualityIncident)
@@ -93,7 +79,6 @@ class ParetoService:
                 counts[key] = counts.get(key, 0) + 1
 
         elif dimension == "root_cause":
-            # ONLY include confirmed root causes verified by Quality Engineers
             q = (
                 db.query(RCAHypothesis)
                 .join(QualityIncident, RCAHypothesis.incident_id == QualityIncident.id)
@@ -113,7 +98,6 @@ class ParetoService:
                 counts[key] = counts.get(key, 0) + 1
 
         else:
-            # Fallback to defect_type
             for inc in incidents:
                 key = inc.defect_type or "Unspecified"
                 counts[key] = counts.get(key, 0) + 1
@@ -135,7 +119,6 @@ class ParetoService:
                 "analysis_note": "No incidents found matching the specified criteria."
             }
 
-        # Stable, deterministic tie-breaking: count descending, then category name ascending
         sorted_items = sorted(counts.items(), key=lambda x: (-x[1], str(x[0])))
 
         items_list = []
@@ -147,13 +130,11 @@ class ParetoService:
             cumulative_sum += count
             pct = round((count / total_occurrences) * 100.0, 1)
 
-            # Ensure cumulative percentage ends at exactly 100.0% for the final item
             if idx == len(sorted_items) - 1:
                 cum_pct = 100.0
             else:
                 cum_pct = round((cumulative_sum / total_occurrences) * 100.0, 1)
 
-            # Vital few rule: categories included until cumulative percentage reaches 80.0%
             if not vital_cutoff_reached:
                 vital_few.append(category)
                 is_vital = True

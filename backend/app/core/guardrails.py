@@ -1,18 +1,11 @@
-"""
-Industrial Guardrail & Autonomous Action Prevention Layer
-Enforces ISO 9001 / IATF 16949 Decision-Support Constraints.
-Prevents any AI agent or autonomous routine from executing physical or disposition actions.
-"""
 from enum import Enum
 from typing import Set, Dict, Any, Optional
 from backend.app.core.logging import logger
 
 class ForbiddenAutonomousAction(Exception):
-    """Raised when an autonomous system attempts a safety-critical physical or disposition action."""
     pass
 
 class EpistemicViolation(Exception):
-    """Raised when an unauthorized agent emits a restricted epistemic certainty level."""
     pass
 
 class EpistemicLabel(str, Enum):
@@ -22,7 +15,6 @@ class EpistemicLabel(str, Enum):
     HYPOTHESIS = "HYPOTHESIS"
     CONFIRMED_ROOT_CAUSE = "CONFIRMED_ROOT_CAUSE"
 
-# The hard allowlist of actions that software agents are permitted to execute
 PERMITTED_AGENT_ACTIONS: Set[str] = {
     "parse_file",
     "validate_batch_schema",
@@ -58,10 +50,9 @@ PERMITTED_AGENT_ACTIONS: Set[str] = {
     "validate_guardrail_compliance",
     "generate_report_draft",
     "request_reassessment",
-    "recommend_disposition"  # Recommendation ONLY, not disposition execution
+    "recommend_disposition"
 }
 
-# Strictly forbidden autonomous actions
 FORBIDDEN_ACTIONS: Set[str] = {
     "release_product",
     "release_batch",
@@ -79,14 +70,9 @@ FORBIDDEN_ACTIONS: Set[str] = {
 }
 
 class GuardrailLayer:
-    """Central policy enforcement interceptor for all agentic operations."""
 
     @staticmethod
     def validate_action(action_name: str, agent_name: str = "System", context: Optional[Dict[str, Any]] = None):
-        """
-        Validates that the requested action is on the strict allowlist and not in the forbidden set.
-        Raises ForbiddenAutonomousAction on violation.
-        """
         clean_action = action_name.strip().lower()
 
         if clean_action in FORBIDDEN_ACTIONS or clean_action not in PERMITTED_AGENT_ACTIONS:
@@ -100,11 +86,6 @@ class GuardrailLayer:
 
     @staticmethod
     def validate_epistemic_label(label: str, source: str = "Agent", is_human_engineer: bool = False):
-        """
-        Validates epistemic certainty classification.
-        Agents can only emit OBSERVED_FACT, MODEL_PREDICTION, STATISTICAL_FINDING, HYPOTHESIS.
-        CONFIRMED_ROOT_CAUSE can ONLY be declared by an authenticated human Quality Engineer.
-        """
         try:
             enum_label = EpistemicLabel(label)
         except ValueError:

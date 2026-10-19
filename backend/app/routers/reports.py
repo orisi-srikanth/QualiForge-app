@@ -1,7 +1,3 @@
-"""
-Reports, Dashboard Analytics & Audit Dossier Endpoints
-Pareto charts, CAPA effectiveness z-tests, executive KPIs, and ISO 9001 PDF generation.
-"""
 import os
 from fastapi import APIRouter, Response, Depends, Query, HTTPException
 from typing import Optional, Dict, Any

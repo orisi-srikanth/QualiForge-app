@@ -15,7 +15,7 @@ interface Props {
 }
 
 export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) => {
-  // -------------------- HERO DYNAMIC TELEMETRY STATE --------------------
+
   const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(() => {
     if (typeof window !== "undefined" && window.matchMedia) {
       return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -41,7 +41,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
   const [liveCpk, setLiveCpk] = useState<number | null>(1.42);
   const [systemBatchesCount, setSystemBatchesCount] = useState(0);
 
-  // Monitor prefers-reduced-motion changes
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -50,7 +49,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // Fetch real operational metrics from backend
   useEffect(() => {
     import("../api").then(({ api }) => {
       api.getDashboardSummary().then((sum) => {
@@ -65,13 +63,12 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
     });
   }, []);
 
-  // Live real-time telemetry line animation ticker (disabled if prefers-reduced-motion is true)
   useEffect(() => {
     if (prefersReducedMotion) return;
 
     let sampleCounter = 111;
     const interval = setInterval(() => {
-      // Subtle micro-variation around nominal 50.00 mm (within ±0.02 mm)
+
       const microDelta = (Math.sin(sampleCounter * 0.75) * 0.014) + ((Math.random() - 0.5) * 0.008);
       const nextDiameter = parseFloat((50.000 + microDelta).toFixed(3));
       const nextVib = parseFloat((2.10 + (Math.sin(sampleCounter * 0.4) * 0.18) + ((Math.random() - 0.5) * 0.08)).toFixed(2));
@@ -91,7 +88,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
     return () => clearInterval(interval);
   }, [prefersReducedMotion]);
 
-  // -------------------- 11-STAGE WORKFLOW ANIMATION STATE --------------------
   const [activeStage, setActiveStage] = useState(0);
   const [isFlowPlaying, setIsFlowPlaying] = useState(true);
 
@@ -218,7 +214,7 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-500 selection:text-white">
-      {/* -------------------- NAVIGATION BAR -------------------- */}
+
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-24 flex items-center justify-between">
           <div
@@ -256,12 +252,10 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
         </div>
       </header>
 
-      {/* -------------------- HERO SECTION (LEFT WORDS + RIGHT LIVE DYNAMIC GRAPHS) -------------------- */}
       <section className="relative overflow-hidden pt-12 pb-20 lg:pt-16 lg:pb-24 bg-gradient-to-b from-white via-slate-50 to-slate-100 border-b border-slate-200/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-            
-            {/* LEFT COLUMN: WORDS MOVED TO LEFT */}
+
             <div className="lg:col-span-6 flex flex-col items-start text-left">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold uppercase tracking-wider mb-6 shadow-2xs">
                 <Sparkles className="w-3.5 h-3.5" />
@@ -307,13 +301,11 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
               </div>
             </div>
 
-            {/* RIGHT COLUMN: DYNAMICALLY CHANGING LIVE TELEMETRY GRAPHS & VALUES */}
             <div className="lg:col-span-6 w-full">
               <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 p-5 sm:p-6 text-white relative overflow-hidden">
-                {/* Glowing subtle background accent */}
+
                 <div className="absolute -top-24 -right-24 w-60 h-60 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
 
-                {/* Live Header Stream Status */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
                   <div className="flex items-center gap-2.5">
                     <span className="relative flex h-3 w-3">
@@ -334,7 +326,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
                   </div>
                 </div>
 
-                {/* 3 Dynamically Changing Live KPI Values */}
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 transition-all">
                     <div className="text-[11px] font-medium text-slate-400">Specification Nominal</div>
@@ -367,7 +358,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
                   </div>
                 </div>
 
-                {/* Live Real-time Recharts I-MR Control Chart or Clean Envelope */}
                 <div className="mt-5 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
                   <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-2">
                     <div className="flex items-center gap-2">
@@ -442,7 +432,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
                   </div>
                 </div>
 
-                {/* Footer Status Indicators */}
                 <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] font-mono text-slate-400">
                   <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -463,7 +452,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
         </div>
       </section>
 
-      {/* -------------------- CAPABILITIES SECTION -------------------- */}
       <section id="capabilities" className="py-20 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto">
@@ -568,11 +556,9 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
         </div>
       </section>
 
-      {/* -------------------- ANIMATED 11-STAGE MULTI-AGENT WORKFLOW PIPELINE -------------------- */}
       <section id="workflow" className="py-20 bg-slate-900 text-white border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Section Header with Animation Play/Pause Toggle */}
+
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-10 border-b border-slate-800">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950 text-blue-400 border border-blue-800 text-xs font-mono uppercase tracking-widest mb-3">
@@ -586,7 +572,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
               </p>
             </div>
 
-            {/* Animation Controls */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsFlowPlaying(!isFlowPlaying)}
@@ -611,10 +596,9 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
             </div>
           </div>
 
-          {/* Animated Interactive Pipeline Stepper Rail */}
           <div className="mt-8 pb-6 overflow-x-auto scrollbar-none">
             <div className="flex items-center justify-between min-w-[850px] relative px-2">
-              {/* Animated Progress Bar behind nodes */}
+
               <div className="absolute top-1/2 left-4 right-4 -translate-y-1/2 h-1 bg-slate-800 z-0">
                 <div
                   className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 transition-all duration-700"
@@ -659,7 +643,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
             </div>
           </div>
 
-          {/* Featured Active Stage Showcase Card */}
           {(() => {
             const current = workflowStages[activeStage];
             return (
@@ -685,7 +668,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
                     </p>
                   </div>
 
-                  {/* Stage Quick Preview Chip */}
                   <div className="w-full lg:w-auto p-4 rounded-xl bg-slate-900/90 border border-slate-700 shrink-0 min-w-[280px]">
                     <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
                       {current.preview.label}
@@ -696,7 +678,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
                   </div>
                 </div>
 
-                {/* Input -> Engine -> Output Flow Diagram */}
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
                     <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Stage Inflow</div>
@@ -715,7 +696,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
             );
           })()}
 
-          {/* Interactive Responsive Grid of All 11 Stages */}
           <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {workflowStages.map((s, idx) => {
               const isActive = activeStage === idx;
@@ -761,7 +741,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
         </div>
       </section>
 
-      {/* -------------------- TWO USER GROUPS -------------------- */}
       <section id="roles" className="py-20 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto">
@@ -775,7 +754,7 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
           </div>
 
           <div className="mt-14 grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* Quality Engineer Card */}
+
             <div className="rounded-2xl border-2 border-blue-600/60 bg-blue-50/20 p-8 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold uppercase tracking-wider mb-4">
@@ -820,7 +799,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
               </div>
             </div>
 
-            {/* Production Team Card */}
             <div className="rounded-2xl border-2 border-slate-300 bg-slate-50/50 p-8 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200 text-slate-800 text-xs font-bold uppercase tracking-wider mb-4">
@@ -868,7 +846,6 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
         </div>
       </section>
 
-      {/* -------------------- TRUST & GOVERNANCE SECTION -------------------- */}
       <section id="governance" className="py-20 bg-slate-900 text-white border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto">
@@ -939,10 +916,9 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
         </div>
       </section>
 
-      {/* -------------------- FOOTER (NO BOX AROUND LOGO) -------------------- */}
       <footer className="bg-slate-950 text-slate-400 py-14 border-t border-slate-800 text-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          {/* Logo completely transparent on dark background, zero box/frame */}
+
           <div className="flex items-center gap-4">
             <img
               src="/logo.png"

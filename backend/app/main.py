@@ -1,12 +1,6 @@
-"""
-FastAPI Enterprise Application Entry Point
-Agentic AI Manufacturing Quality Inspection & Root Cause Analysis System
-Serves unified REST API, Static inspection media, and Production React Frontend.
-"""
 import os
 import sys
 
-# Constrain thread count for low-core cloud containers (Render 0.1 vCPU / 512MB RAM)
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -19,9 +13,6 @@ try:
 except Exception:
     pass
 
-# Note: Torch thread limits are set lazily on demand when defect inspection models initialize
-
-# Ensure both repo root and backend directory are in sys.path
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 _backend_dir = os.path.dirname(_current_dir)
 _repo_dir = os.path.dirname(_backend_dir)
@@ -111,7 +102,6 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# Support FRONTEND_ORIGINS environment variable, settings.cors_origin_list, and default approved origins
 from backend.app.core.config import settings
 raw_frontend_origins = os.environ.get("FRONTEND_ORIGINS", "")
 env_origins = [o.strip().rstrip("/") for o in raw_frontend_origins.split(",") if o.strip()]
@@ -126,7 +116,6 @@ default_origins = [
 ]
 origins = list(dict.fromkeys(env_origins + settings.cors_origin_list + default_origins))
 
-# Enable CORS with explicit origins, regex for all Vercel previews, and full method/header support
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -142,7 +131,6 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 
-# Global exception handler ensuring CORS headers are preserved even on 500 crashes
 import re
 _vercel_regex = re.compile(r"^https:\/\/.*\.vercel\.app$")
 
@@ -177,18 +165,15 @@ async def global_exception_handler(request: Request, exc: Exception):
         headers=headers,
     )
 
-# Initialize Database and Sample Assets on Startup
 @app.on_event("startup")
 def startup_event():
     Base.metadata.create_all(bind=engine)
 
-# Static files mount for uploaded/annotated inspection images
 static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "static"))
 os.makedirs(os.path.join(static_dir, "uploads", "samples"), exist_ok=True)
 os.makedirs(os.path.join(static_dir, "uploads", "annotated"), exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=os.path.join(static_dir, "uploads")), name="uploads")
 
-# Include API and Knowledge routers exactly once
 app.include_router(api_router)
 app.include_router(knowledge_router)
 
@@ -203,7 +188,6 @@ def health_check():
         "mode": "HUMAN_IN_THE_LOOP_DECISION_SUPPORT"
     }
 
-# Mount React Frontend Production Build (if built)
 dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
 if os.path.exists(dist_dir):
     assets_dir = os.path.join(dist_dir, "assets")

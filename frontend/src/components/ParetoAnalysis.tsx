@@ -99,7 +99,7 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
 
   return (
     <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4" id="pareto-analysis-container">
-      {/* Header */}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -120,7 +120,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Dimension Selector Tabs */}
       <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100 rounded-lg" id="pareto-dimension-tabs">
         {DIMENSIONS.map((dim) => (
           <button
@@ -138,7 +137,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* Date Range Filter Bar */}
       <form onSubmit={handleApplyFilter} className="flex flex-wrap items-center gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
         <div className="flex items-center gap-1 text-slate-600 font-medium">
           <Filter className="w-3.5 h-3.5" />
@@ -181,7 +179,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
           <span>Reset</span>
         </button>
 
-        {/* Quick Presets */}
         <div className="flex items-center gap-1 ml-auto text-[11px] text-slate-500">
           <span>Presets:</span>
           <button
@@ -208,7 +205,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </form>
 
-      {/* Error State */}
       {error && (
         <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -216,7 +212,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Loading State */}
       {loading && !error && (
         <div className="h-64 flex flex-col items-center justify-center text-slate-500 text-xs gap-2">
           <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
@@ -224,7 +219,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Empty State */}
       {!loading && !error && data && data.total === 0 && (
         <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-lg space-y-2">
           <Info className="w-6 h-6 text-slate-400 mx-auto" />
@@ -242,10 +236,9 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Loaded Content */}
       {!loading && !error && data && data.total > 0 && (
         <div className="space-y-4">
-          {/* Summary KPIs */}
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
               <span className="text-slate-500 block text-[11px]">Total Events</span>
@@ -267,7 +260,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Dual-Axis Pareto Chart */}
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -327,7 +319,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
             </ResponsiveContainer>
           </div>
 
-          {/* Vital Few Summary Bar */}
           <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-blue-900">Vital Few (80% Focus):</span>
@@ -345,7 +336,6 @@ export const ParetoAnalysis: React.FC<Props> = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Safety & Epistemic Disclaimer */}
           <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-500">
             <div className="flex items-center gap-1.5 text-slate-600">
               <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />

@@ -1,19 +1,3 @@
-"""
-Evaluation Engine for Precision Shaft Defect Detection Pipeline
-Evaluates transfer-learning classifier and Grad-CAM localization on both:
-- Normal Test Split (Held-out generation groups 17..19)
-- Hard Test Split (Unseen lighting, contrast, blur, and sensor noise)
-
-Metrics reported:
-- Per-class Precision, Recall, F1, Support
-- Macro-F1 and Accuracy
-- 6x6 Confusion Matrix
-- Localisation IoU against generator ground truth bounding box
-- % boxes with IoU >= 0.5
-- mAP@0.5
-- Performance drop between normal test and hard test splits
-- Saves 12+ visual prediction figures into docs/cv_samples/
-"""
 import os
 import json
 import time
@@ -47,9 +31,7 @@ from ml.cv.train_classifier import (
     IDX_TO_CLASS
 )
 
-
 def compute_box_iou(boxA: Optional[Dict[str, int]], boxB: Optional[Dict[str, int]]) -> float:
-    """Computes Intersection-over-Union between two bounding boxes {x, y, width, height}."""
     if boxA is None or boxB is None:
         return 0.0
     xA = max(boxA["x"], boxB["x"])
@@ -63,20 +45,16 @@ def compute_box_iou(boxA: Optional[Dict[str, int]], boxB: Optional[Dict[str, int
     denom = float(boxAArea + boxBArea - interArea)
     return interArea / denom if denom > 0 else 0.0
 
-
 def extract_box_from_cam(cam_map: np.ndarray, threshold_ratio: float = 0.45) -> Optional[Dict[str, int]]:
-    """Extracts bounding box from Grad-CAM activation heatmap."""
     binary_cam = (cam_map >= (np.max(cam_map) * threshold_ratio)).astype(np.uint8)
     contours, _ = cv2.findContours(binary_cam, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
-    # Largest contour
     c = max(contours, key=cv2.contourArea)
     bx, by, bw, bh = cv2.boundingRect(c)
     if bw <= 4 or bh <= 4:
         return None
     return {"x": int(bx), "y": int(by), "width": int(bw), "height": int(bh)}
-
 
 def evaluate_split(
     records: List[Dict[str, Any]],
@@ -86,7 +64,6 @@ def evaluate_split(
     device: torch.device,
     split_name: str
 ) -> Dict[str, Any]:
-    """Runs full evaluation over a given split."""
     y_true = []
     y_pred = []
     confidences = []
@@ -117,16 +94,13 @@ def evaluate_split(
         y_pred.append(pred_idx)
         confidences.append(pred_prob)
 
-        # Grad-CAM Localisation
         pred_bbox = None
         iou = 0.0
         if pred_idx != 0:
             cam_map = grad_cam.generate(tensor_in, pred_idx)
             pred_bbox = extract_box_from_cam(cam_map, threshold_ratio=0.42)
 
-        # Compute IoU against GT
         if true_idx == 0:
-            # Normal shaft: if model predicts no_defect, perfect localization
             if pred_idx == 0:
                 iou = 1.0
                 is_box_50 = 1.0
@@ -160,7 +134,6 @@ def evaluate_split(
             "iou": iou
         })
 
-    # Metrics calculation
     y_true_arr = np.array(y_true)
     y_pred_arr = np.array(y_pred)
 
@@ -207,9 +180,7 @@ def evaluate_split(
         "per_sample_details": per_sample_details
     }
 
-
 def save_confusion_matrix_plot(cm: List[List[int]], output_path: Path, title: str):
-    """Renders and saves confusion matrix heatmap."""
     cm_arr = np.array(cm)
     fig, ax = plt.subplots(figsize=(8, 7))
     cax = ax.matshow(cm_arr, cmap=plt.cm.Blues, alpha=0.85)
@@ -235,7 +206,6 @@ def save_confusion_matrix_plot(cm: List[List[int]], output_path: Path, title: st
     plt.savefig(output_path, dpi=130)
     plt.close(fig)
 
-
 def save_prediction_samples(
     sample_list: List[Dict[str, Any]],
     grad_cam: GradCAM,
@@ -244,7 +214,6 @@ def save_prediction_samples(
     output_dir: Path,
     num_samples: int = 12
 ):
-    """Generates visual prediction figures with Grad-CAM heatmap and bounding boxes."""
     output_dir.mkdir(parents=True, exist_ok=True)
     selected = sample_list[:num_samples]
 
@@ -254,7 +223,6 @@ def save_prediction_samples(
             continue
         h, w = img_bgr.shape[:2]
 
-        # Generate Grad-CAM map
         img_pil = Image.open(item["path"]).convert("RGB")
         tensor_in = transform(img_pil).unsqueeze(0).to(device)
         pred_idx = CLASS_TO_IDX.get(item["pred_class"], 0)
@@ -265,14 +233,12 @@ def save_prediction_samples(
             cam_color = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
             overlay = cv2.addWeighted(overlay, 0.65, cam_color, 0.35, 0)
 
-        # Draw GT bbox in Green
         gt = item["gt_bbox"]
         if gt:
             cv2.rectangle(overlay, (gt["x"], gt["y"]), (gt["x"] + gt["width"], gt["y"] + gt["height"]), (0, 220, 0), 2)
             cv2.putText(overlay, f"GT: {item['true_class']}", (gt["x"], max(18, gt["y"] - 6)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
 
-        # Draw Pred bbox in Red
         pred_b = item["pred_bbox"]
         if pred_b:
             cv2.rectangle(overlay, (pred_b["x"], pred_b["y"]), (pred_b["x"] + pred_b["width"], pred_b["y"] + pred_b["height"]), (0, 0, 240), 2)
@@ -280,7 +246,6 @@ def save_prediction_samples(
                         (pred_b["x"], min(h - 8, pred_b["y"] + pred_b["height"] + 16)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 1)
 
-        # Save figure
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
         ax1.imshow(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
         ax1.set_title(f"Input: {item['true_class']} ({item['image_id']})", fontsize=10)
@@ -295,13 +260,11 @@ def save_prediction_samples(
         plt.savefig(out_fig, dpi=120)
         plt.close(fig)
 
-
 def run_evaluation(
     splits_path: Optional[Path] = None,
     models_dir: Optional[Path] = None,
     output_samples_dir: Optional[Path] = None
 ) -> Dict[str, Any]:
-    """Runs complete evaluation on Normal Test and Hard Test splits."""
     project_root = Path(__file__).resolve().parent.parent.parent
     if splits_path is None:
         splits_path = project_root / "data" / "synthetic_shafts" / "splits.json"
@@ -338,32 +301,26 @@ def run_evaluation(
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    # 1. Evaluate Normal Test Split
     print("\n[1/3] Evaluating Normal Test Split (Held-out Groups 17..19)...")
     normal_eval = evaluate_split(normal_records, model, grad_cam, clf_transform, device, "normal_test")
 
-    # 2. Evaluate Hard Test Split
     print("[2/3] Evaluating Hard Test Split (Unseen Lighting, Contrast & Sensor Noise)...")
     hard_eval = evaluate_split(hard_records, model, grad_cam, clf_transform, device, "hard_test")
 
-    # 3. Calculate Performance Drop
     drop_macro_f1 = round(normal_eval["macro_f1"] - hard_eval["macro_f1"], 4)
     drop_acc = round(normal_eval["accuracy"] - hard_eval["accuracy"], 4)
     drop_iou = round(normal_eval["mean_localisation_iou"] - hard_eval["mean_localisation_iou"], 4)
     drop_box50 = round(normal_eval["pct_boxes_iou_gte_05"] - hard_eval["pct_boxes_iou_gte_05"], 2)
     drop_map50 = round(normal_eval["mAP_at_05"] - hard_eval["mAP_at_05"], 4)
 
-    # 4. Save Plots & Samples
     print("[3/3] Saving confusion matrices and visual prediction samples...")
     save_confusion_matrix_plot(normal_eval["confusion_matrix"], output_samples_dir / "confusion_matrix_normal.png",
                                f"Normal Test Split Confusion Matrix (Macro-F1: {normal_eval['macro_f1']:.4f})")
     save_confusion_matrix_plot(hard_eval["confusion_matrix"], output_samples_dir / "confusion_matrix_hard.png",
                                f"Hard Test Split Confusion Matrix (Macro-F1: {hard_eval['macro_f1']:.4f})")
 
-    # Save 12+ samples
     save_prediction_samples(normal_eval["per_sample_details"], grad_cam, clf_transform, device, output_samples_dir, num_samples=12)
 
-    # 5. Assemble and Persist Metrics Payload
     cv_metrics = {
         "dataset": "Synthetic Precision Ground Shafts (Procedural Engine)",
         "evaluation_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -415,7 +372,6 @@ def run_evaluation(
     with open(alt_models_dir / "cv_metrics.json", "w", encoding="utf-8") as f:
         json.dump(cv_metrics, f, indent=2)
 
-    # Print Summary Tables
     print("\n" + "=" * 70)
     print("  EVALUATION SUMMARY: NORMAL TEST SPLIT VS HARD TEST SPLIT")
     print("=" * 70)
@@ -444,7 +400,6 @@ def run_evaluation(
     print(f"Metrics saved to: {metrics_out}")
 
     return cv_metrics
-
 
 if __name__ == "__main__":
     run_evaluation()

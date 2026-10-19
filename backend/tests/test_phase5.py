@@ -1,7 +1,3 @@
-"""
-Unit Tests for Phase 5: RAG & Knowledge Retrieval
-Tests chunking, hybrid retrieval, NCR-019 retrieval, and context-only framing.
-"""
 import pytest
 from backend.app.services.rag import rag_service
 from backend.app.core.guardrails import EpistemicLabel
@@ -10,7 +6,6 @@ def test_rag_knowledge_base_indexed():
     assert len(rag_service.chunks) >= 20, f"Expected >= 20 chunks in KB, found {len(rag_service.chunks)}"
 
 def test_rag_ncr019_retrieval_for_anchor_query():
-    # Mandated query from TC-06: "Oversized shaft diameter tool wear CNC-04 1150 cycles"
     query = "Oversized shaft diameter tool wear CNC-04 1150 cycles"
     results = rag_service.search(query=query, top_k=3)
     assert len(results) > 0, "RAG search must return results"

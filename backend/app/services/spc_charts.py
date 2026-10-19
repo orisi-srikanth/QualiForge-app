@@ -1,14 +1,7 @@
-"""
-Statistical Process Control (SPC) Engine
-Implements I-MR, X-bar/R, and p-charts with automated chart selection.
-Detects Western Electric & Nelson out-of-control rules.
-Strictly separates Statistical Control Limits (UCL/LCL) from Engineering Specification Limits (USL/LSL).
-"""
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 from backend.app.core.guardrails import EpistemicLabel
 
-# Standard SPC constants for X-bar / R charts (sample size n = 2..10)
 SPC_CONSTANTS = {
     2: {"A2": 1.880, "D3": 0.0, "D4": 3.267, "d2": 1.128},
     3: {"A2": 1.023, "D3": 0.0, "D4": 2.574, "d2": 1.693},
@@ -22,7 +15,6 @@ SPC_CONSTANTS = {
 }
 
 class SPCEngine:
-    """Enterprise statistical process control engine for manufacturing lines."""
 
     @staticmethod
     def evaluate_spc(
@@ -33,9 +25,6 @@ class SPCEngine:
         is_attribute_data: bool = False,
         total_subgroup_counts: Optional[List[int]] = None
     ) -> Dict[str, Any]:
-        """
-        Executes automated chart selection, control limit computation, and Nelson rule analysis.
-        """
         n_points = len(data)
         if n_points < 2:
             return {
@@ -51,7 +40,6 @@ class SPCEngine:
                 f"Control limits are preliminary and subject to estimation variation."
             )
 
-        # 1. Chart Selection Logic
         if is_attribute_data:
             chart_type = "p_chart"
             selection_reason = "Attribute binomial pass/fail proportions selected based on defect counts."
@@ -71,10 +59,8 @@ class SPCEngine:
         sigma = chart_result["sigma"]
         points = chart_result["points"]
 
-        # 2. Evaluate Nelson Rules on individual/subgroup averages
         violations = SPCEngine._evaluate_nelson_rules(points, cl, sigma)
 
-        # 3. Explicit separation notice for UI and Report
         limit_separation_info = {
             "control_limits": {
                 "concept": "Statistical Process Control Limits (Natural Process Variation)",
@@ -96,7 +82,6 @@ class SPCEngine:
             )
         }
 
-        # Build chart data series for frontend Plotly/Recharts
         chart_series = []
         for i, val in enumerate(points):
             pt_violations = [v["rule_number"] for v in violations if i in v["violating_indices"]]
@@ -140,12 +125,10 @@ class SPCEngine:
 
     @staticmethod
     def _compute_imr(values: List[float]) -> Dict[str, Any]:
-        """I-MR: Individuals and Moving Range Chart."""
         vals = np.array(values, dtype=float)
         cl = float(np.mean(vals))
         moving_ranges = np.abs(np.diff(vals))
         mr_bar = float(np.mean(moving_ranges)) if len(moving_ranges) > 0 else 0.0
-        # For n=2 moving range, d2 = 1.128, E2 = 2.66, D4 = 3.267
         sigma = mr_bar / 1.128 if mr_bar > 0 else float(np.std(vals))
         ucl = cl + 3.0 * sigma
         lcl = cl - 3.0 * sigma
@@ -166,7 +149,6 @@ class SPCEngine:
 
     @staticmethod
     def _compute_xbar_r(values: List[float], n: int) -> Dict[str, Any]:
-        """X-bar and R chart for rational subgroups."""
         const = SPC_CONSTANTS.get(n, SPC_CONSTANTS[5])
         a2 = const["A2"]
         d2 = const["d2"]
@@ -202,7 +184,6 @@ class SPCEngine:
 
     @staticmethod
     def _compute_p_chart(defect_counts: List[float], totals: List[int]) -> Dict[str, Any]:
-        """p-chart for attribute proportion nonconforming."""
         proportions = [d / t for d, t in zip(defect_counts, totals)]
         total_defects = sum(defect_counts)
         total_inspected = sum(totals)
@@ -218,13 +199,11 @@ class SPCEngine:
 
     @staticmethod
     def _evaluate_nelson_rules(data: List[float], cl: float, sigma: float) -> List[Dict[str, Any]]:
-        """Evaluates Nelson Rules 1 through 8 against process series."""
         violations = []
         n = len(data)
         if n < 1 or sigma <= 0:
             return violations
 
-        # Nelson Rule 1: One point beyond 3-sigma (WECO Rule 1)
         r1_indices = [i for i, val in enumerate(data) if val > (cl + 3.0 * sigma) or val < (cl - 3.0 * sigma)]
         if r1_indices:
             violations.append({
@@ -237,7 +216,6 @@ class SPCEngine:
                 "severity": "CRITICAL"
             })
 
-        # Nelson Rule 2: 8 consecutive points on one side of center line (WECO Rule 4: Process Shift)
         if n >= 8:
             r2_indices = []
             for i in range(n - 7):
@@ -255,7 +233,6 @@ class SPCEngine:
                     "severity": "HIGH"
                 })
 
-        # Nelson Rule 3: 6 consecutive points steadily increasing or decreasing (Process Drift)
         if n >= 6:
             r3_indices = []
             for i in range(n - 5):
@@ -275,7 +252,6 @@ class SPCEngine:
                     "severity": "HIGH"
                 })
 
-        # Nelson Rule 5: 2 of 3 consecutive points beyond 2-sigma on same side (WECO Rule 2)
         if n >= 3:
             r5_indices = []
             for i in range(n - 2):
@@ -295,7 +271,6 @@ class SPCEngine:
                     "severity": "HIGH"
                 })
 
-        # Nelson Rule 6: 4 of 5 consecutive points beyond 1-sigma on same side (WECO Rule 3)
         if n >= 5:
             r6_indices = []
             for i in range(n - 4):

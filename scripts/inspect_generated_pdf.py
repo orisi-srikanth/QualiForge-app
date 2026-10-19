@@ -2,7 +2,6 @@ import urllib.request
 import os
 import pypdf
 
-# 1. Download the PDF
 url = "http://localhost:8000/api/reports/pdf?batch_id=BATCH-0245"
 pdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "downloaded_report.pdf"))
 
@@ -14,7 +13,6 @@ with urllib.request.urlopen(url) as resp:
 
 print(f"Downloaded {len(data)} bytes to {pdf_path}")
 
-# 2. Inspect with pypdf
 reader = pypdf.PdfReader(pdf_path)
 num_pages = len(reader.pages)
 print(f"Total Pages: {num_pages}")

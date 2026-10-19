@@ -1,9 +1,3 @@
-"""
-QualityMind Formal Evaluation Scenario Test Runner (TC-01 through TC-08).
-Executes all eight evaluation scenarios through the live API, orchestrator, and database.
-Gathers real execution evidence, runs strictness checks (random order, 2x repeat, LLM mock, negative controls),
-and generates docs/test_results.json and docs/testing.md.
-"""
 import os
 import sys
 import time
@@ -16,7 +10,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List
 
-# Ensure repository root is on sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
@@ -45,7 +38,6 @@ from backend.app.database.models import Batch, QualityIncident, CAPAAction, Huma
 
 API_BASE = "http://localhost:8000"
 
-
 def http_post(endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
     url = f"{API_BASE}{endpoint}"
     req = urllib.request.Request(
@@ -61,7 +53,6 @@ def http_post(endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         return {"error": str(e)}
 
-
 def http_get(endpoint: str) -> Dict[str, Any]:
     url = f"{API_BASE}{endpoint}"
     try:
@@ -70,9 +61,7 @@ def http_get(endpoint: str) -> Dict[str, Any]:
     except Exception as e:
         return {"error": str(e)}
 
-
 def run_tc01() -> Dict[str, Any]:
-    """TC-01: All measurements within specification."""
     t0 = time.time()
     fixture = get_tc01_fixture()
     
@@ -136,9 +125,7 @@ def run_tc01() -> Dict[str, Any]:
         }
     }
 
-
 def run_tc02() -> Dict[str, Any]:
-    """TC-02: Measurement exceeds USL."""
     t0 = time.time()
     fixture = get_tc02_fixture()
     
@@ -197,13 +184,10 @@ def run_tc02() -> Dict[str, Any]:
         }
     }
 
-
 def run_tc03() -> Dict[str, Any]:
-    """TC-03: Defect image supplied."""
     t0 = time.time()
     fixture = get_tc03_fixture()
     
-    # 1. Inspect held-out defect image
     def_res = vision_agent.inspect(
         image_path=fixture["defect_image_path"],
         batch_id=fixture["batch_id"],
@@ -211,7 +195,6 @@ def run_tc03() -> Dict[str, Any]:
     )
     p_def = def_res["prediction"]
     
-    # 2. Inspect good image
     good_res = vision_agent.inspect(
         image_path=fixture["good_image_path"],
         batch_id=fixture["batch_id"],
@@ -270,9 +253,7 @@ def run_tc03() -> Dict[str, Any]:
         }
     }
 
-
 def run_tc04() -> Dict[str, Any]:
-    """TC-04: Machine vibration suddenly increases."""
     t0 = time.time()
     fixture = get_tc04_fixture()
     
@@ -328,15 +309,12 @@ def run_tc04() -> Dict[str, Any]:
         }
     }
 
-
 def run_tc05() -> Dict[str, Any]:
-    """TC-05: Measurements gradually move toward USL."""
     t0 = time.time()
     fixture = get_tc05_fixture()
     values = fixture["values"]
     first_oos = fixture["expected_first_oos_index"]
     
-    # CUSUM & EWMA
     vals_arr = HybridAnomalyDetector.validate_and_clean_telemetry
     import numpy as np
     from scipy import stats
@@ -344,10 +322,8 @@ def run_tc05() -> Dict[str, Any]:
     cusum = HybridAnomalyDetector.compute_cusum(vals_np, target=50.00, sigma=0.005)
     ewma = HybridAnomalyDetector.compute_ewma(vals_np, target=50.00, sigma=0.005)
     
-    # Trend regression
     reg = stats.linregress(np.arange(len(values)), vals_np)
     
-    # SPC Agent
     spc_rep = spc_agent.analyze_process_capability_and_control(
         batch_id=fixture["batch_id"],
         values=values,
@@ -407,13 +383,10 @@ def run_tc05() -> Dict[str, Any]:
         }
     }
 
-
 def run_tc06() -> Dict[str, Any]:
-    """TC-06: Similar previous NCR exists."""
     t0 = time.time()
     fixture = get_tc06_fixture()
     
-    # 1. Query RAG vector store
     res = quality_knowledge_agent.query(
         query_text=fixture["query"],
         top_k=3
@@ -422,7 +395,6 @@ def run_tc06() -> Dict[str, Any]:
     matched_ids = [m.get("record_id") or m.get("metadata", {}).get("record_id", "") for m in matches]
     ncr_019_match = [m for m in matches if "NCR-019" in str(m.get("record_id") or "") or "019" in str(m.get("title", ""))]
     
-    # 2. Agent 6 RCA analysis
     rca_res = rca_agent.analyze_incident(
         incident_id="INC-TC06",
         batch_id="TC06-BATCH",
@@ -480,13 +452,10 @@ def run_tc06() -> Dict[str, Any]:
         }
     }
 
-
 def run_tc07() -> Dict[str, Any]:
-    """TC-07: Multiple potential causes exist."""
     t0 = time.time()
     fixture = get_tc07_fixture()
     
-    # 1. Elevated wear and vibration
     res = rca_agent.analyze_incident(
         incident_id=fixture["incident_id"],
         batch_id="TC07-BATCH-0245",
@@ -499,7 +468,6 @@ def run_tc07() -> Dict[str, Any]:
     report = res["report"]
     hyps = report.ranked_hypotheses
     
-    # 2. Independent scores recomputation
     indep_scores = recompute_rca_scores(
         tool_cycles=fixture["tool_cycles"],
         vibration_val=fixture["vibration_val"],
@@ -507,7 +475,6 @@ def run_tc07() -> Dict[str, Any]:
         usl=fixture["usl"]
     )
     
-    # 3. Counter-evidence: normal tool cycles & vibration
     neg_fixture = get_tc07_negative_control()
     res_counter = rca_agent.analyze_incident(
         incident_id=neg_fixture["incident_id"],
@@ -520,7 +487,6 @@ def run_tc07() -> Dict[str, Any]:
     )
     hyps_counter = res_counter["report"].ranked_hypotheses
     
-    # 4. Critic check
     injected_unsupported_claim = "The elevated vibration definitely caused the tool wear which is the proven root cause."
     critic_scan = critic_agent.scan_unsupported_causal_claims(injected_unsupported_claim)
     
@@ -585,9 +551,7 @@ def run_tc07() -> Dict[str, Any]:
         }
     }
 
-
 def run_tc08() -> Dict[str, Any]:
-    """TC-08: Corrective action completed."""
     t0 = time.time()
     fixture = get_tc08_fixture()
     action_code = fixture["action_code"]
@@ -619,7 +583,6 @@ def run_tc08() -> Dict[str, Any]:
     duration_ms = int((time.time() - t0) * 1000)
     conclusion_text = eff_res.get("conclusion_label", "").lower()
     
-    # Query database for CAPA record effectiveness
     db = SessionLocal()
     db_persisted = False
     try:
@@ -679,7 +642,6 @@ def run_tc08() -> Dict[str, Any]:
         }
     }
 
-
 def execute_all_cases() -> List[Dict[str, Any]]:
     runners = [run_tc01, run_tc02, run_tc03, run_tc04, run_tc05, run_tc06, run_tc07, run_tc08]
     results = []
@@ -688,18 +650,9 @@ def execute_all_cases() -> List[Dict[str, Any]]:
         results.append(res)
     return results
 
-
 def run_strictness_checks() -> Dict[str, Any]:
-    """
-    Executes mandatory strictness checks:
-    1. Order independence: Random order vs Numeric order
-    2. Determinism: 2x full suite repeat
-    3. LLM independence: Numeric results & rankings deterministic with LLM disabled/mocked
-    4. Negative controls: All 8 negative controls tested
-    """
     strictness = {}
     
-    # 1. Random order vs Numeric order
     runners = [run_tc01, run_tc02, run_tc03, run_tc04, run_tc05, run_tc06, run_tc07, run_tc08]
     rng = random.Random(42)
     shuffled_runners = list(runners)
@@ -718,7 +671,6 @@ def run_strictness_checks() -> Dict[str, Any]:
         "passed": random_all_pass and numeric_all_pass
     }
     
-    # 2. Run whole set twice (verify exact deterministic identity)
     run1 = numeric_order_results
     run2 = [r() for r in runners]
     
@@ -733,9 +685,6 @@ def run_strictness_checks() -> Dict[str, Any]:
         "passed": identical
     }
     
-    # 3. LLM Independence / Deterministic Maths Proof
-    # In QualityMind, when LLM_PROVIDER="none", universal_llm uses rule-based fallback.
-    # Assert numeric calculations and hypothesis scores do not require LLM.
     tc07_run = run_tc07()
     strictness["llm_independence"] = {
         "llm_mode": "LLM_PROVIDER=none (Deterministic rule-based)",
@@ -743,7 +692,6 @@ def run_strictness_checks() -> Dict[str, Any]:
         "passed": tc07_run["status"] == "PASS"
     }
     
-    # 4. Negative controls verification
     neg_controls = {
         "TC-01_neg": get_tc01_negative_control()["measurements"][0]["measured_value"] > 50.05,
         "TC-02_neg": len(get_tc02_negative_control()["measurements"]) == 5,
@@ -761,7 +709,6 @@ def run_strictness_checks() -> Dict[str, Any]:
     }
     
     return strictness
-
 
 def generate_testing_md(results: List[Dict[str, Any]], strictness: Dict[str, Any], commit_hash: str) -> str:
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -899,21 +846,17 @@ def generate_testing_md(results: List[Dict[str, Any]], strictness: Dict[str, Any
     
     return "\n".join(lines)
 
-
 def main():
     print("=" * 70)
     print("QualityMind Formal Evaluation Suite: TC-01 to TC-08")
     print("=" * 70)
     
-    # 1. Execute all 8 cases
     results = execute_all_cases()
     
-    # 2. Run strictness checks
     print("\nRunning Strictness Checks (Random Order, 2x Determinism, Negative Controls)...")
     strictness = run_strictness_checks()
     print("Strictness Checks Complete. All Passed:", all(s["passed"] for s in strictness.values()))
     
-    # 3. Retrieve git commit hash
     commit_hash = "2e26ddc4c7a5a6c5410286f239f2c9da3281ad5d"
     try:
         import subprocess
@@ -923,7 +866,6 @@ def main():
     except Exception:
         pass
         
-    # 4. Save docs/test_results.json
     output_dir = BASE_DIR / "docs"
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "test_results.json"
@@ -954,14 +896,12 @@ def main():
         json.dump(full_data, f, indent=2, default=json_serial_fallback)
     print(f"\n[OK] Saved results JSON to {json_path}")
     
-    # 5. Generate and save docs/testing.md
     md_content = generate_testing_md(results, strictness, commit_hash)
     md_path = output_dir / "testing.md"
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(md_content)
     print(f"[OK] Generated formal testing documentation to {md_path}")
     
-    # Print summary
     print("\n" + "=" * 70)
     print(f"{'TC':<7} | {'Scenario':<38} | {'Status':<6} | {'Time (ms)'}")
     print("-" * 70)
@@ -969,7 +909,6 @@ def main():
         print(f"{r['tc_id']:<7} | {r['scenario']:<38} | {r['status']:<6} | {r['duration_ms']} ms")
     print("=" * 70)
     print(f"Overall Result: {'100% PASS' if all(r['status'] == 'PASS' for r in results) else 'FAIL'}")
-
 
 if __name__ == "__main__":
     main()

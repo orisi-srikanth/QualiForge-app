@@ -82,7 +82,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
     );
   }
 
-  // Handle empty data state
   const isEmpty = !data || (data.inspection_quantity?.total_inspected_parts === 0 && data.production_batches?.total_count === 0);
 
   const batches = data?.production_batches || { total_count: 0, status_split: {}, active_batches_count: 0 };
@@ -94,8 +93,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
   return (
     <div className="space-y-6">
 
-
-      {/* Date Filter & Control Bar */}
       <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
@@ -156,7 +153,7 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
       </div>
 
       {isEmpty ? (
-        /* Empty State */
+
         <div className="p-12 bg-white border border-slate-200 rounded-xl text-center space-y-3">
           <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
             <Calendar className="w-6 h-6" />
@@ -175,7 +172,7 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
         </div>
       ) : (
         <>
-          {/* Active Quality Hold Alert Banner if incidents or holds exist */}
+
           {data.active_quality_incidents > 0 && (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -213,9 +210,8 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
             </div>
           )}
 
-          {/* Primary Top 4 KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Acceptance Rate (Recorded Sample Result) */}
+
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Acceptance Rate</span>
@@ -233,7 +229,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
               </div>
             </div>
 
-            {/* Card 2: Rejection Rate (Recorded Sample Result) */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Rejection Rate</span>
@@ -251,7 +246,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
               </div>
             </div>
 
-            {/* Card 3: Machine Anomalies (Statistical Finding) */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Machine Anomalies</span>
@@ -271,7 +265,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
               </div>
             </div>
 
-            {/* Card 4: Process-Control Status (Statistical signal, not a product decision) */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Process Control Status</span>
@@ -292,9 +285,8 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
             </div>
           </div>
 
-          {/* Secondary 6 KPI Cards (Production Batches, Inspection Quantity, Incidents, CAPAs) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Item 1: Production Batches & Status Split */}
+
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Production Batches</span>
@@ -322,7 +314,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
               </div>
             </div>
 
-            {/* Item 2: Inspection Quantity */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Inspection Quantity</span>
@@ -342,7 +333,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
               </div>
             </div>
 
-            {/* Item 5: Active Quality Incidents */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Active Quality Incidents</span>
@@ -365,7 +355,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
               </div>
             </div>
 
-            {/* Items 8 & 9: Open & Overdue CAPAs */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">CAPA Management</span>
@@ -391,11 +380,10 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
             </div>
           </div>
 
-          {/* Two-Column Middle Section: Machine Health & Pareto Defect Categories */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Column 1: Machine Cell Health Card & Telemetry Risk Breakdown Pie Chart */}
+
             <div className="space-y-4">
-              {/* Machine Status & Telemetry Card */}
+
               <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -449,7 +437,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
                 </button>
               </div>
 
-              {/* Machine Telemetry Risk Factor Pie Chart */}
               <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <div className="flex items-center gap-2">
@@ -523,10 +510,9 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
               </div>
             </div>
 
-            {/* Interactive Pareto Analysis & Top Defect Categories (Item 6) */}
             <div className="lg:col-span-2">
               <div className="space-y-4">
-                {/* Top Defect Categories Summary Cards */}
+
                 <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-bold text-slate-900">Item 6: Top Defect Categories (Pareto Vital Few)</h2>
@@ -548,7 +534,6 @@ export const DashboardPage: React.FC<Props> = ({ onNavigate, onRunPipeline }) =>
                   </div>
                 </div>
 
-                {/* Pareto Component */}
                 <ParetoAnalysis onNavigate={onNavigate} />
               </div>
             </div>

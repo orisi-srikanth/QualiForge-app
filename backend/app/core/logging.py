@@ -1,6 +1,3 @@
-"""
-Structured Logging & Request-ID Tracing for Industrial Audit Compliance
-"""
 import sys
 import logging
 import json

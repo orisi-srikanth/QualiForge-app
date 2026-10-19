@@ -1,7 +1,3 @@
-"""
-Authentication & Persona Endpoints
-Provides JWT Bearer tokens for demo personas and retrieves user profile details.
-"""
 from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field

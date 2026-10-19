@@ -19,7 +19,7 @@ export const CertaintyBadge: React.FC<Props> = ({
   confirmedBy,
   confirmedAt,
 }) => {
-  // Determine if this item requires engineering verification
+
   const isUnconfirmed =
     requiresVerification !== undefined
       ? requiresVerification

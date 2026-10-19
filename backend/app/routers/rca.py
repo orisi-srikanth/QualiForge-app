@@ -14,7 +14,6 @@ from backend.app.services.pareto import pareto_service
 
 router = APIRouter()
 
-
 @router.get("/incidents", tags=["Incidents"], summary="List Quality Incidents and Non-Conformance Reports (NCR)", description="List all active and closed Quality Non-Conformance Reports with assigned severity and status.")
 def get_incidents(db: Session = Depends(get_db)):
     db_incidents = db.query(QualityIncident).all()
@@ -355,7 +354,6 @@ def submit_hypothesis_decision(
     if action not in valid_actions:
         raise HTTPException(status_code=422, detail=f"Invalid decision '{payload.decision}'. Must be one of {valid_actions}")
 
-    # Role-based authorization enforcement
     user_role = current_user.get("role", "quality_engineer")
     auth_header = request.headers.get("authorization")
     if auth_header and auth_header.startswith("Bearer "):
@@ -368,7 +366,6 @@ def submit_hypothesis_decision(
     if is_strict and user_role not in ["quality_engineer", "admin"]:
         raise HTTPException(status_code=403, detail="Unauthorized: Only authorized Quality Engineers or Admins may record root cause decisions.")
 
-    # Validation: Rejection requires comment
     if action == "REJECT" and (not payload.comment or not payload.comment.strip()):
         raise HTTPException(status_code=422, detail="Rejection requires a mandatory engineering justification/comment.")
 
@@ -377,7 +374,6 @@ def submit_hypothesis_decision(
 
     safe_comment = html.escape(payload.comment.strip()) if payload.comment else f"Dispositioned as {action} by {current_user.get('name', 'Quality Engineer')}."
 
-    # Check if hypothesis exists in DB
     hyp = db.query(RCAHypothesis).filter(RCAHypothesis.id == hypothesis_id).first()
     if not hyp and not hypothesis_id.startswith("HYP-"):
         raise HTTPException(status_code=404, detail=f"Hypothesis '{hypothesis_id}' not found.")
@@ -401,7 +397,6 @@ def submit_hypothesis_decision(
         elif action == "COMMENT":
             hyp.comment = safe_comment
 
-    # Log human decision to audit table
     user_id = current_user.get("id", "usr-qe-01")
     record = HumanDecision(
         workflow_id=f"WF-{hypothesis_id}",
@@ -416,7 +411,6 @@ def submit_hypothesis_decision(
     db.commit()
     db.refresh(record)
 
-    # Return structured confirmation
     label = CertaintyLevel.CONFIRMED_ROOT_CAUSE if action == "CONFIRM" else CertaintyLevel.HYPOTHESIS
     status = "CONFIRMED" if action == "CONFIRM" else ("REJECTED" if action == "REJECT" else "UNDER_INVESTIGATION")
     return {
@@ -435,7 +429,6 @@ def submit_hypothesis_decision(
             else ("Hypothesis rejected; will not be presented as a likely candidate." if action == "REJECT" else "Decision logged.")
         )
     }
-
 
 @router.get(
     "/rca/decisions",
@@ -458,7 +451,6 @@ def list_hypothesis_decisions(db: Session = Depends(get_db)):
         for d in decisions
     ]
 
-
 @router.get(
     "/rca/gateway-models",
     tags=["Root Cause Analysis"],
@@ -472,7 +464,6 @@ def get_gateway_model_status(
     from backend.app.core.config import settings
     target = model_id or getattr(settings, "KILO_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
     return verify_kilo_model_availability(model_id=target)
-
 
 @router.get(
     "/rca/{batch_id}",

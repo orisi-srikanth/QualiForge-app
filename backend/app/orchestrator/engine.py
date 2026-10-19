@@ -1,8 +1,3 @@
-"""
-Multi-Agent Orchestration Engine & Workflow Execution Graph
-Orchestrates Agent 1 through Agent 8, manages state transitions, persists paused state in SQLite,
-and provides resume, re-analyze, and comment capabilities with full audit trail in human_decisions.
-"""
 import os
 import uuid
 import time
@@ -33,7 +28,6 @@ from backend.app.database.session import SessionLocal
 
 logger = logging.getLogger("orchestrator.engine")
 
-
 def record_agent_run(
     workflow_id: str,
     batch_id: str,
@@ -46,7 +40,6 @@ def record_agent_run(
     model_outputs: Optional[Dict[str, Any]] = None,
     retrieved_evidence: Optional[List[Any]] = None
 ):
-    """Persists granular agent execution telemetry and RAG evidence to agent_runs table."""
     try:
         db = SessionLocal()
         b = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
@@ -70,9 +63,7 @@ def record_agent_run(
     except Exception as e:
         logger.warning(f"Could not record AgentRun for {agent_name}: {e}")
 
-
 def serialize_workflow_state(state: Any) -> str:
-    """Helper to cleanly serialize workflow state to JSON string."""
     try:
         if hasattr(state, "model_dump_json"):
             return state.model_dump_json()
@@ -85,9 +76,7 @@ def serialize_workflow_state(state: Any) -> str:
         logger.warning(f"Serialization fallback for state: {e}")
         return json.dumps({"status": "SERIALIZATION_FALLBACK", "raw": str(state)}, default=str)
 
-
 def persist_workflow_to_db(workflow_id: str, state_data: Any, status_str: str = "PAUSED_AWAITING_HUMAN_APPROVAL", current_node: str = "approval_gate"):
-    """Persists workflow checkpoint to SQLite workflow_state table for crash/restart recovery."""
     try:
         db = SessionLocal()
         state_str = serialize_workflow_state(state_data)
@@ -111,9 +100,7 @@ def persist_workflow_to_db(workflow_id: str, state_data: Any, status_str: str = 
     except Exception as e:
         logger.error(f"Error persisting workflow {workflow_id} to DB: {e}")
 
-
 def load_workflow_from_db(workflow_id: str) -> Optional[Dict[str, Any]]:
-    """Loads workflow checkpoint from SQLite workflow_state table."""
     try:
         db = SessionLocal()
         rec = db.query(WorkflowStateModel).filter(WorkflowStateModel.workflow_id == workflow_id).first()
@@ -127,7 +114,6 @@ def load_workflow_from_db(workflow_id: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error loading workflow {workflow_id} from DB: {e}")
     return None
-
 
 class QualityWorkflowOrchestrator:
     def __init__(self):
@@ -166,7 +152,6 @@ class QualityWorkflowOrchestrator:
         self.active_workflows[w_id] = state
         self.loop_counts[w_id] = 0
 
-        # Enrich missing batch/product/spec metadata from DB if present
         try:
             db_enrich = SessionLocal()
             b_rec = db_enrich.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
@@ -234,7 +219,6 @@ class QualityWorkflowOrchestrator:
         except Exception as e:
             logger.warning(f"Error enriching batch context from DB: {e}")
 
-        # STAGE 1: Agent 1 - Production Data Intake & Validation
         t0_intake = datetime.now(timezone.utc)
         state.current_agent = data_intake_agent.name
         intake_res = data_intake_agent.process_batch_and_measurements(
@@ -257,7 +241,6 @@ class QualityWorkflowOrchestrator:
             model_outputs=intake_res["batch_data"]
         )
 
-        # STAGE 2: Parallel Quality Analysis — Agents 2, 3, 4, and 5
         parsed_meas = state.batch_metadata.get("measurements", [])
         raw_vals = [m["measured_value"] for m in parsed_meas] if parsed_meas else [50.01, 50.03, 50.06, 50.08, 50.07]
         nom = state.batch_metadata.get("nominal_mm", 50.0)
@@ -337,7 +320,6 @@ class QualityWorkflowOrchestrator:
                 "finished_at": datetime.now(timezone.utc)
             }
 
-        # Execute Agents 2, 3, 4, 5 in Parallel via ThreadPoolExecutor
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             fut_vis = executor.submit(run_visual_task)
             fut_comp = executor.submit(run_compliance_task)
@@ -349,7 +331,6 @@ class QualityWorkflowOrchestrator:
             anom_out = fut_anom.result(timeout=60)
             spc_out = fut_spc.result(timeout=60)
 
-        # Process Visual (Agent 2)
         vision_res = None
         if vis_out.get("status") == "COMPLETED":
             vision_res = vis_out["result"]
@@ -381,7 +362,6 @@ class QualityWorkflowOrchestrator:
             state.execution_trace.append(vision_res["log"])
             state.stage_statuses["visual"] = "COMPLETED"
 
-            # Validate Product and Batch Association
             batch_prod = (state.batch_metadata.get("part_name") or state.batch_metadata.get("product_name") or "Precision Ground Shaft").lower()
             img_cat = (state.visual_prediction.product_category or state.visual_prediction.category or "").lower()
             if ("shaft" in batch_prod and "shaft" not in img_cat) or ("screw" in batch_prod and "screw" not in img_cat):
@@ -411,7 +391,6 @@ class QualityWorkflowOrchestrator:
                 status="SKIPPED", input_data={"reason": vis_out.get("reason")}
             )
 
-        # Process Compliance (Agent 3)
         comp_res = comp_out["result"]
         state.dimensional_report = comp_res["report"]
         state.execution_trace.append(comp_res["log"])
@@ -425,7 +404,6 @@ class QualityWorkflowOrchestrator:
             tool_calls=comp_res["log"].tool_calls, model_outputs=state.dimensional_report.model_dump()
         )
 
-        # Process Anomaly (Agent 4)
         anomaly_res = anom_out["result"]
         state.process_report = anomaly_res["report"]
         state.execution_trace.append(anomaly_res["log"])
@@ -439,7 +417,6 @@ class QualityWorkflowOrchestrator:
             tool_calls=anomaly_res["log"].tool_calls, model_outputs=state.process_report.model_dump()
         )
 
-        # Process SPC (Agent 5)
         spc_res = spc_out["result"]
         state.spc_report = spc_res["report"]
         state.execution_trace.append(spc_res["log"])
@@ -453,8 +430,6 @@ class QualityWorkflowOrchestrator:
             tool_calls=spc_res["log"].tool_calls, model_outputs=state.spc_report.model_dump()
         )
 
-        # STAGE 3: Consolidated Findings & Routing
-        # If batch is 100% conforming with no anomalies or Nelson special-cause signals:
         if not state.has_defects and not state.has_anomalies and not state.has_spc_violations:
             state.status = "CONFORMING_AUDITED"
             state.current_agent = "Report Compiler"
@@ -466,7 +441,6 @@ class QualityWorkflowOrchestrator:
             state.stage_statuses["report"] = "COMPLETED"
             state.completed_at = time.strftime("%Y-%m-%d %H:%M:%S")
 
-            # Compile conforming report
             try:
                 from backend.app.services.pdf_report import pdf_report_generator
                 rpt_buf = pdf_report_generator.generate_audit_report(state.model_dump())
@@ -482,7 +456,6 @@ class QualityWorkflowOrchestrator:
             persist_workflow_to_db(w_id, state, status_str="CONFORMING_AUDITED", current_node="final_report")
             return state
 
-        # STAGE 4: Root Cause Analysis (Agent 6)
         t0_rca = datetime.now(timezone.utc)
         state.current_agent = rca_agent.name
         max_val = max(raw_vals) if raw_vals else 50.08
@@ -497,7 +470,6 @@ class QualityWorkflowOrchestrator:
         elif state.dimensional_report and state.dimensional_report.nonconforming > 0:
             dt = "Oversized shaft diameter"
 
-        # Record QualityIncident if not already present
         try:
             db_inc = SessionLocal()
             b = db_inc.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
@@ -541,7 +513,6 @@ class QualityWorkflowOrchestrator:
             tool_calls=rca_res["log"].tool_calls, model_outputs=state.rca_report.model_dump()
         )
 
-        # STAGE 5: Quality Reviewer / Critic (Agent 8) - Audits RCA before CAPA
         t0_critic = datetime.now(timezone.utc)
         state.current_agent = critic_agent.name
         critic_res = critic_agent.review_workflow(
@@ -551,7 +522,7 @@ class QualityWorkflowOrchestrator:
             anomaly_data=anomaly_res,
             spc_data=spc_res,
             rca_data=rca_res,
-            capa_data=None  # Auditing RCA stage before CAPA planning
+            capa_data=None
         )
         state.critic_review = critic_res["review"]
         state.execution_trace.append(critic_res["log"])
@@ -564,7 +535,6 @@ class QualityWorkflowOrchestrator:
             tool_calls=critic_res["log"].tool_calls, model_outputs=state.critic_review.model_dump()
         )
 
-        # Reviewer feedback loop if correction required (bounded to 2 loops)
         if state.critic_review.critic_verdict in ("REASSESS", "REASSESSMENT_REQUIRED", "NEEDS_REVISION") and state.reassessment_loops < 2:
             state.reassessment_loops += 1
             corr_note = "Critic Audit: " + "; ".join(state.critic_review.identified_flaws or ["Reassess causal evidence"])
@@ -583,7 +553,6 @@ class QualityWorkflowOrchestrator:
             state.rca_report = rca_res["report"]
             state.execution_trace.append(rca_res["log"])
 
-            # Re-run Critic
             critic_res = critic_agent.review_workflow(
                 intake_data=intake_res,
                 compliance_data=comp_res,
@@ -596,7 +565,6 @@ class QualityWorkflowOrchestrator:
             state.critic_review = critic_res["review"]
             state.execution_trace.append(critic_res["log"])
 
-        # STAGE 6: CAPA Planning (Agent 7) - Formulated after Reviewer passes
         t0_capa = datetime.now(timezone.utc)
         state.current_agent = capa_agent.name
         capa_res = capa_agent.generate_capa_plan(
@@ -615,7 +583,6 @@ class QualityWorkflowOrchestrator:
             tool_calls=capa_res["log"].tool_calls, model_outputs=state.capa_report.model_dump()
         )
 
-        # STAGE 7: Human Approval Gate (HITL) - Pauses execution for authorized sign-off
         state.status = "PENDING_HUMAN_APPROVAL"
         state.stage_statuses["approval"] = "PENDING"
         state.current_agent = "Human Quality Engineer (Gatekeeper)"
@@ -634,7 +601,6 @@ class QualityWorkflowOrchestrator:
         telemetry_records: Optional[List[Dict[str, Any]]] = None,
         workflow_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Executes multi-agent orchestration via compiled LangGraph StateGraph, pausing before approval_gate."""
         from backend.app.orchestrator.langgraph_orchestration import qualitymind_langgraph
         w_id = workflow_id or f"WF-LG-{uuid.uuid4().hex[:8].upper()}"
         batch_id = batch_meta.get("batch_id", "BATCH-0245")
@@ -652,7 +618,6 @@ class QualityWorkflowOrchestrator:
             "reassessment_loops": 0
         }
 
-        # Invokes up to interrupt_before=['approval_gate']
         result_state = qualitymind_langgraph.invoke(
             init_state,
             config={"configurable": {"thread_id": w_id}}
@@ -661,7 +626,6 @@ class QualityWorkflowOrchestrator:
         result_state["status"] = "PAUSED_AWAITING_HUMAN_APPROVAL"
         result_state["current_agent"] = "Human Quality Engineer (Gatekeeper)"
 
-        # Persist checkpointed state to SQLite DB
         persist_workflow_to_db(w_id, result_state, status_str="PAUSED_AWAITING_HUMAN_APPROVAL", current_node="approval_gate")
 
         return result_state
@@ -669,14 +633,12 @@ class QualityWorkflowOrchestrator:
     def get_workflow(self, workflow_id: str) -> Optional[Any]:
         if workflow_id in self.active_workflows:
             return self.active_workflows[workflow_id]
-        # Fallback to database if server was restarted
         db_data = load_workflow_from_db(workflow_id)
         if db_data:
             return db_data
         return None
 
     def get_latest_workflow_for_batch(self, batch_id: str) -> Optional[Any]:
-        """Finds the most recent workflow execution state for a given batch from memory or SQLite checkpoint."""
         for w_id, wf in reversed(list(self.active_workflows.items())):
             b_id = getattr(wf, "batch_id", None) or (wf.get("batch_id") if isinstance(wf, dict) else None)
             if b_id == batch_id:
@@ -704,17 +666,10 @@ class QualityWorkflowOrchestrator:
         payload: HumanApprovalRequest,
         current_user: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Resumes a paused workflow upon human decision arrival.
-        Validates decision, enforces mandatory comment on rejection, escapes comments,
-        records immutable human decision into human_decisions table, executes Effectiveness
-        Monitoring and Final Report generation, updates workflow state, and returns completed state.
-        """
         wf = self.get_workflow(workflow_id)
         if not wf:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workflow '{workflow_id}' not found.")
 
-        # Check if already decided
         current_status = getattr(wf, "status", None) or (wf.get("status") if isinstance(wf, dict) else None)
         if current_status in ["SIGNED_OFF", "COMPLETED", "RESUMED_AND_COMPLETED"]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Workflow '{workflow_id}' has already been decided.")
@@ -723,7 +678,6 @@ class QualityWorkflowOrchestrator:
         is_rejection = decision in ["REJECT", "REJECT_BATCH", "QUARANTINE_BATCH"]
         is_reassess = decision in ["REQUIRES_REASSESSMENT", "REASSESS", "REQUEST_REASSESSMENT"]
 
-        # Validation: Rejection requires comment
         if is_rejection and (not payload.engineering_comments or not payload.engineering_comments.strip()):
             raise HTTPException(
                 status_code=422,
@@ -736,7 +690,6 @@ class QualityWorkflowOrchestrator:
                 detail="Requesting reassessment requires engineering feedback instructions."
             )
 
-        # Validation: Comment length limit (max 2000 chars)
         raw_comment = payload.engineering_comments or ""
         if len(raw_comment) > 2000:
             raise HTTPException(
@@ -744,7 +697,6 @@ class QualityWorkflowOrchestrator:
                 detail="Engineering comments exceed maximum length limit of 2000 characters."
             )
 
-        # Safe escaping of comments to prevent XSS / script injection in UI
         safe_comment = html.escape(raw_comment.strip()) if raw_comment else (
             f"Findings dispositioned as {decision} by {current_user.get('name', 'Quality Engineer')}."
         )
@@ -752,7 +704,6 @@ class QualityWorkflowOrchestrator:
         batch_id = getattr(wf, "batch_id", None) or (wf.get("batch_id") if isinstance(wf, dict) else "BATCH-0245")
         user_id = current_user.get("id", "usr-qe-01")
 
-        # 1. Store immutable record in human_decisions table
         db = SessionLocal()
         try:
             decision_record = HumanDecision(
@@ -766,7 +717,6 @@ class QualityWorkflowOrchestrator:
             )
             db.add(decision_record)
 
-            # If confirmed root cause provided, elevate in rca_hypotheses
             if payload.confirmed_root_cause:
                 hyps = db.query(RCAHypothesis).all()
                 for h in hyps:
@@ -782,7 +732,6 @@ class QualityWorkflowOrchestrator:
         finally:
             db.close()
 
-        # Handle Reassessment Loop
         if is_reassess:
             if isinstance(wf, WorkflowState):
                 wf.stage_statuses["approval"] = "REASSESSMENT_REQUIRED"
@@ -795,7 +744,6 @@ class QualityWorkflowOrchestrator:
                 current_user=current_user
             )
 
-        # 2. Update state in memory & DB for human approval completion
         if isinstance(wf, WorkflowState):
             wf.stage_statuses["approval"] = "COMPLETED"
             wf.human_approval = payload
@@ -803,7 +751,6 @@ class QualityWorkflowOrchestrator:
             wf.setdefault("stage_statuses", {})["approval"] = "COMPLETED"
             wf["human_approval"] = payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
 
-        # STAGE 8: Effectiveness Monitoring
         t0_eff = datetime.now(timezone.utc)
         eff_res = None
         try:
@@ -836,7 +783,6 @@ class QualityWorkflowOrchestrator:
                 status="INSUFFICIENT_DATA", input_data={"error": str(e)}
             )
 
-        # STAGE 9: Final Quality Report
         t0_rpt = datetime.now(timezone.utc)
         from backend.app.services.pdf_report import generate_quality_pdf_report
         try:
@@ -889,7 +835,6 @@ class QualityWorkflowOrchestrator:
         except Exception as e:
             logger.warning(f"Error compiling final report: {e}")
 
-        # Persist finalized state to memory and DB
         if isinstance(wf, WorkflowState):
             self.active_workflows[workflow_id] = wf
         persist_workflow_to_db(workflow_id, wf, status_str="COMPLETED", current_node="final_report")
@@ -911,7 +856,6 @@ class QualityWorkflowOrchestrator:
             "report_id": f"RPT-{batch_id}"
         }
 
-
     def reanalyze_workflow(
         self,
         workflow_id: str,
@@ -919,16 +863,11 @@ class QualityWorkflowOrchestrator:
         comment: Optional[str] = None,
         current_user: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Re-runs target agent incorporating engineer comments as input.
-        Enforces maximum loop count (3 loops) and escalates to Quality Engineer if exceeded.
-        """
         user = current_user or {"name": "Quality Engineer", "role": "quality_engineer", "id": "usr-qe-01"}
         wf = self.get_workflow(workflow_id)
         if not wf:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workflow '{workflow_id}' not found.")
 
-        # Require comment for re-analysis
         if not comment or not comment.strip():
             raise HTTPException(
                 status_code=422,
@@ -944,7 +883,6 @@ class QualityWorkflowOrchestrator:
         safe_comment = html.escape(comment.strip())
         current_loops = self.loop_counts.get(workflow_id, 0)
 
-        # Check Loop Limit: After 3 requests, stop looping and escalate
         if current_loops >= 3:
             db = SessionLocal()
             try:
@@ -971,11 +909,9 @@ class QualityWorkflowOrchestrator:
                 "escalated_to": "Lead Quality Engineer"
             }
 
-        # Increment loop count
         new_loops = current_loops + 1
         self.loop_counts[workflow_id] = new_loops
 
-        # Log to human_decisions
         db = SessionLocal()
         try:
             rec = HumanDecision(
@@ -992,7 +928,6 @@ class QualityWorkflowOrchestrator:
         finally:
             db.close()
 
-        # Re-run target agent
         batch_id = getattr(wf, "batch_id", None) or (wf.get("batch_id") if isinstance(wf, dict) else "BATCH-0245")
         if "rca" in target_agent.lower():
             re_res = rca_agent.analyze_incident(
@@ -1039,7 +974,6 @@ class QualityWorkflowOrchestrator:
         comment: str,
         current_user: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Adds length-limited, escaped engineering comment to human_decisions and reviewer_comments."""
         if not comment or not comment.strip():
             raise HTTPException(status_code=422, detail="Comment cannot be empty.")
         if len(comment) > 2000:
@@ -1086,7 +1020,6 @@ class QualityWorkflowOrchestrator:
             "user": current_user.get("name", "Quality Engineer"),
             "timestamp": rec_ts
         }
-
 
 orchestrator = QualityWorkflowOrchestrator()
 workflow_engine = orchestrator

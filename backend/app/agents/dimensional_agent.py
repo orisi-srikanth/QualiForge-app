@@ -1,15 +1,8 @@
-"""
-Agent 3: Dimensional & Specification Compliance Agent
-Performs 100% deterministic comparison of measured product characteristics against engineering specifications.
-Calculates deviations, rejection percentages, and flags specification non-conformances.
-Uses SpecificationEngine (Decimal/NumPy). Zero LLM involvement in arithmetic or conformance decisions.
-"""
 import time
 from typing import Dict, Any, List, Optional
 from backend.app.agents.base_agent import BaseQualityAgent
 from backend.app.models.schemas import CertaintyLevel, InspectionReport, MeasurementItem
 from backend.app.services.spec_check import SpecificationEngine
-
 
 class DimensionalComplianceAgent(BaseQualityAgent):
     def __init__(self):
@@ -25,10 +18,6 @@ class DimensionalComplianceAgent(BaseQualityAgent):
         product_id: Optional[str] = None,
         db: Optional[Any] = None
     ) -> Dict[str, Any]:
-        """
-        Retrieves nominal dimensions, tolerances, and specification limits
-        from actual QE configuration (Product, InspectionCharacteristic, Batch).
-        """
         from backend.app.services.inspection_service import get_batch_and_spec
         if batch_id:
             spec = get_batch_and_spec(batch_id, db=db, product_id=product_id)
@@ -86,7 +75,6 @@ class DimensionalComplianceAgent(BaseQualityAgent):
         start = time.time()
         tool_calls = ["tool_calculate_spec_limits", "tool_deterministic_tolerance_check"]
 
-        # Resolve QE specifications if not explicitly fully provided
         if db is not None or (nominal_mm is None and tolerance_mm is None):
             spec_info = self.retrieve_specification(batch_id=batch_id, product_id=product_id, db=db)
             if nominal_mm is None:
@@ -106,7 +94,6 @@ class DimensionalComplianceAgent(BaseQualityAgent):
         eff_minus = tol_minus if tol_minus is not None else eff_tol
         eff_param = parameter_name or "shaft_diameter"
 
-        # Pure deterministic evaluation via SpecificationEngine
         spec_result = SpecificationEngine.evaluate_compliance(
             batch_id=batch_id,
             nominal_mm=eff_nom,

@@ -1,6 +1,3 @@
-"""
-API Routers Package
-"""
 __all__ = ["api_router", "knowledge_router"]
 
 def __getattr__(name: str):

@@ -1,16 +1,3 @@
-"""
-Automated Comprehensive Test Suite for Quality & Safety Requirements
-Verifies:
-1. Part A: The Seven Prohibitions (guard layer, API intercept, DB logging, tool allowlist)
-2. Part A: Batch status governance (no autonomous transitions to REJECTED or APPROVED)
-3. Part A: Machine actions non-executability (zero outbound network/PLC connections)
-4. Part A: Quality engineer decision immutability (no silent overrides on re-run)
-5. Part A: RBAC enforcement (operator 403, unauthenticated 401, QE allowed)
-6. Part A: Human approval gate (pause, SQLite persistence, and resume)
-7. Part B: The Five Epistemic Labels (definition, mapping, agent cannot output CONFIRMED_ROOT_CAUSE)
-8. Part B: PDF report governance (13 sections, labels, legend, unconfirmed warnings, footer disclaimer)
-9. Part B: Wording scan (no absolute causal claims or autonomous actions)
-"""
 import pytest
 import io
 from datetime import datetime, timezone
@@ -34,12 +21,10 @@ from backend.app.schemas.schemas import CertaintyLevel, BatchStatus
 from backend.app.services.pdf_report import generate_quality_pdf_report
 from backend.app.orchestrator.engine import orchestrator
 
-
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as c:
         yield c
-
 
 @pytest.fixture(scope="function")
 def db():
@@ -48,25 +33,17 @@ def db():
     session.rollback()
     session.close()
 
-
 @pytest.fixture(scope="module")
 def operator_headers():
     token = create_access_token({"sub": "usr-op-01", "name": "John Operator", "role": "operator"})
     return {"Authorization": f"Bearer {token}"}
-
 
 @pytest.fixture(scope="module")
 def qe_headers():
     token = create_access_token({"sub": "usr-qe-01", "name": "Sarah Chen", "role": "quality_engineer"})
     return {"Authorization": f"Bearer {token}"}
 
-
-# ==============================================================================
-# PART A: THE SEVEN PROHIBITIONS
-# ==============================================================================
-
 def test_seven_prohibitions_blocked_via_guardrail_and_api(client, db):
-    """Verifies that all seven prohibited actions are blocked via API and logged to human_decisions."""
     prohibitions = [
         ("RELEASE_PRODUCT", "BATCH-0245", {"lot": "LOT-01"}),
         ("REJECT_BATCH", "BATCH-0245", {"reason": "autonomous_scrap"}),
@@ -78,7 +55,6 @@ def test_seven_prohibitions_blocked_via_guardrail_and_api(client, db):
     ]
 
     for action, target, params in prohibitions:
-        # 1. API intercept
         res = client.post(
             "/api/safety/guardrails/test-autonomous-action",
             json={"action": action, "target_id": target, "parameters": params}
@@ -88,7 +64,6 @@ def test_seven_prohibitions_blocked_via_guardrail_and_api(client, db):
         assert detail.get("error") == "AutonomousActionForbidden"
         assert "SAFETY" in detail.get("message", "").upper()
 
-        # 2. Database audit logging in human_decisions table
         recent_log = db.query(HumanDecision).filter(
             HumanDecision.entity_type == "safety_guardrail",
             HumanDecision.decision == "GUARDRAIL_BLOCKED"
@@ -96,14 +71,10 @@ def test_seven_prohibitions_blocked_via_guardrail_and_api(client, db):
         assert recent_log is not None
         assert "SAFETY GUARD TRIPPED" in recent_log.comment
 
-
 def test_agent_tool_allowlist_and_forbidden_actions():
-    """Confirms strict allowlist of permitted agent actions and blocks forbidden actions."""
-    # Permitted actions pass validation
     for permitted in ["parse_file", "run_cv_model", "check_dimensional_conformance", "evaluate_nelson_rules", "build_6m_fishbone"]:
         guardrails.validate_action(permitted, agent_name="TestAgent")
 
-    # Forbidden actions raise ForbiddenAutonomousAction
     forbidden_list = [
         "release_product", "release_batch", "reject_batch", "scrap_batch",
         "modify_cnc_parameter", "change_plc_config", "set_feed_rate",
@@ -115,31 +86,23 @@ def test_agent_tool_allowlist_and_forbidden_actions():
             guardrails.validate_action(forbidden, agent_name="AutonomousAgent")
         assert "strictly barred" in str(exc_info.value) or "forbidden" in str(exc_info.value).lower()
 
-
 def test_batch_status_rules_no_auto_reject_release(client, db):
-    """Non-conformance flags components and opens incident, but does NOT change batch to REJECTED or APPROVED."""
     batch = db.query(Batch).filter((Batch.batch_number == "BATCH-0245") | (Batch.id == "BATCH-0245")).first()
     if batch:
-        # Batch status should be QUALITY_HOLD or IN_PROGRESS, never silently auto-rejected
         assert batch.status in ["QUALITY_HOLD", "IN_PROGRESS"]
 
-
 def test_no_outbound_machine_or_plc_connections():
-    """Confirms no machine control or PLC driver libraries exist in application dependencies."""
     import sys
     forbidden_modules = ["opcua", "pymodbus", "snap7", "pycomm3", "serial"]
     for mod in forbidden_modules:
         assert mod not in sys.modules, f"Forbidden hardware control module {mod} loaded in sys.modules!"
 
-
 def test_engineer_decisions_are_immutable(client, qe_headers, db):
-    """Once an engineer confirms or rejects a hypothesis, re-running the agent preserves the decision in history."""
     hyp_id = f"HYP-IMMUTABLE-TEST-{int(datetime.now(timezone.utc).timestamp())}"
     hyp = RCAHypothesis(id=hyp_id, incident_id="INC-TEST", rank=1, category="Machine", title="Spindle Bearing Wear", label="HYPOTHESIS", status="proposed")
     db.add(hyp)
     db.commit()
 
-    # Engineer confirms
     res = client.post(
         f"/api/rca/hypotheses/{hyp.id}/decision",
         json={"decision": "CONFIRM", "comment": "Verified on optical microscope."},
@@ -148,14 +111,11 @@ def test_engineer_decisions_are_immutable(client, qe_headers, db):
     assert res.status_code == 200
     assert res.json()["status"] == "CONFIRMED"
 
-    # Verify decision logged in human_decisions
     decision_log = db.query(HumanDecision).filter(HumanDecision.entity_id == hyp.id, HumanDecision.decision == "CONFIRM").first()
     assert decision_log is not None
     assert decision_log.user_id == "usr-qe-01"
 
-
 def test_operator_token_403_and_unauth_401(client, operator_headers):
-    """Auth is removed: unauthenticated calls and all roles are accepted without 401/403."""
     decision_endpoints = [
         ("POST", "/api/workflows/WF-BATCH-0245/decision", {"decision": "ACCEPT_FINDINGS"}),
         ("POST", "/api/review/sign-off", {"decision": "ACCEPT_FINDINGS", "approved_by": "Test"}),
@@ -165,21 +125,13 @@ def test_operator_token_403_and_unauth_401(client, operator_headers):
     ]
 
     for method, path, payload in decision_endpoints:
-        # Unauthenticated -> allowed (not 401 or 403)
         r_unauth = client.request(method, path, json=payload)
         assert r_unauth.status_code not in [401, 403], f"Expected no 401/403 for {path}, got {r_unauth.status_code}"
 
-        # Operator -> allowed (not 403)
         r_op = client.request(method, path, json=payload, headers=operator_headers)
         assert r_op.status_code not in [401, 403], f"Expected no 401/403 for operator on {path}, got {r_op.status_code}"
 
-
-# ==============================================================================
-# PART B: THE FIVE LABELS & GOVERNANCE
-# ==============================================================================
-
 def test_five_epistemic_labels_definition():
-    """Confirms the five epistemic labels match the problem statement requirements."""
     expected = {
         "Observed Fact",
         "Model Prediction",
@@ -190,10 +142,7 @@ def test_five_epistemic_labels_definition():
     actual = {e.value for e in CertaintyLevel}
     assert actual == expected
 
-
 def test_agent_cannot_output_confirmed_root_cause():
-    """Agent cannot output CONFIRMED_ROOT_CAUSE without human engineer authentication."""
-    # Agent attempt -> raises EpistemicViolation
     with pytest.raises(EpistemicViolation):
         guardrails.validate_epistemic_label(
             label=EpistemicLabel.CONFIRMED_ROOT_CAUSE.value,
@@ -201,7 +150,6 @@ def test_agent_cannot_output_confirmed_root_cause():
             is_human_engineer=False
         )
 
-    # Human engineer -> allowed
     res = guardrails.validate_epistemic_label(
         label=EpistemicLabel.CONFIRMED_ROOT_CAUSE.value,
         source="QualityEngineer",
@@ -209,9 +157,7 @@ def test_agent_cannot_output_confirmed_root_cause():
     )
     assert res == EpistemicLabel.CONFIRMED_ROOT_CAUSE
 
-
 def test_pdf_report_contains_all_13_sections_and_labels():
-    """Generates PDF and verifies labels across 13 sections, running footer disclaimer, and legend."""
     pdf_bytes = generate_quality_pdf_report({
         "batch_metadata": {"batch_id": "BATCH-0245", "nominal_mm": 50.0, "tolerance_mm": 0.05, "usl": 50.05, "lsl": 49.95},
         "dimensional_report": {"total_inspected": 5, "non_conforming_count": 3, "measurements": []},
@@ -225,7 +171,6 @@ def test_pdf_report_contains_all_13_sections_and_labels():
     reader = PdfReader(io.BytesIO(pdf_bytes))
     full_text = " ".join([page.extract_text() for page in reader.pages])
 
-    # Check 13 sections and labels
     assert "1. Product Details [OBSERVED_FACT]" in full_text
     assert "2. Batch Information [OBSERVED_FACT]" in full_text
     assert "3. Inspection Summary [OBSERVED_FACT]" in full_text
@@ -240,23 +185,17 @@ def test_pdf_report_contains_all_13_sections_and_labels():
     assert "12. Human Quality Approval [CONFIRMED_ROOT_CAUSE]" in full_text
     assert "13. Effectiveness Monitoring [STATISTICAL_FINDING]" in full_text
 
-    # Check legend
     assert "MANDATORY AUDIT GOVERNANCE & EPISTEMIC LABELS" in full_text
 
-    # Check unconfirmed warning
     assert "REQUIRES ENGINEERING VERIFICATION" in full_text
 
-    # Check mandatory footer disclaimer
     assert "Decision-support only. Final product disposition is a human decision." in full_text
 
-
 def test_wording_scan_for_autonomous_or_unsupported_claims():
-    """Scans prompts and agent templates to ensure no autonomous claim of certainty exists."""
     from pathlib import Path
     prompts_dir = Path("backend/app/agents/prompts")
     if prompts_dir.exists():
         for p in prompts_dir.glob("*.md"):
             text = p.read_text(encoding="utf-8").lower()
-            # Must not claim autonomous release or machine control
             assert "autonomously release" not in text
             assert "automatically stop" not in text

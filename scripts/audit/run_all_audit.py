@@ -1,9 +1,3 @@
-"""
-Independent V&V Master Audit Runner for QualityMind.
-Runs all independent verifiers and regression test suites.
-Exits with code 0 ONLY if 100% of all audit checks and tests pass.
-Exits with non-zero code on any single failure.
-"""
 
 import sys
 import subprocess

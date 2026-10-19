@@ -1,7 +1,3 @@
-"""
-Unified Enterprise API Router for Quality Inspection & RCA Platform
-Aggregates modular domain routers under the /api prefix.
-"""
 from fastapi import APIRouter
 
 from backend.app.routers.batches import router as batches_router
@@ -19,7 +15,6 @@ from backend.app.routers.investigation import router as investigation_router
 
 router = APIRouter(prefix="/api")
 
-# Mount domain routers
 router.include_router(auth_router)
 router.include_router(batches_router)
 router.include_router(inspection_router)

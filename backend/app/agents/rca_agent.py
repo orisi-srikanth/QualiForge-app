@@ -1,12 +1,3 @@
-"""
-Agent 6: Root Cause Analysis (RCA) Agent
-Performs systematic root cause investigation using:
-- 5 Whys Analysis
-- Fishbone (Ishikawa 6M) Diagram
-- Evidence-Ranked Hypotheses (Supporting vs Contradicting)
-- Semantic RAG Retrieval of Historical Quality Incidents (NCRs)
-Strictly treats findings as 'Hypotheses' pending engineering verification.
-"""
 import os
 import json
 import logging
@@ -25,15 +16,9 @@ from backend.app.core.config import settings
 
 logger = logging.getLogger("qualiforge.agent6")
 
-# Module-level cached Kilo Gateway OpenAI client (avoids re-instantiating client per request)
 _cached_kilo_client: Optional[OpenAI] = None
 
 def get_kilo_client(force_refresh: bool = False) -> Optional[OpenAI]:
-    """
-    Returns a reusable OpenAI client configured for Kilo Gateway.
-    Reads KILO_API_KEY from environment or settings using python-dotenv.
-    Never exposes, logs, or returns the raw API key.
-    """
     global _cached_kilo_client
     if _cached_kilo_client is not None and not force_refresh:
         return _cached_kilo_client
@@ -68,17 +53,14 @@ def get_kilo_client(force_refresh: bool = False) -> Optional[OpenAI]:
         return None
 
 def set_kilo_client(client: Optional[Any]) -> None:
-    """Injects a mock or custom Kilo Gateway client for testing."""
     global _cached_kilo_client
     _cached_kilo_client = client
 
 def reset_kilo_client() -> None:
-    """Resets cached Kilo client."""
     global _cached_kilo_client
     _cached_kilo_client = None
 
 def strip_markdown_json_fences(text: str) -> str:
-    """Safely normalizes markdown code fences (```json ... ```) into clean JSON string."""
     cleaned = text.strip()
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
@@ -93,10 +75,6 @@ def verify_kilo_model_availability(
     client: Optional[OpenAI] = None,
     model_id: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
 ) -> Dict[str, Any]:
-    """
-    Queries client.models.list() to verify the requested model_id is available and callable.
-    Returns availability status, model list, and matching Nemotron variants.
-    """
     active_client = client or get_kilo_client()
     if not active_client:
         return {
@@ -134,23 +112,12 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             certainty_level=CertaintyLevel.HYPOTHESIS
         )
 
-
     def reason_with_kilo(
         self,
         evidence_payload: Dict[str, Any],
         client: Optional[OpenAI] = None,
         model: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Organize and reason over manufacturing quality evidence using Kilo Gateway and NVIDIA Nemotron.
-        - Strictly maintains epistemic label as 'HYPOTHESIS'
-        - Never converts correlation or temporal precedence into confirmed causation
-        - Never fabricates measurements, NCRs, maintenance records, or source IDs
-        - Grounded citation checking against valid source references
-        - Normalizes markdown code fences
-        - Retries at most once for recoverable JSON/schema parsing failures
-        - Recommends engineering reassessment when evidence is insufficient or contradictory
-        """
         active_client = client or get_kilo_client()
         if not active_client:
             return {
@@ -171,7 +138,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             or getattr(settings, "KILO_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
         )
 
-        # Check model availability if client supports models.list()
         try:
             if hasattr(active_client, "models") and hasattr(active_client.models, "list"):
                 models_data = active_client.models.list()
@@ -196,7 +162,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
         except Exception as model_check_err:
             logger.debug(f"[Agent 6] Model list check bypassed: {model_check_err}")
 
-        # Extract and compile valid source references
         valid_source_ids = set(evidence_payload.get("valid_source_ids", []))
         for k in ["inspection_results", "measurements"]:
             sub = evidence_payload.get(k)
@@ -296,13 +261,11 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                     if not isinstance(h_raw, dict):
                         raise ValueError("Each item in 'hypotheses' must be a dictionary.")
 
-                    # Safety: Force epistemic label and certainty to HYPOTHESIS
                     h_raw["epistemic_label"] = "HYPOTHESIS"
                     h_raw["certainty"] = CertaintyLevel.HYPOTHESIS
                     if str(h_raw.get("status", "")).upper() in ["CONFIRMED", "CONFIRMED_ROOT_CAUSE"]:
                         h_raw["status"] = "UNDER_INVESTIGATION"
 
-                    # Verify sources against valid_source_ids
                     raw_sources = h_raw.get("sources") or []
                     filtered_sources = []
                     for s in raw_sources:
@@ -312,13 +275,11 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                             unsupported_sources_detected.append(s)
                     h_raw["sources"] = filtered_sources
 
-                    # Verify causal claims
                     desc = (str(h_raw.get("description", "")) + " " + " ".join(h_raw.get("supporting_evidence", []))).lower()
                     if "proves causation" in desc or "correlation proves" in desc:
                         unsupported_causal_claims_detected.append(h_raw.get("hypothesis_id", "HYP"))
                         h_raw["description"] = h_raw.get("description", "") + " (Statistical correlation indicates association, not proven causation.)"
 
-                    # Fallback defaults for Pydantic schema
                     if "hypothesis_id" not in h_raw:
                         h_raw["hypothesis_id"] = f"HYP-0{len(validated_hypotheses)+1}"
                     if "required_confirmation" not in h_raw:
@@ -331,7 +292,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                     hyp_obj = HypothesisEvidence(**h_raw)
                     validated_hypotheses.append(hyp_obj)
 
-                # Validation succeeded!
                 last_error = None
                 break
 
@@ -450,14 +410,12 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             "tool_synthesize_fault_tree_deductive"
         ]
 
-        # Extract process parameters from process_report if provided
         if process_report:
             if "vibration_current" in process_report:
                 vibration_val = float(process_report["vibration_current"])
             if "tool_cycles_current" in process_report:
                 tool_cycles = int(process_report["tool_cycles_current"]) if process_report["tool_cycles_current"] is not None else None
 
-        # Query batch, machine, maintenance, and inspection records from DB if available
         db_batch = None
         db_product_part_number = None
         db_product_name = None
@@ -497,7 +455,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                         if mach_obj:
                             db_machine_code = mach_obj.code
 
-                    # Fetch actual measurements for this batch
                     m_records = db_conn.query(Measurement).filter(Measurement.batch_id == db_batch.id).all()
                     db_measurements_vals = [m.value for m in m_records if m.value is not None]
                     if db_measurements_vals and not dimensional_findings:
@@ -505,13 +462,11 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                         if nonconf:
                             max_measured_val = max(max_measured_val, max(db_measurements_vals))
 
-                    # Fetch anomalies strictly for this batch and its machine
                     anom_q = db_conn.query(Anomaly).filter(Anomaly.batch_id == db_batch.id)
                     if db_batch.machine_id:
                         anom_q = anom_q.filter(Anomaly.machine_id == db_batch.machine_id)
                     db_anomalies_count = anom_q.count()
 
-                    # Fetch maintenance records STRICTLY for this machine (NO cross-machine contamination!)
                     if not db_maintenance_items and db_batch.machine_id:
                         m_list = db_conn.query(MaintenanceRecord).filter(
                             MaintenanceRecord.machine_id == db_batch.machine_id
@@ -523,7 +478,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                 elif batch_id and (batch_id.startswith("UNKNOWN") or batch_id.lower() == "unknown"):
                     is_unknown_batch = True
 
-                # If machine_id provided but maintenance_items still empty, fetch machine maintenance strictly
                 if not db_maintenance_items and db_machine_code:
                     mach_rec = db_conn.query(Machine).filter(
                         (Machine.code == db_machine_code) | (Machine.id == db_machine_code)
@@ -541,8 +495,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
         except Exception:
             pass
 
-        # 1. RAG Vector Retrieval of similar historical incidents
-        # Build query dynamically from Agent 2 visual findings and Agent 3 dimensional findings
         query_parts = []
         effective_defect_type = defect_type
         proxy_cat = category
@@ -566,7 +518,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
         rag_matches = []
         historical_incidents: List[HistoricalIncident] = []
 
-        # Route query through persistent ChromaDB vector store
         try:
             from backend.app.agents.quality_knowledge_agent import quality_knowledge_agent
             chroma_res = quality_knowledge_agent.query(query_text=query_text, top_k=3)
@@ -594,7 +545,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
         except Exception:
             pass
 
-        # Fallback to vector_store if Chroma returned empty
         if not historical_incidents:
             rag_matches = vector_store.search(
                 query=query_text,
@@ -619,7 +569,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                     )
                 )
 
-        # 2. Fishbone / Ishikawa 6M Diagram Structure
         fishbone = [
             FishboneCategory(
                 category="Machine",
@@ -672,7 +621,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             )
         ]
 
-        # 3. 5-Whys Sequential Root Cause Analysis
         if insufficient_evidence_for_whys:
             five_whys = [
                 FiveWhysItem(
@@ -736,8 +684,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                 )
             ]
 
-        # 4. DETERMINISTIC EVIDENCE SCORING FUNCTION
-        # Formula: score = normalise( sum(strength * reliability [supporting]) - sum(strength * reliability [contradicting]) )
         def score_hypothesis(supporting_items: List[Dict[str, Any]], contradicting_items: List[Dict[str, Any]], base: float):
             sum_supp = sum(item["strength"] * item["reliability"] for item in supporting_items)
             sum_contra = sum(item["strength"] * item["reliability"] for item in contradicting_items)
@@ -754,7 +700,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             }
             return score, breakdown
 
-        # HYP-01: Progressive Tool Flank Wear (Machine)
         if tool_cycles is not None and tool_cycles > 800:
             supp_h1 = [
                 {"desc": f"Tool cycle count is {tool_cycles} cycles, significantly exceeding nominal 600 cycles [Source: process_reading @ 02:20 CNC-04].", "strength": 1.0, "reliability": 1.0},
@@ -775,7 +720,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             ]
         score_h1, breakdown_h1 = score_hypothesis(supp_h1, contra_h1, base=0.40)
 
-        # HYP-02: Incorrect Tool Offset Setting (Method)
         supp_h2 = [
             {"desc": "Shift changeover occurred at 02:00 during night shift setup [Source: batch_metadata shift=Night Shift].", "strength": 0.60, "reliability": 0.8},
             {"desc": "Dimensional shift observed across consecutive inspection pieces [Source: measurements P003-P005].", "strength": 0.50, "reliability": 0.9}
@@ -786,7 +730,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
         ]
         score_h2, breakdown_h2 = score_hypothesis(supp_h2, contra_h2, base=0.50)
 
-        # HYP-03: Spindle Harmonic Vibration and Bearing Play (Machine)
         if vibration_val >= 3.5:
             supp_h3 = [
                 {"desc": f"Machine vibration increased to {vibration_val} mm/s (baseline: 2.1 mm/s) [Source: process_reading @ 02:20 CNC-04].", "strength": 0.90, "reliability": 1.0},
@@ -805,7 +748,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             ]
         score_h3, breakdown_h3 = score_hypothesis(supp_h3, contra_h3, base=0.50)
 
-        # HYP-04: Fixture & Workpiece Clamping Instability (Machine)
         supp_h4 = [
             {"desc": "Vibration increased during heavy cut pass [Source: process_reading @ 02:20 CNC-04].", "strength": 0.40, "reliability": 0.8}
         ]
@@ -815,7 +757,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
         ]
         score_h4, breakdown_h4 = score_hypothesis(supp_h4, contra_h4, base=0.45)
 
-        # HYP-05: Measurement System & Calibration Error (Measurement)
         supp_h5 = [
             {"desc": "Multiple consecutive parts measured high [Source: measurements P003-P005].", "strength": 0.35, "reliability": 0.8}
         ]
@@ -825,7 +766,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
         ]
         score_h5, breakdown_h5 = score_hypothesis(supp_h5, contra_h5, base=0.37)
 
-        # Query human decisions to identify any rejected or confirmed hypotheses
         rejected_hyp_ids = set()
         confirmed_hyp_ids = set()
         try:
@@ -985,13 +925,11 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             }
         ]
 
-        # Sort hypotheses by computed deterministic score descending
         sorted_hypos = sorted(hypotheses_raw, key=lambda x: x["confidence_score"], reverse=True)
         for rank_idx, h in enumerate(sorted_hypos, start=1):
             h["rank"] = rank_idx
         hypotheses = [HypothesisEvidence(**h) for h in sorted_hypos]
 
-        # 8 Inputs to RCA State (Strictly reports 'not available' if missing)
         rca_inputs = {
             "defect_type": effective_defect_type or "not available",
             "batch_id": batch_id or "not available",
@@ -1050,7 +988,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             }
         }
 
-        # Statistical Correlations & Temporal Precedence
         correlations = [
             {
                 "parameter_x": "tool_usage_cycles",
@@ -1137,7 +1074,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             "label": "[STATISTICAL_FINDING]"
         }
 
-        # 5. Fault-Tree Deductive Reasoning Model
         fault_tree = {
             "top_event": {
                 "id": "TE-01",
@@ -1194,7 +1130,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             certainty=CertaintyLevel.HYPOTHESIS
         )
 
-        # Collect authoritative grounded source IDs for citation verification
         valid_source_ids = set()
         valid_source_ids.update([
             "measurements:P001", "measurements:P002", "measurements:P003",
@@ -1223,7 +1158,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             "qe_spec:outer_diameter_mm", "product_spec:PS-2026-101"
         ])
 
-        # Kilo Gateway + NVIDIA Nemotron LLM Reasoning Integration
         active_kilo = kilo_client or get_kilo_client()
         if active_kilo:
             evidence_payload = {
@@ -1270,7 +1204,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                 if kilo_res.get("requires_reassessment"):
                     report.review_status = "REASSESSMENT_REQUIRED"
         else:
-            # Fallback legacy narrative hook if Kilo is not configured
             from backend.app.core.llm import universal_llm
             llm_prompt = [
                 {"role": "system", "content": "You are Agent 6 Root Cause Analysis reasoning agent for precision manufacturing. Synthesize hypotheses under 6M Ishikawa. Epistemic label is HYPOTHESIS. Never assert unproven causation."},
@@ -1294,7 +1227,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
             duration_ms=duration
         )
 
-        # Persist to agent_runs table for end-to-end RAG audit traceability (Req 11 Check 8)
         try:
             import json
             from datetime import datetime, timezone
@@ -1339,7 +1271,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
         except Exception:
             pass
 
-        # Persist / Upsert QualityIncident and RCAHypothesis to database (idempotent, no duplicate records)
         try:
             import json
             from datetime import datetime, timezone
@@ -1376,7 +1307,6 @@ class RootCauseAnalysisAgent(BaseQualityAgent):
                         db_inc.defect_type = clean_defect_type
                         db_sess.commit()
 
-                # Upsert hypotheses for this incident
                 for h in hypotheses:
                     h_id = h.hypothesis_id
                     existing_hyp = db_sess.query(RCAHypothesis).filter(

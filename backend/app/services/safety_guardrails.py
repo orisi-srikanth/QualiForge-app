@@ -1,11 +1,3 @@
-"""
-Safety Guardrails Service for QualityMind Industrial Decision Support System
-Enforces ISO 9001, IATF 16949, and PDF Problem Statement Safety Policy:
-"The system must not autonomously release safety-critical products, reject entire batches
-without authorization, modify CNC or machine parameters, stop production machinery,
-change PLC configurations, execute corrective machine actions, or override quality-engineer decisions.
-Observed fact, model prediction, statistical finding, hypothesis and confirmed root cause must be clearly distinguished."
-"""
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
@@ -16,7 +8,6 @@ from backend.app.database.models import HumanDecision
 logger = logging.getLogger("safety_guardrails")
 
 class AutonomousActionForbiddenError(HTTPException):
-    """Raised whenever an autonomous agent or non-human code path attempts an unauthorized physical machine or batch disposition action."""
     def __init__(self, detail: str, violation_code: str = "SAFETY_GATE_VIOLATION"):
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -29,7 +20,6 @@ class AutonomousActionForbiddenError(HTTPException):
         )
 
 class SafetyGuardrailService:
-    """Zero-trust guardrail interceptor for autonomous actions."""
 
     @staticmethod
     def _log_guardrail_trip(action_type: str, target: str, reason: str, user_id: str = "SYSTEM_AGENT"):
@@ -52,7 +42,6 @@ class SafetyGuardrailService:
 
     @classmethod
     def assert_no_autonomous_batch_release(cls, batch_id: str, initiated_by: str = "AI_AGENT"):
-        """Guardrail: System must NOT autonomously release safety-critical products."""
         msg = (
             f"[SAFETY GUARDRAIL VIOLATION] Autonomous release of product/batch '{batch_id}' is strictly forbidden. "
             "Final product disposition requires authorized human quality engineer sign-off."
@@ -62,7 +51,6 @@ class SafetyGuardrailService:
 
     @classmethod
     def assert_no_autonomous_batch_rejection(cls, batch_id: str, initiated_by: str = "AI_AGENT"):
-        """Guardrail: System must NOT autonomously reject entire batches without authorization."""
         msg = (
             f"[SAFETY GUARDRAIL VIOLATION] Autonomous batch rejection of '{batch_id}' without human authorization is strictly forbidden. "
             "Batch quarantine or scrap decisions require human quality engineer approval."
@@ -72,7 +60,6 @@ class SafetyGuardrailService:
 
     @classmethod
     def assert_no_machine_parameter_modification(cls, machine_id: str, parameters: Dict[str, Any], initiated_by: str = "AI_AGENT"):
-        """Guardrail: System must NOT modify CNC or machine parameters (e.g. tool offsets, feed rates, spindle speeds)."""
         msg = (
             f"[SAFETY GUARDRAIL VIOLATION] Autonomous modification of CNC machine parameters on '{machine_id}' is strictly forbidden. "
             f"Requested parameter modifications: {list(parameters.keys())}. CNC parameter changes must be physically executed by certified operators."
@@ -82,7 +69,6 @@ class SafetyGuardrailService:
 
     @classmethod
     def assert_no_plc_configuration_change(cls, machine_id: str, plc_config: Dict[str, Any], initiated_by: str = "AI_AGENT"):
-        """Guardrail: System must NOT change PLC configurations."""
         msg = (
             f"[SAFETY GUARDRAIL VIOLATION] Autonomous modification of PLC configurations on '{machine_id}' is strictly forbidden. "
             "PLC modifications require certified controls engineering sign-off."
@@ -92,7 +78,6 @@ class SafetyGuardrailService:
 
     @classmethod
     def assert_no_autonomous_machinery_stop(cls, machine_id: str, initiated_by: str = "AI_AGENT"):
-        """Guardrail: System must NOT stop production machinery or execute emergency stops autonomously."""
         msg = (
             f"[SAFETY GUARDRAIL VIOLATION] Autonomous line shutdown or emergency stop on '{machine_id}' is strictly forbidden. "
             "Machine stoppage is restricted to physical E-stops and authorized shop floor personnel."
@@ -102,7 +87,6 @@ class SafetyGuardrailService:
 
     @classmethod
     def assert_no_override_engineer_decision(cls, entity_id: str, initiated_by: str = "AI_AGENT"):
-        """Guardrail: System must NOT override quality engineer decisions."""
         msg = (
             f"[SAFETY GUARDRAIL VIOLATION] Overriding quality engineer decisions for '{entity_id}' is strictly forbidden. "
             "Human engineering decisions are sovereign and immutable."
@@ -112,7 +96,6 @@ class SafetyGuardrailService:
 
     @classmethod
     def assert_no_corrective_machine_action(cls, machine_id: str, action_desc: str = "tool_change", initiated_by: str = "AI_AGENT"):
-        """Guardrail: System must NOT execute corrective machine actions autonomously."""
         msg = (
             f"[SAFETY GUARDRAIL VIOLATION] Autonomous execution of corrective machine action '{action_desc}' on '{machine_id}' is strictly forbidden. "
             "Corrective physical actions require human maintenance or operator task authorization and execution."

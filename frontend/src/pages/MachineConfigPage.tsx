@@ -47,7 +47,6 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // New Machine Registration Modal State
   const [showNewMachineModal, setShowNewMachineModal] = useState(false);
   const [newMachineCode, setNewMachineCode] = useState("");
   const [newMachineType, setNewMachineType] = useState("");
@@ -119,7 +118,7 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
           const num = value === "" ? null : parseFloat(value);
           updated[field] = isNaN(num as number) ? null : num;
         }
-        // If critical fields are filled, mark as CONFIGURED
+
         if (updated.mean !== null && updated.upper_threshold !== null) {
           updated.status = "CONFIGURED";
         }
@@ -210,7 +209,7 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
 
   return (
     <div className="space-y-6">
-      {/* Top Header Card */}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white border border-[#E3E8EF] rounded-xl shadow-xs">
         <div>
           <div className="flex items-center gap-2">
@@ -243,7 +242,6 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
         </div>
       </div>
 
-      {/* Success Notification */}
       {successMessage && (
         <div id="machine-config-success" className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
           <Check className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -251,7 +249,6 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
         </div>
       )}
 
-      {/* Error Notification */}
       {errorMessage && (
         <div id="machine-config-error" className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center gap-2 animate-in fade-in">
           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -263,7 +260,7 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Left Column: Machine Cell Directory */}
+
         <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -303,9 +300,8 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
           </div>
         </div>
 
-        {/* Right Column: Baselines & Thresholds Configuration Table */}
         <div className="lg:col-span-3 p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-5">
-          {/* Machine Info Bar */}
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div>
               <div className="flex items-center gap-2">
@@ -344,7 +340,6 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
             </div>
           </div>
 
-          {/* Operational Parameters Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border border-slate-200 rounded-lg">
               <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
@@ -439,7 +434,6 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
             </table>
           </div>
 
-          {/* Quality Engineering Compliance Notice */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <span>
@@ -450,7 +444,6 @@ export const MachineConfigPage: React.FC<Props> = ({ initialMachineId, onNavigat
         </div>
       </div>
 
-      {/* Register Machine Modal */}
       {showNewMachineModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4 border border-slate-200 animate-in fade-in">

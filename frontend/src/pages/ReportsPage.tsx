@@ -77,7 +77,7 @@ export const ReportsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-[26px] font-bold text-slate-900 leading-tight">Reports & Audit Dossiers</h2>
@@ -119,7 +119,6 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Batch Selector Dropdown */}
       {batches.length > 0 && (
         <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
@@ -145,7 +144,6 @@ export const ReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* PDF Download Action Banner / Clean State */}
       {selectedBatchId ? (
         <div className="p-5 bg-white border border-[#E3E8EF] rounded-xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
@@ -178,7 +176,6 @@ export const ReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* 13 Standard Sections Preview */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
         <div className="p-5 border-b border-slate-200">
           <h3 className="text-base font-bold text-slate-900">

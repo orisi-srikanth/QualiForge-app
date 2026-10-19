@@ -1,7 +1,3 @@
-"""
-Base Agent Architecture for Enterprise Manufacturing Quality System
-Implements standard tool calling interface, prompt telemetry, structured logging, and certainty attribution.
-"""
 from typing import Dict, Any, List
 import time
 from backend.app.models.schemas import CertaintyLevel, AgentStepLog

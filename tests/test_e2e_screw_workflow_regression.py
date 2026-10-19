@@ -1,13 +1,9 @@
-"""
-Focused Regression Test: End-to-End Image Workflow, Product Mismatch Quarantine & 13-Section PDF Verification
-"""
 import os
 import pytest
 from pypdf import PdfReader
 from backend.app.agents.visual_agent import vision_agent
 from backend.app.orchestrator.engine import orchestrator
 from backend.app.services.pdf_report import generate_quality_pdf_report
-
 
 def test_screw_vision_inspection():
     img_path = os.path.abspath("backend/app/static/uploads/samples/screw_thread.png")
@@ -24,7 +20,6 @@ def test_screw_vision_inspection():
     assert pred.location_zone == "mid_region"
     assert pred.certainty.value == "Model Prediction"
 
-
 def test_product_batch_mismatch_quarantine_in_orchestrator():
     img_path = os.path.abspath("backend/app/static/uploads/samples/screw_thread.png")
     state = orchestrator.run_full_pipeline(
@@ -40,13 +35,11 @@ def test_product_batch_mismatch_quarantine_in_orchestrator():
         image_path=img_path
     )
 
-    # Validate Mismatch is flagged
     assert state.product_mismatch is True
     assert "PRODUCT MISMATCH DETECTED" in state.product_mismatch_warning
     assert "screw" in state.product_mismatch_warning
     assert "Precision Ground Shaft" in state.product_mismatch_warning
 
-    # Validate Agent Execution Trace (8 agents executed)
     agent_names = [step.agent_name for step in state.execution_trace]
     assert any("Data Intake" in name for name in agent_names)
     assert any("Visual Quality" in name for name in agent_names)
@@ -57,18 +50,14 @@ def test_product_batch_mismatch_quarantine_in_orchestrator():
     assert any("Corrective & Preventive" in name for name in agent_names)
     assert any("Critic" in name for name in agent_names)
 
-    # Validate RCA defect type is NOT overwritten to thread_damage
-    # Shaft root cause is tool wear on CNC-04
     assert len(state.rca_report.ranked_hypotheses) > 0
     top_hypo = state.rca_report.ranked_hypotheses[0]
     assert "Tool Flank Wear" in top_hypo.title
     assert top_hypo.confidence_score >= 0.80
 
-    # Validate CAPA received RCA findings
     assert len(state.capa_report.containment_actions) > 0
     assert len(state.capa_report.corrective_actions) > 0
     assert len(state.capa_report.preventive_actions) > 0
-
 
 def test_13_sections_pdf_generation_with_mismatch_notice():
     img_path = os.path.abspath("backend/app/static/uploads/samples/screw_thread.png")
@@ -89,7 +78,6 @@ def test_13_sections_pdf_generation_with_mismatch_notice():
     assert pdf_bytes.startswith(b"%PDF-1.4"), "Invalid PDF header signature"
     assert len(pdf_bytes) > 50000, f"PDF too small: {len(pdf_bytes)} bytes"
 
-    # Write temporary file to inspect with pypdf
     tmp_path = os.path.abspath("backend/app/static/test_regression_report.pdf")
     with open(tmp_path, "wb") as f:
         f.write(pdf_bytes)
@@ -101,7 +89,6 @@ def test_13_sections_pdf_generation_with_mismatch_notice():
     for page in reader.pages:
         full_text += "\n" + (page.extract_text() or "")
 
-    # Audit all 13 sections
     required_sections = [
         "1. Product Details",
         "2. Batch Information",
@@ -121,6 +108,5 @@ def test_13_sections_pdf_generation_with_mismatch_notice():
     for sec in required_sections:
         assert sec.lower() in full_text.lower(), f"Missing required section: {sec}"
 
-    # Verify Product Mismatch banner is present in Section 4
     assert "product mismatch flagged" in full_text.lower()
     assert "quarantined" in full_text.lower()

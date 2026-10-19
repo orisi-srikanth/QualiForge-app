@@ -1,13 +1,3 @@
-"""
-Corrective & Preventive Action (CAPA) API Endpoints (Agent 7)
-Fully compliant with IATF 16949 Section 10.2:
-- 3-tiered action management (Containment, Corrective, Preventive)
-- Strict RBAC: Quality Engineer / Admin sign-off required
-- Monotonically sequential non-reusable IDs (CAPA-YYYY-NNN)
-- Deterministic state machine & field validations
-- Safety guardrails blocking autonomous machine control
-- Defect recurrence detection
-"""
 import os
 import shutil
 from typing import Optional, List, Dict, Any
@@ -23,9 +13,6 @@ from backend.app.core.security import require_authenticated_role, get_current_us
 
 router = APIRouter(prefix="", tags=["CAPA"])
 
-# ---------------------------------------------------------------------------
-# Pydantic Schemas
-# ---------------------------------------------------------------------------
 class CAPACreateRequest(BaseModel):
     incident_id: str = Field(..., description="ID of the associated quality incident (e.g. inc-ncr-019)")
     type: str = Field(..., description="Action tier: containment, corrective, preventive")
@@ -82,10 +69,6 @@ class CAPAUpdateRequest(BaseModel):
     effectiveness_result: Optional[str] = Field(None, description="Post-intervention verification outcome")
     comment: Optional[str] = Field(None, description="Audit log note")
 
-
-# ---------------------------------------------------------------------------
-# API Routes
-# ---------------------------------------------------------------------------
 @router.get(
     "/capa/actions",
     summary="List and filter CAPA actions",
@@ -112,7 +95,6 @@ def list_capa_actions(
         "actions": actions
     }
 
-
 @router.get(
     "/capa/actions/{action_id_or_code}",
     summary="Get single CAPA action by ID or Code",
@@ -124,7 +106,6 @@ def get_capa_action(
 ):
     act = capa_service.get_action(db, action_id_or_code)
     return capa_service.serialize_action(act)
-
 
 @router.post(
     "/capa/actions",
@@ -149,7 +130,6 @@ def create_capa_action(
         responsible_role=payload.responsible_role
     )
     return capa_service.serialize_action(act)
-
 
 @router.post(
     "/capa/actions/{action_id_or_code}/approve",
@@ -176,7 +156,6 @@ def approve_capa_action(
         "action": capa_service.serialize_action(act)
     }
 
-
 @router.post(
     "/capa/actions/{action_id_or_code}/reject",
     summary="Reject a proposed CAPA action",
@@ -198,7 +177,6 @@ def reject_capa_action(
         "message": f"Action {act.action_code} rejected.",
         "action": capa_service.serialize_action(act)
     }
-
 
 @router.patch(
     "/capa/actions/{action_id_or_code}",
@@ -228,7 +206,6 @@ def update_capa_action(
         "action": capa_service.serialize_action(act)
     }
 
-
 @router.delete(
     "/capa/actions/{action_id_or_code}",
     summary="Delete a CAPA action",
@@ -240,7 +217,6 @@ def delete_capa_action(
     db: Session = Depends(get_db)
 ):
     return capa_service.delete_action(db, action_id_or_code, user)
-
 
 @router.post(
     "/capa/actions/{action_id_or_code}/evidence",
@@ -255,7 +231,6 @@ def upload_capa_evidence(
 ):
     action = capa_service.get_action(db, action_id_or_code)
 
-    # Validate file extension
     filename = file.filename or "evidence.dat"
     ext = os.path.splitext(filename)[1].lower()
     allowed_extensions = [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".csv", ".txt", ".docx"]
@@ -265,7 +240,6 @@ def upload_capa_evidence(
             detail=f"Disallowed evidence file type '{ext}'. Allowed types: {allowed_extensions}."
         )
 
-    # Validate file size (max 10MB)
     upload_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static", "uploads", "evidence"))
     os.makedirs(upload_dir, exist_ok=True)
 
@@ -291,7 +265,6 @@ def upload_capa_evidence(
     else:
         action.evidence += f" | File: {filename}"
 
-    # Audit log
     audit_log = HumanDecision(
         workflow_id=f"wf-capa-{action.action_code}",
         entity_type="capa",
@@ -310,7 +283,6 @@ def upload_capa_evidence(
         "file_path": rel_path,
         "action": capa_service.serialize_action(action)
     }
-
 
 @router.get(
     "/capa/actions/{action_id_or_code}/audit",
@@ -341,7 +313,6 @@ def get_capa_audit_trail(
         ]
     }
 
-
 @router.get(
     "/capa/actions/{action_id_or_code}/effectiveness",
     tags=["Effectiveness", "CAPA"],
@@ -355,7 +326,6 @@ def get_action_effectiveness(
     from backend.app.services.effectiveness import effectiveness_engine
     return effectiveness_engine.evaluate_capa_effectiveness(capa_id=action_id_or_code, db=db)
 
-
 @router.get(
     "/capa/recurrence-check",
     summary="Defect Recurrence Detector",
@@ -367,7 +337,6 @@ def check_defect_recurrence(
     db: Session = Depends(get_db)
 ):
     return capa_service.detect_defect_recurrence(db=db, machine_code=machine, defect_type=defect_type)
-
 
 @router.post(
     "/capa/generate-proposals/{batch_id}",
@@ -401,7 +370,6 @@ def generate_proposals_for_batch(
         "preventive_actions": preventive
     }
 
-
 @router.get(
     "/capa/stats",
     summary="Get aggregated CAPA counts",
@@ -424,7 +392,6 @@ def get_capa_statistics(db: Session = Depends(get_db)):
         "completed_actions": completed_count,
         "as_of_date": today_str
     }
-
 
 @router.get(
     "/capa/plan",

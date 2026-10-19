@@ -1,7 +1,3 @@
-"""
-Security, Password Hashing, JWT Tokens & Role-Based Access Control (RBAC)
-Enforces industrial authorization: only quality_engineer and admin can confirm/approve.
-"""
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
@@ -54,7 +50,6 @@ def get_current_user_optional(
     authorization: Optional[str] = Header(None),
     token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
-    """Reads authorization header or token if present; defaults to DEFAULT_USER if unauthenticated."""
     raw_token = token
     if not raw_token and authorization:
         if authorization.lower().startswith("bearer "):
@@ -69,11 +64,9 @@ def get_current_user_optional(
     return DEFAULT_USER
 
 def get_current_user(user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)) -> Dict[str, Any]:
-    """Returns current user or DEFAULT_USER."""
     return user or DEFAULT_USER
 
 def require_roles(*allowed_roles: UserRole):
-    """Role checker enforcing role access."""
     def role_checker(user: Dict[str, Any] = Depends(get_current_user)):
         user_role = str(user.get("role", "")).lower()
         if user_role and allowed_roles:
@@ -86,13 +79,10 @@ def require_roles(*allowed_roles: UserRole):
         return user
     return role_checker
 
-
 def require_authenticated_user(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """Allows authenticated user."""
     return user
 
 def require_authenticated_role(*allowed_roles: str):
-    """Role-based authorization dependency enforcing allowed roles when x-enforce-role header is present."""
     def checker(request: Request, user: Dict[str, Any] = Depends(get_current_user)):
         is_strict = request.headers.get("x-enforce-role", "").lower() in ("true", "1")
         user_role = str(user.get("role", "")).lower()

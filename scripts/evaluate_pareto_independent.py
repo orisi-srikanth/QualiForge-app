@@ -1,9 +1,3 @@
-"""
-Independent Raw SQL / Pandas Pareto Analysis Verifier
-Strictly independent verification: does NOT import application code or services.
-Connects directly to backend/data/quality_system.db via raw sqlite3.
-Compares independent calculation side-by-side with live FastAPI endpoint.
-"""
 import sqlite3
 import json
 import requests
@@ -20,7 +14,6 @@ def compute_independent_pareto(
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Build date clause for quality_incidents created_at
     date_clauses = []
     params = []
     if start_date:
@@ -74,7 +67,6 @@ def compute_independent_pareto(
             GROUP BY cat
         """
     elif dimension == "root_cause":
-        # Strictly confirmed root causes only
         rc_where = ["(rh.label = 'CONFIRMED_ROOT_CAUSE' OR rh.status = 'confirmed')"]
         if date_clauses:
             rc_where.extend(date_clauses)
@@ -103,7 +95,6 @@ def compute_independent_pareto(
             "vital_few": []
         }
 
-    # Deterministic sorting: count descending, then category name ascending
     sorted_rows = sorted(rows, key=lambda x: (-x[1], str(x[0])))
 
     items = []
@@ -152,9 +143,7 @@ def run_side_by_side_verification():
 
     for dim in dimensions:
         print(f"\n>>> DIMENSION: {dim.upper()} <<<")
-        # 1. Independent calculation
         indep = compute_independent_pareto(dim)
-        # 2. App API
         resp = requests.get(f"{API_URL}?dimension={dim}")
         assert resp.status_code == 200, f"API failed with {resp.status_code}"
         app_data = resp.json()
@@ -188,7 +177,6 @@ def run_side_by_side_verification():
         print(f"Vital Few List Match: {indep['vital_few'] == app_data['vital_few_categories']}")
         assert indep['vital_few'] == app_data['vital_few_categories']
 
-    # Date range independent verification
     print("\n" + "=" * 80)
     print("  DATE RANGE FILTER INDEPENDENT VERIFICATION")
     print("=" * 80)

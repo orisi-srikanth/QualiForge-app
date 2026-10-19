@@ -29,7 +29,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
   const [machines, setMachines] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // Form State
   const [batchNumber, setBatchNumber] = useState(`BATCH-${Math.floor(1000 + Math.random() * 9000)}`);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedMachineId, setSelectedMachineId] = useState("");
@@ -39,7 +38,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
   const [operatorRef, setOperatorRef] = useState("OP-04-JOHN");
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
 
-  // Upload File States
   const [measurementFile, setMeasurementFile] = useState<File | null>(null);
   const [measurementUploadStatus, setMeasurementUploadStatus] = useState<string | null>(null);
   const [measurementResults, setMeasurementResults] = useState<any | null>(null);
@@ -54,7 +52,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
   const [imagePrediction, setImagePrediction] = useState<any | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
-  // Submission States
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [completedWorkflow, setCompletedWorkflow] = useState<any | null>(null);
@@ -82,7 +79,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
 
   const selectedProduct = products.find((p) => p.product_id === selectedProductId);
 
-  // Measurement file upload handler
   const handleMeasurementUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -100,7 +96,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
     }
   };
 
-  // Telemetry file upload handler
   const handleTelemetryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -117,7 +112,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
     }
   };
 
-  // Image file upload handler
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -135,12 +129,11 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
     }
   };
 
-  // Final submission and multi-agent pipeline execution
   const handleSubmitBatch = async () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      // 1. Create batch record in backend (or ignore if already initialized during intake upload)
+
       const batchPayload = {
         batch_number: batchNumber,
         product_id: selectedProductId,
@@ -155,11 +148,10 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
       try {
         await api.createBatch(batchPayload);
       } catch (createErr: any) {
-        // If batch already created in intake step, continue
+
         console.warn("Batch record already registered or initialized:", createErr);
       }
 
-      // 2. Trigger multi-agent pipeline
       const wfRes = await api.runOrchestratedPipeline(batchNumber);
       setCompletedWorkflow(wfRes);
       if (onBatchCreated) onBatchCreated(batchNumber);
@@ -172,7 +164,7 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* -------------------- STEP INDICATOR -------------------- */}
+
       <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
         <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-3">
           <span>Step {currentStep} of 8: {STEPS[currentStep - 1].title}</span>
@@ -195,7 +187,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
         </div>
       </div>
 
-      {/* -------------------- WIZARD STEP BODY -------------------- */}
       <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-xs">
         {loadingData ? (
           <div className="py-12 text-center text-xs text-slate-500 space-y-2">
@@ -204,7 +195,7 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
           </div>
         ) : (
           <div>
-            {/* STEP 1: BATCH DETAILS */}
+
             {currentStep === 1 && (
               <div className="space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Step 1: Batch Identification & Lot Tracking</h3>
@@ -239,7 +230,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
               </div>
             )}
 
-            {/* STEP 2: PRODUCT & MACHINE SELECTION */}
             {currentStep === 2 && (
               <div className="space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Step 2: Product Specification & Machining Cell</h3>
@@ -291,7 +281,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
               </div>
             )}
 
-            {/* STEP 3: SHIFT & MATERIAL */}
             {currentStep === 3 && (
               <div className="space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Step 3: Shift, Production Quantity & Material Lot</h3>
@@ -348,7 +337,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
               </div>
             )}
 
-            {/* STEP 4: INSPECTION MEASUREMENTS */}
             {currentStep === 4 && (
               <div className="space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Step 4: Dimensional Inspection Measurements Intake</h3>
@@ -395,7 +383,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
               </div>
             )}
 
-            {/* STEP 5: PROCESS TELEMETRY */}
             {currentStep === 5 && (
               <div className="space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Step 5: Machine Telemetry & Sensor Log Stream</h3>
@@ -442,7 +429,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
               </div>
             )}
 
-            {/* STEP 6: PRODUCT IMAGES */}
             {currentStep === 6 && (
               <div className="space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Step 6: High-Resolution Component Photography</h3>
@@ -496,7 +482,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
               </div>
             )}
 
-            {/* STEP 7: VALIDATION REVIEW */}
             {currentStep === 7 && (
               <div className="space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Step 7: Pre-Submission Deterministic Validation</h3>
@@ -538,7 +523,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
               </div>
             )}
 
-            {/* STEP 8: SUBMIT & MULTI-AGENT EXECUTION */}
             {currentStep === 8 && (
               <div className="space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Step 8: Submit Batch for Quality Analysis</h3>
@@ -609,7 +593,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
           </div>
         )}
 
-        {/* -------------------- WIZARD NAVIGATION FOOTER -------------------- */}
         {!completedWorkflow && (
           <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between">
             <button

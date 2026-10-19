@@ -1,24 +1,3 @@
-"""
-Transfer-Learning Defect Classifier for Machined Precision Shafts
-Primary Vision Model for QualityMind Industrial Platform
-
-Backbone: MobileNetV3-Small (Pretrained ImageNet Weights)
-Classes: 6 synthetic machined shaft classes:
-  0: no_defect
-  1: surface_scratch
-  2: dent
-  3: crack
-  4: missing_feature
-  5: incorrect_assembly
-
-Includes:
-- Class-weighted CrossEntropyLoss
-- Conservative spatial augmentations (flips, rotation, mild color jitter)
-- Cosine annealing learning rate scheduling
-- PyTorch state_dict export
-- ONNX export (<2s CPU latency, 11-15 ms actual)
-- Grad-CAM interpretability hook
-"""
 import os
 import sys
 import json
@@ -49,7 +28,6 @@ SHAFT_CLASSES = [
 
 CLASS_TO_IDX = {cls_name: i for i, cls_name in enumerate(SHAFT_CLASSES)}
 IDX_TO_CLASS = {i: cls_name for i, cls_name in enumerate(SHAFT_CLASSES)}
-
 
 class ShaftClassificationDataset(Dataset):
     def __init__(self, records: List[Dict[str, Any]], is_train: bool = True):
@@ -85,16 +63,14 @@ class ShaftClassificationDataset(Dataset):
         tensor = self.transform(img)
         return tensor, torch.tensor(label, dtype=torch.long)
 
-
 class DefectClassifier(nn.Module):
-    """MobileNetV3-Small backbone with fine-tuned defect classification head."""
     def __init__(self, num_classes: int = len(SHAFT_CLASSES), pretrained: bool = False):
         super().__init__()
         weights = models.MobileNet_V3_Small_Weights.DEFAULT if pretrained else None
         base = models.mobilenet_v3_small(weights=weights)
         self.features = base.features
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        in_features = base.classifier[0].in_features  # 576
+        in_features = base.classifier[0].in_features
         self.classifier = nn.Sequential(
             nn.Linear(in_features, 256),
             nn.Hardswish(),
@@ -109,9 +85,7 @@ class DefectClassifier(nn.Module):
         x = self.classifier(x)
         return x
 
-
 class GradCAM:
-    """Computes class-activation maps for interpretability and bounding box localization without backward graphs."""
     def __init__(self, model: DefectClassifier, target_layer: Optional[nn.Module] = None):
         self.model = model
         self.target_layer = target_layer if target_layer is not None else model.features[-1]
@@ -140,7 +114,6 @@ class GradCAM:
         cam = cv2.resize(cam, (512, 512))
         return cam
 
-
 def compute_class_weights(records: List[Dict[str, Any]], num_classes: int) -> torch.Tensor:
     counts = np.zeros(num_classes, dtype=np.float32)
     for r in records:
@@ -152,7 +125,6 @@ def compute_class_weights(records: List[Dict[str, Any]], num_classes: int) -> to
     weights = total / (num_classes * counts)
     weights = np.clip(weights, 0.4, 4.0)
     return torch.tensor(weights, dtype=torch.float32)
-
 
 def train_classifier(
     splits_path: Optional[Path] = None,
@@ -227,7 +199,6 @@ def train_classifier(
         train_acc = correct / max(total, 1)
         avg_loss = total_loss / max(total, 1)
 
-        # Validation
         model.eval()
         val_preds = []
         val_targets = []
@@ -252,10 +223,8 @@ def train_classifier(
     model.load_state_dict(torch.load(best_weights_path, map_location=device))
     model.eval()
 
-    # Mirror PyTorch weights to models/cv_model.pt
     torch.save(model.state_dict(), alt_models_dir / "cv_model.pt")
 
-    # Export ONNX model
     onnx_path = output_dir / "cv_model.onnx"
     dummy_input = torch.randn(1, 3, 224, 224, device=device)
     print(f"Exporting model to ONNX format at {onnx_path}...")
@@ -272,7 +241,6 @@ def train_classifier(
     with open(onnx_path, "rb") as f_in, open(alt_models_dir / "cv_model.onnx", "wb") as f_out:
         f_out.write(f_in.read())
 
-    # Save classes metadata
     classes_meta = {
         "classes": SHAFT_CLASSES,
         "class_to_idx": CLASS_TO_IDX,
@@ -291,7 +259,6 @@ def train_classifier(
     with open(alt_models_dir / "classes.json", "w", encoding="utf-8") as f:
         json.dump(classes_meta, f, indent=2)
 
-    # Benchmark CPU Latency
     print("Benchmarking CPU inference latency (< 2,000 ms constraint)...")
     latencies = []
     with torch.no_grad():
@@ -304,7 +271,6 @@ def train_classifier(
     print(f"Mean CPU Inference Latency: {mean_lat:.2f} ms per image (Requirement: < 2,000 ms). PASS!")
 
     return model
-
 
 if __name__ == "__main__":
     train_classifier()

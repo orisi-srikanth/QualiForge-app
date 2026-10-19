@@ -1,19 +1,3 @@
-"""
-Automated Test Suite for Functional Requirement 17: Agent Execution Visibility
-Source of Truth: FR-17, Page 17 of Problem Statement
-
-Requirements Verified:
-1. Current agent
-2. Agent input
-3. Tool calls
-4. Model results
-5. Retrieved evidence
-6. RCA hypotheses
-7. Reviewer comments
-8. Human decision
-9. Trace integrity & handoffs
-10. Security & RBAC on trace and decision endpoints
-"""
 import pytest
 from fastapi.testclient import TestClient
 import os
@@ -25,24 +9,20 @@ from backend.app.database.models import HumanDecision, WorkflowStateModel
 from backend.app.orchestrator.engine import orchestrator
 from backend.app.core.security import create_access_token
 
-
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as c:
         yield c
-
 
 @pytest.fixture(scope="module")
 def operator_headers():
     token = create_access_token({"sub": "usr-op-01", "name": "John Operator", "role": "operator"})
     return {"Authorization": f"Bearer {token}"}
 
-
 @pytest.fixture(scope="module")
 def qe_headers():
     token = create_access_token({"sub": "usr-qe-01", "name": "Sarah Chen", "role": "quality_engineer"})
     return {"Authorization": f"Bearer {token}"}
-
 
 @pytest.fixture(scope="module")
 def test_workflow_run():
@@ -57,9 +37,7 @@ def test_workflow_run():
     )
     return state
 
-
 def test_fr17_1_current_agent_display(client, test_workflow_run):
-    """FR-17.1: Current agent is correctly displayed and reflects active/paused state."""
     res = client.get(f"/api/workflows/{test_workflow_run.workflow_id}")
     assert res.status_code == 200
     data = res.json()
@@ -67,9 +45,7 @@ def test_fr17_1_current_agent_display(client, test_workflow_run):
     assert data["current_agent"] == "Human Quality Engineer (Gatekeeper)"
     assert data["status"] in ["PENDING_HUMAN_APPROVAL", "PAUSED_AWAITING_HUMAN_APPROVAL"]
 
-
 def test_fr17_2_agent_input_display(client, test_workflow_run):
-    """FR-17.2: Run-specific agent input summaries are recorded across trace steps."""
     res = client.get(f"/api/workflows/{test_workflow_run.workflow_id}/trace")
     assert res.status_code == 200
     trace = res.json()
@@ -79,36 +55,27 @@ def test_fr17_2_agent_input_display(client, test_workflow_run):
         assert "input_summary" in step
         assert step["input_summary"] is not None
         assert len(step["input_summary"]) > 15
-        # Verify input references actual domain data
         assert any(kw in step["input_summary"].lower() for kw in ["batch", "measurements", "points", "telemetry", "incident", "upstream", "spec"])
 
-
-
 def test_fr17_3_tool_calls_display(client, test_workflow_run):
-    """FR-17.3: Tool calls are explicitly recorded for agents with invoked tools."""
     res = client.get(f"/api/workflows/{test_workflow_run.workflow_id}/trace")
     assert res.status_code == 200
     trace = res.json()
 
-    # Step 1: Intake tools
     intake_step = next((s for s in trace if "Intake" in s["agent_name"]), None)
     assert intake_step is not None
     assert "tool_validate_batch_schema" in intake_step.get("tool_calls", [])
 
-    # Step 6: RCA tools
     rca_step = next((s for s in trace if "Root Cause" in s["agent_name"]), None)
     assert rca_step is not None
     assert "tool_rag_query_historical_ncrs" in rca_step.get("tool_calls", [])
     assert "tool_synthesize_fishbone_6m" in rca_step.get("tool_calls", [])
 
-
 def test_fr17_4_model_results_display(client, test_workflow_run):
-    """FR-17.4: ML model results and metadata are recorded."""
     res = client.get(f"/api/workflows/{test_workflow_run.workflow_id}")
     assert res.status_code == 200
     data = res.json()
 
-    # Check Visual Prediction model output if image provided
     if data.get("visual_prediction"):
         vp = data["visual_prediction"]
         assert "model_version" in vp
@@ -116,15 +83,12 @@ def test_fr17_4_model_results_display(client, test_workflow_run):
         assert "defect_type" in vp
         assert vp["confidence"] > 0.50
 
-    # Check Telemetry anomaly model output
     pr = data.get("process_report")
     assert pr is not None
     assert "anomalies_detected" in pr
     assert pr["anomalies_detected"] > 0
 
-
 def test_fr17_5_retrieved_evidence_display(client, test_workflow_run):
-    """FR-17.5: Retrieved evidence with traceable sources and similarity scores."""
     res = client.get(f"/api/workflows/{test_workflow_run.workflow_id}")
     assert res.status_code == 200
     data = res.json()
@@ -140,9 +104,7 @@ def test_fr17_5_retrieved_evidence_display(client, test_workflow_run):
     assert "confirmed_root_cause" in top_match
     assert top_match["similarity_score"] > 0.0
 
-
 def test_fr17_6_rca_hypotheses_display(client, test_workflow_run):
-    """FR-17.6: RCA hypotheses with evidence scores, confirmation tests, and status."""
     res = client.get(f"/api/workflows/{test_workflow_run.workflow_id}")
     assert res.status_code == 200
     data = res.json()
@@ -158,9 +120,7 @@ def test_fr17_6_rca_hypotheses_display(client, test_workflow_run):
     assert "required_confirmation" in top_hyp
     assert "supporting_evidence" in top_hyp
 
-
 def test_fr17_7_reviewer_comments_display(client, test_workflow_run):
-    """FR-17.7: Reviewer comments from Critic Agent are persisted."""
     res = client.get(f"/api/workflows/{test_workflow_run.workflow_id}")
     assert res.status_code == 200
     data = res.json()
@@ -170,12 +130,9 @@ def test_fr17_7_reviewer_comments_display(client, test_workflow_run):
     assert "review_comments" in critic
     assert len(critic["review_comments"]) >= 3
 
-
 def test_fr17_8_human_decision_persistence_and_rbac(client, test_workflow_run, operator_headers, qe_headers):
-    """FR-17.8: Human decision persistence and status tracking without auth gating."""
     wf_id = test_workflow_run.workflow_id
 
-    # 1. Unauthenticated decision attempt -> permitted (HTTP 200) and resumes workflow
     res = client.post(
         f"/api/workflows/{wf_id}/decision",
         json={
@@ -189,7 +146,6 @@ def test_fr17_8_human_decision_persistence_and_rbac(client, test_workflow_run, o
     res_data = res.json()
     assert res_data["status"] == "RESUMED_AND_COMPLETED"
 
-    # 2. Verify DB persistence in human_decisions table
     db = SessionLocal()
     try:
         rec = db.query(HumanDecision).filter(HumanDecision.workflow_id == wf_id).first()
@@ -200,9 +156,7 @@ def test_fr17_8_human_decision_persistence_and_rbac(client, test_workflow_run, o
     finally:
         db.close()
 
-
 def test_fr17_trace_integrity_and_isolation(client, test_workflow_run):
-    """Verifies that execution trace data strictly belongs to the target workflow ID and batch."""
     res = client.get(f"/api/workflows/{test_workflow_run.workflow_id}")
     assert res.status_code == 200
     data = res.json()

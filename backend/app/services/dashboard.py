@@ -1,12 +1,3 @@
-"""
-Dashboard Analytics & Real-Time KPI Service
-Functional Requirement 16: Quality Dashboard
-Computes all 10 key quality indicators directly from raw relational tables with date filtering.
-Adheres to strict mathematical consistency:
-- accepted + nonconforming == inspected
-- acceptance_rate + rejection_rate == 100.0% (within rounding)
-- epistemic labelling and human decision-support notices
-"""
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from sqlalchemy import func, case, or_
@@ -18,14 +9,9 @@ from backend.app.database.models import (
 from backend.app.services.pareto import pareto_service
 
 class DashboardService:
-    """Enterprise dashboard aggregation engine with zero hardcoded values."""
 
     @staticmethod
     def _parse_date_bounds(start_date: Optional[str], end_date: Optional[str]):
-        """
-        Parses and validates inclusive start and end date bounds.
-        Raises ValueError with 'Invalid' (for 422) or 'Reversed date range' (for 400).
-        """
         dt_start = None
         dt_end = None
 
@@ -64,17 +50,10 @@ class DashboardService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Computes all 10 Quality Dashboard items directly from SQLite/PostgreSQL database.
-        Zero hardcoded or mock numbers.
-        """
         dt_start, dt_end = self._parse_date_bounds(start_date, end_date)
         s_str = dt_start.strftime("%Y-%m-%d %H:%M:%S") if dt_start else None
         e_str = dt_end.strftime("%Y-%m-%d %H:%M:%S") if dt_end else None
 
-        # ---------------------------------------------------------
-        # 1. PRODUCTION BATCHES (Total count & status split)
-        # ---------------------------------------------------------
         batch_q = db.query(Batch.status, func.count(Batch.id))
         if dt_start:
             batch_q = batch_q.filter(Batch.start_time >= dt_start)
@@ -89,9 +68,6 @@ class DashboardService:
             batch_status_split.get("IN_PROGRESS", 0)
         )
 
-        # ---------------------------------------------------------
-        # 2, 3, 4. INSPECTION QUANTITY, ACCEPTANCE RATE, REJECTION RATE
-        # ---------------------------------------------------------
         m_q = db.query(
             func.count(Measurement.id).label("total_inspected"),
             func.sum(
@@ -117,22 +93,16 @@ class DashboardService:
         accepted_count = m_row.accepted or 0
         nonconforming_count = m_row.nonconforming or 0
 
-        # Exact boundary-safe rate calculation (zero-division guarded)
         if total_inspected > 0:
             acceptance_rate = round((accepted_count / total_inspected) * 100.0, 2)
             rejection_rate = round((nonconforming_count / total_inspected) * 100.0, 2)
-            # Ensure rates sum to 100.0 within rounding
             diff = round(100.0 - (acceptance_rate + rejection_rate), 2)
             if abs(diff) == 0.01:
-                # Adjust acceptance rate slightly for exact 100% sum
                 acceptance_rate = round(acceptance_rate + diff, 2)
         else:
             acceptance_rate = 0.0
             rejection_rate = 0.0
 
-        # ---------------------------------------------------------
-        # 5. ACTIVE QUALITY INCIDENTS (Status not closed)
-        # ---------------------------------------------------------
         inc_q = db.query(QualityIncident)
         if dt_start:
             inc_q = inc_q.filter(QualityIncident.created_at >= dt_start)
@@ -147,9 +117,6 @@ class DashboardService:
         ]
         active_incidents_count = len(active_incidents)
 
-        # ---------------------------------------------------------
-        # 6. TOP DEFECT CATEGORIES (Ranked defect Pareto)
-        # ---------------------------------------------------------
         try:
             pareto_res = pareto_service.compute_pareto(
                 db=db,
@@ -168,10 +135,6 @@ class DashboardService:
         except Exception:
             top_defects = []
 
-        # ---------------------------------------------------------
-        # 7. MACHINE ANOMALIES (Detected telemetry anomalies)
-        # ---------------------------------------------------------
-        # Check anomalies table first, then evaluate out-of-boundary telemetry readings
         anom_q = db.query(Anomaly)
         if dt_start:
             anom_q = anom_q.filter(Anomaly.ts >= dt_start)
@@ -180,9 +143,6 @@ class DashboardService:
         table_anomalies_count = anom_q.count()
         machine_anomalies_detected = table_anomalies_count
 
-        # ---------------------------------------------------------
-        # 8 & 9. OPEN CAPAs & OVERDUE CAPAs
-        # ---------------------------------------------------------
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
         capa_q = db.query(CAPAAction)
@@ -202,9 +162,6 @@ class DashboardService:
         ]
         overdue_capas_count = len(overdue_capas_list)
 
-        # ---------------------------------------------------------
-        # 10. PROCESS-CONTROL STATUS (Per characteristic & reason)
-        # ---------------------------------------------------------
         if total_inspected == 0:
             spc_is_in_control = True
             spc_state = "NO_DATA"
@@ -228,7 +185,6 @@ class DashboardService:
                 active_nelson_rules = []
                 cpk_value = None
 
-        # Overall Plant Health Score (Deterministic synthesis based on KPIs)
         if total_batches_count == 0:
             health_score = 100.0
         else:
@@ -236,14 +192,12 @@ class DashboardService:
             health_score = max(0.0, min(100.0, round(100.0 - penalty, 1)))
 
         return {
-            # Meta & Filters
             "filter_applied": {
                 "start_date": start_date,
                 "end_date": end_date,
                 "is_filtered": bool(start_date or end_date)
             },
             
-            # 1. Production Batches
             "production_batches": {
                 "total_count": total_batches_count,
                 "status_split": batch_status_split,
@@ -252,7 +206,6 @@ class DashboardService:
             "active_batches_count": active_batches_count,
             "total_batches": total_batches_count,
 
-            # 2. Inspection Quantity
             "inspection_quantity": {
                 "total_inspected_parts": total_inspected,
                 "accepted_parts": accepted_count,
@@ -262,23 +215,18 @@ class DashboardService:
             "total_inspected_today": total_inspected,
             "total_inspected_parts": total_inspected,
 
-            # 3. Acceptance Rate
             "acceptance_rate_percent": acceptance_rate,
             "acceptance_rate_label": "Recorded Sample Result",
 
-            # 4. Rejection Rate
             "rejection_rate_percent": rejection_rate,
             "rejection_rate_label": "Recorded Sample Result",
             "rates_sum_percent": round(acceptance_rate + rejection_rate, 2),
 
-            # 5. Active Quality Incidents
             "active_quality_incidents": active_incidents_count,
             "total_incidents": total_incidents_count,
 
-            # 6. Top Defect Categories
             "top_defect_categories": top_defects,
 
-            # 7. Machine Anomalies
             "machine_anomalies": {
                 "detected_count": machine_anomalies_detected,
                 "primary_machine": "CNC-04",
@@ -286,13 +234,10 @@ class DashboardService:
             },
             "machine_anomalies_detected": machine_anomalies_detected,
 
-            # 8. Open CAPAs
             "open_capas": open_capas_count,
 
-            # 9. Overdue CAPAs
             "overdue_capas": overdue_capas_count,
 
-            # 10. Process-Control Status
             "process_control_status": {
                 "status": spc_state,
                 "is_in_control": spc_is_in_control,
@@ -317,7 +262,6 @@ class DashboardService:
                 "notice": "statistical signal, not a product decision"
             },
 
-            # Machine Telemetry Snapshot
             "primary_machine_status": {
                 "machine_id": "CNC-04",
                 "status": "NORMAL" if machine_anomalies_detected == 0 else "ATTENTION_REQUIRED",
@@ -328,7 +272,6 @@ class DashboardService:
                 "health_index": "100%" if machine_anomalies_detected == 0 else "75%"
             },
 
-            # Overall Health & Disclaimers
             "overall_health_score": health_score,
             "governance_notice": "Decision-support only. Final product disposition is a human decision.",
             "synthetic_data_note": "Synthetic demonstration dataset for AI manufacturing quality intelligence testing.",

@@ -1,8 +1,3 @@
-"""
-Agent 2: Visual Quality Inspection Agent
-Executes PyTorch and OpenCV defect detection models on product images.
-Detects surface scratches, cracks, dents, and localizes them with bounding boxes and confidence scores.
-"""
 import os
 import time
 from typing import Dict, Any, Optional
@@ -31,13 +26,11 @@ class VisualQualityInspectionAgent(BaseQualityAgent):
         annotated_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static", "uploads", "annotated"))
         result = vision_model.inspect_image(image_path, image_id=image_id, category=category, output_annotated_dir=annotated_dir)
 
-        # Run trained YOLO surface defect detection
         yolo_res = None
         yolo_detections = []
         try:
             yolo_res = yolo_defect_detector.detect(image_path)
             yolo_detections = yolo_res.get("detections", [])
-            # If YOLO localized defect on machined part, enrich findings
             if yolo_res.get("defect_detected") and not result.get("defect_detected"):
                 d0 = yolo_detections[0]
                 result["defect_detected"] = True

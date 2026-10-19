@@ -1,17 +1,7 @@
-"""
-Master MVTec AD CV Training and Evaluation Pipeline
-Reproduces the entire Stage A & Stage B CV pipeline:
-1. Build Manifest from allowed MVTec AD folders (metal_nut, screw, transistor, cable)
-2. Generate Stratified Splits with zero-leakage assertion
-3. Train Stage A PatchCore Anomaly Detector and calibrate thresholds
-4. Train Stage B MobileNetV3-Small Defect Classifier and export ONNX
-5. Evaluate honestly on held-out test split, compute 5-fold CV, and save artifacts
-"""
 import sys
 import time
 from pathlib import Path
 
-# Ensure root directory is in sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))

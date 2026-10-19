@@ -142,7 +142,7 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
       setSubmitted(true);
       alert(`Human Decision Recorded: ${res.decision}. Disposition: ${res.disposition || disposition}`);
       loadHistory();
-      // Reload current workflow state to reflect human decision
+
       if (workflowState?.workflow_id) {
         api.getWorkflow(workflowState.workflow_id).then(setWorkflowState).catch(() => {});
       }
@@ -264,7 +264,7 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
 
   return (
     <div className="space-y-6">
-      {/* Header with FR-17 Title & Controls */}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -304,7 +304,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       </div>
 
-      {/* FR-17 Requirement 1: Current Agent & Workflow Status Banner */}
       <div className="p-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-xl shadow-md border border-blue-700/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0">
@@ -336,7 +335,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       </div>
 
-      {/* Navigation Tabs for FR-17 Display Requirements */}
       <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-1 text-xs sm:text-sm font-medium">
         <button
           onClick={() => setActiveTab("overview")}
@@ -389,9 +387,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </button>
       </div>
 
-      {/* ========================================================================= */}
-      {/* SECTION 1: EXECUTION TRACE, AGENT INPUTS, AND TOOL CALLS (FR-17.1, 2, 3) */}
-      {/* ========================================================================= */}
       {(activeTab === "overview" || activeTab === "trace") && (
         <div className="bg-white border border-[#E3E8EF] rounded-xl shadow-xs overflow-hidden space-y-4 p-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -434,14 +429,12 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
                   </div>
                 </div>
 
-                {/* FR-17.2: Agent Input */}
                 <div className="space-y-1.5 text-xs text-slate-700">
                   <div className="p-2.5 bg-blue-50/70 border border-blue-200/60 rounded text-slate-800">
                     <strong className="text-blue-900 block mb-0.5">FR-17.2 Agent Input:</strong>
                     <span className="font-mono text-[11.5px]">{step.input_summary}</span>
                   </div>
 
-                  {/* FR-17.3: Tool Calls */}
                   {step.tool_calls && step.tool_calls.length > 0 && (
                     <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded text-slate-800">
                       <strong className="text-amber-900 block mb-1">FR-17.3 Tool Invocations ({step.tool_calls.length} Tools):</strong>
@@ -455,7 +448,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
                     </div>
                   )}
 
-                  {/* Agent Output Summary */}
                   <div className="p-2.5 bg-white border border-slate-200 rounded text-slate-700">
                     <strong className="text-slate-900 block mb-0.5">Agent Output:</strong>
                     <span>{step.output_summary}</span>
@@ -467,9 +459,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SECTION 2: MODEL RESULTS (FR-17.4)                                        */}
-      {/* ========================================================================= */}
       {(activeTab === "overview" || activeTab === "models") && (
         <div className="p-5 bg-white border border-[#E3E8EF] rounded-xl shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -488,7 +477,7 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Visual Inspection CV Model */}
+
             <div className="p-4 bg-purple-50/50 border border-purple-200 rounded-lg space-y-2.5">
               <div className="flex items-center justify-between">
                 <strong className="text-purple-900 text-sm flex items-center gap-1.5">
@@ -535,7 +524,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
               )}
             </div>
 
-            {/* Process Monitoring Isolation Forest Model */}
             <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-lg space-y-2.5">
               <div className="flex items-center justify-between">
                 <strong className="text-blue-900 text-sm flex items-center gap-1.5">
@@ -587,9 +575,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SECTION 3: RETRIEVED EVIDENCE (RAG VECTOR SEARCH) (FR-17.5)                */}
-      {/* ========================================================================= */}
       {(activeTab === "overview" || activeTab === "evidence") && (
         <div className="p-5 bg-white border border-[#E3E8EF] rounded-xl shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -644,9 +629,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SECTION 4: RCA HYPOTHESES (FR-17.6)                                       */}
-      {/* ========================================================================= */}
       {(activeTab === "overview" || activeTab === "hypotheses") && (
         <div className="p-5 bg-white border border-[#E3E8EF] rounded-xl shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -692,7 +674,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
 
                   <p className="text-[13px] text-slate-700 leading-relaxed font-normal bg-white p-3 rounded-lg border border-slate-200">{hyp.description}</p>
 
-                  {/* Supporting & Contradicting Evidence */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 space-y-2">
                       <strong className="text-emerald-900 block font-bold text-xs">Supporting Evidence ({hyp.supporting_evidence?.length || 0}):</strong>
@@ -741,7 +722,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
                     </div>
                   </div>
 
-                  {/* Physical Confirmation Required */}
                   <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-950 flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                     <div>
@@ -758,9 +738,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SECTION 5: REVIEWER COMMENTS & CRITIC AUDIT (FR-17.7)                     */}
-      {/* ========================================================================= */}
       {(activeTab === "overview" || activeTab === "critic") && criticReview && (
         <div className="p-5 bg-white border border-[#E3E8EF] rounded-xl shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -817,9 +794,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SECTION 6: HUMAN DECISION GATE & AUDIT TRAIL (FR-17.8)                    */}
-      {/* ========================================================================= */}
       {(activeTab === "overview" || activeTab === "decision") && (
         <div className="p-6 bg-[#EAF2FF]/50 border border-[#BFD6FF] rounded-xl shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-[#BFD6FF]/60 pb-3">
@@ -839,7 +813,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
             </span>
           </div>
 
-          {/* Current Persisted Human Decision Status */}
           {humanApproval && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-1">
               <div className="flex items-center justify-between">
@@ -852,7 +825,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
             </div>
           )}
 
-          {/* Operator Read-Only Banner */}
           {isOperator && (
             <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-[13px] flex items-center gap-2.5">
               <Lock className="w-4 h-4 text-amber-700 shrink-0" />
@@ -862,7 +834,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
             </div>
           )}
 
-          {/* Re-analysis Loop Warning */}
           {reanalysisMessage && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-900 text-[13px] flex items-center gap-2.5">
               <AlertTriangle className="w-4 h-4 text-rose-700 shrink-0" />
@@ -913,7 +884,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
             />
           </div>
 
-          {/* Action Controls */}
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <button
               disabled={isOperator || submitted}
@@ -943,7 +913,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       )}
 
-      {/* Immutable Decision History Audit Trail Table */}
       {(activeTab === "overview" || activeTab === "decision") && (
         <div className="bg-white border border-[#E3E8EF] rounded-xl shadow-xs overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EEF1F5] flex items-center justify-between bg-[#F8FAFC]">
@@ -1002,7 +971,6 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
         </div>
       )}
 
-      {/* Confirmation Dialog Modal for Irreversible Actions */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">

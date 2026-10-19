@@ -1,16 +1,9 @@
-"""
-YOLO26 Surface Defect Training & ONNX Export Script (NEU-DET Dataset)
-Designed for free-tier Google Colab (T4 GPU) or Kaggle GPU.
-Trains Ultralytics YOLO26 (AGPL-3.0 license) on NEU surface defect benchmarks
-and exports an optimized, lightweight ONNX model for CPU deployment on Render (<512 MB RAM).
-"""
 import os
 import sys
 import yaml
 import argparse
 from pathlib import Path
 
-# NEU-DET Defect Classes
 NEU_CLASSES = [
     "crazing",
     "inclusion",
@@ -21,7 +14,6 @@ NEU_CLASSES = [
 ]
 
 def generate_neu_yaml(output_dir: str = "./data/neu_det") -> str:
-    """Generates the Ultralytics dataset configuration file for NEU-DET."""
     os.makedirs(output_dir, exist_ok=True)
     yaml_path = os.path.join(output_dir, "neu_det.yaml")
     
@@ -47,10 +39,6 @@ def train_yolo_model(
     weights: str = "yolo26n.pt",
     output_onnx: str = "./backend/models/yolo_model.onnx"
 ):
-    """
-    Trains Ultralytics YOLO26 on NEU-DET and exports to ONNX.
-    Note: Requires 'pip install ultralytics' in a GPU environment (Colab/Kaggle).
-    """
     try:
         from ultralytics import YOLO
     except ImportError:
@@ -62,16 +50,14 @@ def train_yolo_model(
     print(" TRAINING YOLO26 ON NEU SURFACE DEFECT BENCHMARK (AGPL-3.0)")
     print("=" * 70)
 
-    # 1. Load pretrained YOLO26 Nano architecture for lightweight inference
     model = YOLO(weights)
 
-    # 2. Train on dataset
     results = model.train(
         data=data_yaml,
         epochs=epochs,
         imgsz=imgsz,
         batch=batch,
-        device=0, # GPU
+        device=0,
         save=True,
         project="neu_defect_yolo",
         name="yolo26_surface",
@@ -82,7 +68,6 @@ def train_yolo_model(
 
     print("\n[YOLO26 Train] Training complete. Exporting to ONNX for 512 MB Render deployment...")
     
-    # 3. Export to ONNX format (dynamic=False, opset=17, simplify=True)
     os.makedirs(os.path.dirname(output_onnx), exist_ok=True)
     onnx_path = model.export(
         format="onnx",
@@ -92,7 +77,6 @@ def train_yolo_model(
         opset=17
     )
 
-    # Copy / rename to target model path
     if os.path.exists(onnx_path):
         import shutil
         shutil.copy(onnx_path, output_onnx)

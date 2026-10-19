@@ -1,17 +1,3 @@
-"""
-Independent Verification & Validation Audit Script: RAG & ChromaDB Store
-Module: scripts/audit/verify_rag_chromadb.py
-
-AUDIT MANDATE:
-Evaluates:
-- Direct Chroma store metadata inspection: doc_type, part_number, machine, defect_type,
-  defect_family, proxy_category, provenance across all chunks.
-- Stale content scan: query store for obsolete generator terms, 'crack detection', etc.
-- 25 labelled queries RAG benchmark:
-  Computes Hit@1, Hit@3, Recall@5, and MRR.
-  Verifies TC-06 passes (NCR-019 in top 3 for oversized shaft diameter) and overall Hit@3 >= 0.80.
-- Rebuild idempotency and document count reconciliation against SQLite.
-"""
 import os
 import sys
 import json
@@ -19,7 +5,6 @@ import sqlite3
 from pathlib import Path
 from typing import Dict, List, Any, Tuple
 
-# Add project root to sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -33,9 +18,6 @@ def banner(title: str):
 
 results = {}
 
-# -----------------------------------------------------------------------------
-# 1. DIRECT CHROMADB STORE INSPECTION
-# -----------------------------------------------------------------------------
 banner("1. Direct ChromaDB Store & Metadata Inspection")
 
 CHROMA_PATH = Path("backend/data/knowledge_db")
@@ -75,9 +57,6 @@ assert missing_keys_count == 0, f"Found {missing_keys_count} chunks missing requ
 print("PASS: 100% of chunks contain all 7 required metadata fields.")
 results["1_metadata_integrity"] = "PASS"
 
-# -----------------------------------------------------------------------------
-# 2. STALE CONTENT SCAN
-# -----------------------------------------------------------------------------
 banner("2. Stale Content Scan")
 
 stale_terms = ["synthetic image", "crack detection", "brushed-metal synthetic"]
@@ -95,24 +74,16 @@ assert len(stale_findings) == 0, f"Found stale content in vector store: {stale_f
 print("PASS: No stale generator terms or crack detection in vector store.")
 results["2_stale_content_scan"] = "PASS"
 
-# -----------------------------------------------------------------------------
-# 3. 25 LABELLED QUERIES RAG BENCHMARK
-# -----------------------------------------------------------------------------
 banner("3. 25 Labelled Queries RAG Benchmark (Hit@1, Hit@3, Recall@5, MRR)")
 
-# Benchmark Query Set (Targeting NCRs, SOPs, specs, machine manuals, decoys)
 RAG_BENCHMARK_SET = [
-    # 1. Shaft oversize & Tool wear (Anchor)
     {"query": "oversized shaft diameter CNC-04 tool wear", "target": "NCR-019"},
     {"query": "shaft journal diameter exceeding 50.05 mm USL", "target": "NCR-019"},
     {"query": "progressive tool flank wear cutting force increase", "target": "NCR-019"},
-    # 2. Tool-wear SOP -> SOP-044
     {"query": "cutting tool life management replacement interval cycle limit", "target": "SOP-044"},
     {"query": "tool wear offset compensation procedure and maximum cycles", "target": "SOP-044"},
-    # 3. Vibration limit in machine manual -> Machine_Guidelines.txt / MANUAL
     {"query": "spindle radial vibration trip threshold 3.5 mm/s", "target": "Machine_Guidelines"},
     {"query": "vibration alarm level warning 3.0 critical 3.5", "target": "Machine_Guidelines"},
-    # 4. Decoys with different confirmed root causes
     {"query": "oversized shaft diameter incorrect tool offset setting", "target": "NCR-042"},
     {"query": "surface scratch metal nut unloader gripper swarf", "target": "NCR-140"},
     {"query": "surface scratch metal nut conveyor chute tumbling decoy", "target": "NCR-141"},
@@ -123,7 +94,6 @@ RAG_BENCHMARK_SET = [
     {"query": "bore dimension undersized thermal contraction coolant", "target": "NCR-024"},
     {"query": "gauge calibration drift digital micrometer false rejection", "target": "NCR-084"},
     {"query": "coolant concentration breakdown thermal insert wear", "target": "NCR-092"},
-    # 5. One per visual defect type (MVTec Unified defect types)
     {"query": "metal_nut surface scratch linear abrasion", "target": "surface_scratch"},
     {"query": "metal_nut dent deformation rim bent", "target": "dent_deformation"},
     {"query": "metal_nut incorrect assembly flipped inverted", "target": "incorrect_assembly"},
@@ -147,15 +117,12 @@ for idx, item in enumerate(RAG_BENCHMARK_SET, start=1):
     q = item["query"]
     target = item["target"]
     
-    # Query Chroma
     res = col.query(query_texts=[q], n_results=5)
     matched_docs = res["documents"][0] if res and "documents" in res else []
     matched_metas = res["metadatas"][0] if res and "metadatas" in res else []
     
-    # Find rank of target
     rank = None
     for r, (doc, meta) in enumerate(zip(matched_docs, matched_metas), start=1):
-        # Target can match ID, defect_type, source, or text
         m_str = (
             str(meta.get("record_id", "")) + " " +
             str(meta.get("file_name", "")) + " " +
@@ -182,7 +149,6 @@ for idx, item in enumerate(RAG_BENCHMARK_SET, start=1):
     h3_str = "YES" if (rank is not None and rank <= 3) else "NO"
     print(f"{idx:<3} | {q[:45]:<45} | {target:<15} | {rank_str:<6} | {h3_str}")
 
-    # Check TC-06: query 1 ("oversized shaft diameter CNC-04 tool wear") must find NCR-019 in top 3
     if idx == 1 and rank is not None and rank <= 3:
         tc06_passed = True
 
@@ -205,9 +171,6 @@ assert hit_3_pct >= 0.80, f"Hit@3 below target: {hit_3_pct:.2f} < 0.80"
 print("PASS: RAG Evaluation Benchmark targets met (Hit@3 >= 80%, TC-06 Pass).")
 results["3_rag_benchmark"] = "PASS"
 
-# -----------------------------------------------------------------------------
-# SUMMARY
-# -----------------------------------------------------------------------------
 banner("OVERALL RAG & CHROMADB VERIFICATION SUMMARY")
 all_passed = all(v == "PASS" for v in results.values())
 for k, v in results.items():

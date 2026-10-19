@@ -1,11 +1,3 @@
-"""
-Knowledge Base Alignment & Enrichment Script for QualityMind
-Aligns all visual defects to MVTec AD unified defect types (surface_scratch, dent_deformation,
-incorrect_assembly, surface_contamination, thread_damage, missing_component, insulation_or_wire_damage).
-Adds 14 new proxy-part visual NCRs with confirmed root causes and decoys.
-Adds SOP-055 Visual Inspection Procedure and NIST/SEMATECH SPC public reference.
-Enforces data_provenance ('synthetic_illustrative' vs 'public_reference') on all records.
-"""
 import os
 import json
 import csv
@@ -288,7 +280,6 @@ def update_kb():
     os.makedirs(BACKEND_DATA_DIR / "knowledge_docs", exist_ok=True)
     os.makedirs(ROOT_DATA_DIR / "knowledge_docs", exist_ok=True)
 
-    # 1. Write SOP-055 and NIST Reference
     sop_path = KB_DIR / "SOP-055_Visual_Inspection_Procedure.md"
     with open(sop_path, "w", encoding="utf-8") as f:
         f.write(VISUAL_INSPECTION_PROCEDURE_MD.strip() + "\n")
@@ -301,7 +292,6 @@ def update_kb():
     with open(BACKEND_DATA_DIR / "knowledge_docs" / "REF-NIST-SPC_Statistical_Process_Control_Handbook.md", "w", encoding="utf-8") as f:
         f.write(NIST_SPC_REF_MD.strip() + "\n")
 
-    # 2. Write 14 new NCR Markdown files
     for ncr in NEW_NCRS:
         md_content = f"""# Nonconformance Report: {ncr['id']}
 - **Title:** {ncr['title']}
@@ -321,14 +311,12 @@ def update_kb():
         with open(KB_DIR / f"{ncr['id']}.md", "w", encoding="utf-8") as f:
             f.write(md_content)
 
-    # 3. Update existing KB files to add data_provenance if missing
     for fname in os.listdir(KB_DIR):
         if fname.endswith(".md"):
             fpath = KB_DIR / fname
             with open(fpath, "r", encoding="utf-8") as f:
                 content = f.read()
             if "data_provenance" not in content.lower():
-                # Add data_provenance after title or first header
                 lines = content.split("\n")
                 new_lines = []
                 added = False
@@ -340,21 +328,18 @@ def update_kb():
                 with open(fpath, "w", encoding="utf-8") as f:
                     f.write("\n".join(new_lines))
 
-    # 4. Update historical_ncrs.json
     ncr_json_path = BACKEND_DATA_DIR / "historical_ncrs.json"
     ncrs = []
     if ncr_json_path.exists():
         with open(ncr_json_path, "r", encoding="utf-8") as f:
             ncrs = json.load(f)
 
-    # Add data_provenance to existing records
     for item in ncrs:
         if "data_provenance" not in item:
             item["data_provenance"] = "synthetic_illustrative"
         if "proxy_category" not in item:
             item["proxy_category"] = "none"
 
-    # Merge new NCRs if not already present
     existing_ids = {n["id"] for n in ncrs}
     for ncr in NEW_NCRS:
         if ncr["id"] not in existing_ids:
@@ -376,11 +361,9 @@ def update_kb():
     with open(ncr_json_path, "w", encoding="utf-8") as f:
         json.dump(ncrs, f, indent=2)
 
-    # Mirror to root data if needed
     with open(ROOT_DATA_DIR / "historical_ncrs.json", "w", encoding="utf-8") as f:
         json.dump(ncrs, f, indent=2)
 
-    # 5. Update historical_ncrs.csv
     csv_path = BACKEND_DATA_DIR / "historical_ncrs.csv"
     existing_rows = []
     if csv_path.exists():

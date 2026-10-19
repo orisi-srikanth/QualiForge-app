@@ -1,7 +1,3 @@
-"""
-Multi-Agent Orchestrator & Human-in-the-Loop Workflows
-Coordinates execution through all 8 agents and enforces human decision gates.
-"""
 import os
 import json
 import html
@@ -18,23 +14,19 @@ from backend.app.services.safety_guardrails import safety_guardrail
 
 router = APIRouter()
 
-
 class ReanalyzeRequest(BaseModel):
     target_agent: str = Field("rca_agent", description="Target agent to re-execute", example="rca_agent")
     comment: str = Field(..., description="Engineering feedback instructions for re-analysis", example="Re-evaluate root cause including morning shift thermal drift readings.")
-
 
 class WorkflowCommentRequest(BaseModel):
     entity_type: str = Field("batch", description="Entity type: batch, hypothesis, capa, finding", example="batch")
     entity_id: str = Field("BATCH-0245", description="Entity identifier", example="BATCH-0245")
     comment: str = Field(..., description="Engineering observation or investigation note", example="Thermal drift observed on machine CNC-04 spindle bearing.")
 
-
 class SafetyActionTestRequest(BaseModel):
     action: str = Field(..., description="Autonomous action to test: RELEASE_PRODUCT, REJECT_BATCH, MODIFY_CNC, MODIFY_PLC, STOP_MACHINERY, OVERRIDE_ENGINEER", example="RELEASE_PRODUCT")
     target_id: str = Field("BATCH-0245", description="Target batch or machine", example="BATCH-0245")
     parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Requested machine or PLC parameters")
-
 
 @router.post("/orchestrator/run", tags=["Workflows (Agents)"], summary="Execute full 8-agent manufacturing quality pipeline", description="Runs end-to-end multi-agent orchestration for specified batch. Pauses execution at human approval gate and persists state to SQLite.")
 def run_orchestrated_pipeline(batch_id: str = "BATCH-0245", sample_name: Optional[str] = None, image_name: Optional[str] = None):
@@ -46,7 +38,6 @@ def run_orchestrated_pipeline(batch_id: str = "BATCH-0245", sample_name: Optiona
     )
     return state
 
-
 @router.post("/orchestrator/langgraph-run", tags=["Workflows (Agents)"], summary="Execute pipeline via compiled LangGraph StateGraph", description="Explicitly executes multi-agent pipeline using compiled LangGraph StateGraph with checkpointing and pauses at approval_gate.")
 def run_langgraph_pipeline_endpoint(batch_id: str = "BATCH-0245", sample_name: Optional[str] = None, image_name: Optional[str] = None):
     chosen = sample_name or image_name or "IMG-001.png"
@@ -57,7 +48,6 @@ def run_langgraph_pipeline_endpoint(batch_id: str = "BATCH-0245", sample_name: O
     )
     return res
 
-
 @router.post("/workflows", tags=["Workflows (Agents)"], summary="Initialize new quality inspection workflow", description="Initializes workflow for batch and returns initial checkpointed state.")
 def start_workflow(batch_id: str = "BATCH-0245"):
     sample_img = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static", "uploads", "samples", "IMG-001.png"))
@@ -67,14 +57,12 @@ def start_workflow(batch_id: str = "BATCH-0245"):
     )
     return state
 
-
 @router.get("/workflows/batch/{batch_id}", tags=["Workflows (Agents)"], summary="Retrieve latest workflow state for a batch", description="Retrieves the most recent workflow execution state for a given batch from memory or persisted SQLite checkpoints.")
 def get_batch_latest_workflow(batch_id: str):
     wf = orchestrator.get_latest_workflow_for_batch(batch_id)
     if not wf:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No execution workflow found for batch {batch_id}")
     return wf
-
 
 @router.get("/workflows/{workflow_id}", tags=["Workflows (Agents)"], summary="Retrieve workflow execution state", description="Retrieves state, agent outputs, and pause gate status for specified workflow.")
 def get_workflow_state(workflow_id: str):
@@ -88,8 +76,6 @@ def get_workflow_state(workflow_id: str):
         )
     return wf
 
-
-
 @router.get("/workflows/{workflow_id}/trace", tags=["Workflows (Agents)"], summary="Retrieve multi-agent execution trace", description="Returns detailed agent execution step logs, timestamps, and input/output summaries.")
 def get_workflow_trace(workflow_id: str):
     wf = orchestrator.get_workflow(workflow_id)
@@ -99,7 +85,6 @@ def get_workflow_trace(workflow_id: str):
         return wf.get("execution_trace", [])
     return getattr(wf, "execution_trace", [])
 
-
 @router.post("/workflows/{workflow_id}/decision", tags=["Workflows (Agents)"], summary="Submit human engineering disposition (HITL Gate)", description="Authorized quality engineer confirms or rejects findings, records comments, and resumes workflow. Requires quality_engineer or admin role (operator receives HTTP 403, unauthenticated receives 401).")
 def submit_workflow_decision(
     workflow_id: str,
@@ -108,7 +93,6 @@ def submit_workflow_decision(
 ):
     return orchestrator.resume_workflow(workflow_id=workflow_id, payload=payload, current_user=current_user)
 
-
 @router.post("/workflows/{workflow_id}/resume", tags=["Workflows (Agents)"], summary="Resume paused workflow checkpoint", description="Resumes paused workflow with authorized human decision, updating database state and completing execution trace.")
 def resume_workflow_endpoint(
     workflow_id: str,
@@ -116,7 +100,6 @@ def resume_workflow_endpoint(
     current_user: Dict[str, Any] = Depends(require_authenticated_role("quality_engineer", "admin"))
 ):
     return orchestrator.resume_workflow(workflow_id=workflow_id, payload=payload, current_user=current_user)
-
 
 @router.post("/workflows/{workflow_id}/re-analyze", tags=["Workflows (Agents)"], summary="Request another agent analysis with engineer feedback", description="Re-runs specified agent with engineering feedback. Enforces maximum 3 reassessment loop count.")
 def request_reanalysis_endpoint(
@@ -131,7 +114,6 @@ def request_reanalysis_endpoint(
         current_user=current_user
     )
 
-
 @router.post("/workflows/{workflow_id}/comment", tags=["Workflows (Agents)"], summary="Add engineering comment to workflow audit", description="Records length-limited, escaped engineering comment in human_decisions and reviewer_comments tables.")
 def add_workflow_comment_endpoint(
     workflow_id: str,
@@ -145,7 +127,6 @@ def add_workflow_comment_endpoint(
         comment=payload.comment,
         current_user=current_user
     )
-
 
 @router.post("/review/sign-off", tags=["Workflows (Agents)"], summary="Submit authorized engineering disposition and root cause elevation", description="Human-in-the-Loop decision gate. Authenticated Quality Engineer assigns final batch disposition and elevates confirmed root cause. Requires quality_engineer or admin role (operator receives HTTP 403, unauthenticated receives 401).")
 def submit_human_decision(
@@ -204,7 +185,6 @@ def submit_human_decision(
         "certainty": CertaintyLevel.CONFIRMED_ROOT_CAUSE.value
     }
 
-
 @router.get("/human-decisions", tags=["Workflows (Agents)", "Governance"], summary="List audit trail of all human engineering decisions", description="Returns complete immutable audit trail of engineering approvals, rejections, comments, and dispositions from human_decisions table.")
 def list_human_decisions(
     workflow_id: Optional[str] = Query(None, description="Filter by workflow ID"),
@@ -239,7 +219,6 @@ def list_human_decisions(
     finally:
         db.close()
 
-
 @router.post("/safety/guardrails/test-autonomous-action", tags=["System", "Safety"], summary="Test safety guardrails intercepting prohibited autonomous actions", description="Verifies that autonomous product release, batch rejection, machine parameter adjustments, PLC changes, and machinery stoppage raise HTTP 403 safety violation exceptions and log attempts.")
 def test_autonomous_action_guard(payload: SafetyActionTestRequest):
     act = payload.action.upper().strip()
@@ -261,7 +240,6 @@ def test_autonomous_action_guard(payload: SafetyActionTestRequest):
     else:
         raise HTTPException(status_code=400, detail=f"Unknown autonomous action '{payload.action}'. Supported: RELEASE_PRODUCT, REJECT_BATCH, MODIFY_CNC, MODIFY_PLC, STOP_MACHINERY, OVERRIDE_ENGINEER, EXECUTE_MACHINE_ACTION")
     return {"status": "UNEXPECTED_PASS", "message": "Guardrail failed to trip."}
-
 
 @router.get("/orchestrator/agent-runs", tags=["Workflows (Agents)", "RAG"], summary="List Agent Execution Runs and Retrieved RAG Evidence", description="Returns audit history of agent runs from agent_runs table including query, filters, retrieved evidence, and similarity scores.")
 def list_agent_runs(batch_id: Optional[str] = None):

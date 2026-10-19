@@ -1,17 +1,9 @@
-"""
-Deterministic Specification & Dimensional Compliance Engine
-100% Deterministic Arithmetic (NumPy / Decimal). Zero LLM involvement in conformance decisions.
-Guarantees boundary safety (e.g. 50.05 mm is strictly conforming for 50.00 +/- 0.05).
-Supports symmetric, asymmetric, and one-sided engineering tolerances.
-"""
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Dict, Any, Optional
 import numpy as np
 from backend.app.core.guardrails import EpistemicLabel
 
-
 class SpecificationEngine:
-    """Computes engineering limits, evaluations, and tolerance band proximity."""
 
     @staticmethod
     def evaluate_trend(
@@ -23,20 +15,6 @@ class SpecificationEngine:
         consecutive_run: int = 5,
         slope_threshold: float = 0.003
     ) -> Dict[str, Any]:
-        """
-        Explicit, configurable rule to detect sequential trends toward specification limits.
-        Enforces data sufficiency rule: does not claim a trend from insufficient data (minimum 5 points).
-        
-        Rules:
-        1. Data Sufficiency: If len(values) < min_points_for_trend, status is INSUFFICIENT_DATA.
-        2. Consecutive Directional Run:
-           - 5 consecutive increasing measurements ending above nominal -> DRIFT_TOWARD_USL
-           - 5 consecutive decreasing measurements ending below nominal -> DRIFT_TOWARD_LSL
-        3. Linear Regression Drift:
-           - Slope >= slope_threshold with latest point > nominal -> DRIFT_TOWARD_USL
-           - Slope <= -slope_threshold with latest point < nominal -> DRIFT_TOWARD_LSL
-        4. Stability: Otherwise, trend is STABLE.
-        """
         n = len(values)
         if n < min_points_for_trend:
             return {
@@ -55,7 +33,6 @@ class SpecificationEngine:
         slope, _ = np.polyfit(x, values, 1)
         slope_val = round(float(slope), 5)
 
-        # Check consecutive runs in the most recent consecutive_run window
         window = values[-consecutive_run:]
         is_increasing_run = all(window[i] < window[i+1] for i in range(len(window)-1))
         is_decreasing_run = all(window[i] > window[i+1] for i in range(len(window)-1))
@@ -112,24 +89,11 @@ class SpecificationEngine:
         usl: Optional[float] = None,
         lsl: Optional[float] = None
     ) -> Dict[str, Any]:
-        """
-        Evaluates physical sample measurements against engineering specification limits.
-        Uses 4-decimal precision quantization to eliminate IEEE 754 float boundary noise.
-        Supports:
-        - Symmetric tolerances (nominal +/- tol)
-        - Asymmetric tolerances (tol_plus != tol_minus)
-        - One-sided tolerances (usl only or lsl only)
-        - Decimal boundary safety (50.05 and 49.95 strictly conforming; 50.0501 nonconforming)
-        - Float noise safety (50.050000000000004 strictly conforming)
-        - Deterministic sample standard deviation (ddof=1, n-1)
-        """
         if measurements is None:
             measurements = []
 
-        # Decimal conversions for deterministic engineering limits
         d_nom = Decimal(str(nominal_mm))
         
-        # Determine USL
         d_usl = None
         if usl is not None:
             d_usl = Decimal(str(usl)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
@@ -137,7 +101,6 @@ class SpecificationEngine:
             d_plus = Decimal(str(tol_plus))
             d_usl = (d_nom + d_plus).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
-        # Determine LSL
         d_lsl = None
         if lsl is not None:
             d_lsl = Decimal(str(lsl)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
@@ -149,7 +112,6 @@ class SpecificationEngine:
         eff_lsl = float(d_lsl) if d_lsl is not None else None
         tolerance_band = (eff_usl - eff_lsl) if (eff_usl is not None and eff_lsl is not None) else None
 
-        # Tolerance delta for band usage
         band_half = (Decimal(str(tolerance_band)) / Decimal("2")) if tolerance_band is not None else None
 
         evaluated_items = []
@@ -162,7 +124,6 @@ class SpecificationEngine:
         seen_component_ids = set()
 
         for idx, m in enumerate(measurements):
-            # Extract raw value and component identifier
             raw_val = None
             if isinstance(m, (int, float, Decimal)):
                 raw_val = m
@@ -174,18 +135,15 @@ class SpecificationEngine:
                 raw_val = None
                 comp_id = f"P{idx+1:03d}"
 
-            # Check duplicate component identifier
             if comp_id in seen_component_ids:
                 warnings.append(f"Duplicate sample identifier '{comp_id}' encountered at row {idx+1}.")
             seen_component_ids.add(comp_id)
 
-            # Validate null / empty
             if raw_val is None or str(raw_val).strip() == "" or str(raw_val).strip().lower() in ("none", "null", "nan"):
                 excluded_items.append({"sample_id": comp_id, "row": idx+1, "raw_value": raw_val, "reason": "Null or blank measurement"})
                 warnings.append(f"Sample '{comp_id}' (row {idx+1}) had null/blank value and was excluded from calculation.")
                 continue
 
-            # Validate numeric parse
             try:
                 val_float = float(raw_val)
                 if np.isnan(val_float) or np.isinf(val_float):
@@ -195,12 +153,10 @@ class SpecificationEngine:
                 warnings.append(f"Sample '{comp_id}' (row {idx+1}) had non-numeric value '{raw_val}' and was excluded from calculation.")
                 continue
 
-            # Round float noise to 4 decimals and convert to Decimal for strict boundary checks
             val = round(val_float, 4)
             values.append(val)
             d_val = Decimal(str(val)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
-            # Boundary evaluation
             is_conforming = True
             dev_from_limit = 0.0
             status = "CONFORMING"
@@ -223,7 +179,6 @@ class SpecificationEngine:
             if abs(dev_from_limit) > max_deviation:
                 max_deviation = abs(dev_from_limit)
 
-            # Tolerance band usage
             part_usage = 0.0
             if band_half is not None and band_half > 0:
                 part_usage = float(abs(d_val - d_nom) / band_half)
@@ -247,20 +202,17 @@ class SpecificationEngine:
         total = len(values)
         rejection_rate = round((nonconforming_count / total * 100.0), 2) if total > 0 else 0.0
 
-        # Descriptive statistics (mean, sample std dev n-1, min, max)
         mean_val = round(float(np.mean(values)), 4) if total > 0 else None
         std_sample = round(float(np.std(values, ddof=1)), 6) if total > 1 else 0.0
         std_pop = round(float(np.std(values, ddof=0)), 6) if total > 0 else 0.0
         min_val = round(float(np.min(values)), 4) if total > 0 else None
         max_val = round(float(np.max(values)), 4) if total > 0 else None
-        # Trend analysis across sequence
         trend_slope = 0.0
         if total >= 2:
             x = np.arange(total)
             slope, _ = np.polyfit(x, values, 1)
             trend_slope = round(float(slope), 5)
 
-        # Explicit trend evaluation
         trend_eval = SpecificationEngine.evaluate_trend(
             values=values,
             nominal_mm=nominal_mm,
@@ -268,12 +220,10 @@ class SpecificationEngine:
             lsl=eff_lsl
         )
 
-        # Proximity to limit (% of tolerance band consumed by mean)
         tolerance_used_pct = 0.0
         if mean_val is not None and tolerance_band is not None and tolerance_band > 0:
             tolerance_used_pct = round((abs(mean_val - nominal_mm) / (tolerance_band / 2.0)) * 100.0, 1)
 
-        # Histogram bins aligned with specification limits
         histogram_bins = []
         if total > 0:
             below_lsl_count = sum(1 for v in values if (eff_lsl is not None and v < eff_lsl))
@@ -316,7 +266,6 @@ class SpecificationEngine:
                 }
             ]
 
-        # Compute empirical histogram edges and counts
         bin_edges = []
         counts = []
         if total > 0:
@@ -324,7 +273,6 @@ class SpecificationEngine:
             bin_edges = [round(float(e), 4) for e in hist_edges]
             counts = [int(c) for c in hist_counts]
 
-        # Extract nonconforming items list
         nonconforming_items = [
             {
                 "sample_id": item["sample_id"],
@@ -400,6 +348,5 @@ class SpecificationEngine:
             "certainty": EpistemicLabel.OBSERVED_FACT.value,
             "disposition_notice": "Observed sample result. Final physical product disposition is an authorized human decision. System does not automatically reject batches."
         }
-
 
 spec_engine = SpecificationEngine()

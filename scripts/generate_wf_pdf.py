@@ -23,7 +23,6 @@ with open(out_path, "wb") as f:
 
 print(f"Generated PDF with {len(pdf_bytes)} bytes at {out_path}")
 
-# Inspect with pypdf
 reader = pypdf.PdfReader(out_path)
 print(f"Total Pages: {len(reader.pages)}")
 

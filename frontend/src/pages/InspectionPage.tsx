@@ -57,7 +57,6 @@ export const InspectionPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<"file_upload" | "manual_entry" | "image_upload" | "charts">("file_upload");
 
-  // Persona / RBAC State
   const [activeRole, setActiveRole] = useState<Role>("quality_engineer");
   const [roleTokens, setRoleTokens] = useState<Record<Role, string>>({
     admin: "",
@@ -65,17 +64,14 @@ export const InspectionPage: React.FC = () => {
     operator: "",
   });
 
-  // Target Batch
   const [batchId, setBatchId] = useState("");
   const [batches, setBatches] = useState<any[]>([]);
 
-  // Validation Report Panel State
   const [validationReport, setValidationReport] = useState<ValidationReportData | null>(null);
   const [sourceInfo, setSourceInfo] = useState<string>("Master Inspection Registry");
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
-  // Manual Entry Form State
   const [manualForm, setManualForm] = useState({
     component_id: "SMPL-001",
     value: 50.00,
@@ -85,7 +81,6 @@ export const InspectionPage: React.FC = () => {
   const [editValue, setEditValue] = useState<number>(50.00);
   const [editUnit, setEditUnit] = useState<string>("mm");
 
-  // Image Upload State
   const [imageComponentId, setImageComponentId] = useState("SMPL-001");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePredictionResult, setImagePredictionResult] = useState<any | null>(null);
@@ -93,7 +88,6 @@ export const InspectionPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // Load available batches on mount
   useEffect(() => {
     api.getBatches().then((bList) => {
       setBatches(bList || []);
@@ -110,7 +104,6 @@ export const InspectionPage: React.FC = () => {
     });
   }, []);
 
-  // Load all initial data from backend (data survives page reload!)
   const loadData = async () => {
     if (!batchId) {
       setLoading(false);
@@ -129,7 +122,6 @@ export const InspectionPage: React.FC = () => {
         api.getInspectionImages(batchId)
       ]);
 
-      // Construct report from spec check
       const incomingReport: InspectionReport = {
         batch_id: batchId,
         total_inspected: specRes.total_inspected ?? measList.length,
@@ -169,7 +161,6 @@ export const InspectionPage: React.FC = () => {
     }
   }, [batchId]);
 
-  // Handle CSV / Excel File Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -177,7 +168,6 @@ export const InspectionPage: React.FC = () => {
     const file = files[0];
     const fn = file.name.toLowerCase();
 
-    // Check allowed format
     if (!fn.endsWith(".csv") && !fn.endsWith(".xlsx") && !fn.endsWith(".xls")) {
       setErrorBanner(`Invalid format: "${file.name}". Only CSV (.csv) and Excel (.xlsx, .xls) files are supported.`);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -193,7 +183,6 @@ export const InspectionPage: React.FC = () => {
       const token = roleTokens[activeRole];
       const res = await api.uploadInspectionFile(file, batchId, token, false);
 
-      // On successful upload
       setValidationReport({
         status: "success",
         message: `Successfully validated and imported ${res.accepted_rows} rows from ${file.name}.`,
@@ -213,10 +202,9 @@ export const InspectionPage: React.FC = () => {
       );
       setSourceInfo(`Uploaded file: ${file.name} (${res.sheet_name ? `Sheet: ${res.sheet_name}` : "CSV"})`);
 
-      // Reload state from database
       await loadData();
     } catch (err: any) {
-      // Check if structured validation report was returned
+
       if (err && typeof err === "object" && err.detail) {
         const detail = err.detail;
         if (typeof detail === "object" && detail.status === "rejected") {
@@ -246,7 +234,6 @@ export const InspectionPage: React.FC = () => {
     }
   };
 
-  // Handle Manual Measurement Creation
   const handleAddManualMeasurement = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -262,7 +249,7 @@ export const InspectionPage: React.FC = () => {
         token
       );
       setSuccessBanner(`Added manual measurement ${manualForm.component_id} = ${manualForm.value} ${manualForm.unit}`);
-      // Increment sample ID for fast entry
+
       const nextNum = parseInt(manualForm.component_id.replace(/\D/g, "")) || 6;
       setManualForm({
         component_id: `P${String(nextNum + 1).padStart(3, "0")}`,
@@ -275,7 +262,6 @@ export const InspectionPage: React.FC = () => {
     }
   };
 
-  // Handle Manual Measurement Update
   const handleUpdateManualMeasurement = async (id: string) => {
     try {
       setErrorBanner(null);
@@ -289,7 +275,6 @@ export const InspectionPage: React.FC = () => {
     }
   };
 
-  // Handle Manual Measurement Delete
   const handleDeleteManualMeasurement = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this measurement?")) return;
     try {
@@ -303,7 +288,6 @@ export const InspectionPage: React.FC = () => {
     }
   };
 
-  // Handle Inspection Image Upload (Vision Agent)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -327,7 +311,6 @@ export const InspectionPage: React.FC = () => {
     }
   };
 
-  // Template Download
   const handleDownloadTemplate = () => {
     const csvContent =
       "component_id,diameter_mm\n" +
@@ -357,7 +340,6 @@ export const InspectionPage: React.FC = () => {
     );
   }
 
-  // Distribution chart data
   const chartData = report.measurements.map((m) => ({
     sample_id: m.sample_id,
     measured: m.measured_value,
@@ -374,7 +356,7 @@ export const InspectionPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Persona Switcher & Controls */}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-[26px] font-bold text-slate-900 leading-tight">Inspection Center & Measurement Intake</h2>
@@ -384,7 +366,7 @@ export const InspectionPage: React.FC = () => {
         </div>
 
         <div className="flex items-center flex-wrap gap-3">
-          {/* Prominent Visible Target Batch Field */}
+
           <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 border border-blue-200 rounded-lg shadow-2xs">
             <Layers className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-xs font-bold text-blue-900 whitespace-nowrap">Target Batch:</span>
@@ -411,7 +393,6 @@ export const InspectionPage: React.FC = () => {
             )}
           </div>
 
-          {/* RBAC Persona Switcher */}
           <div className="segmented-control">
             <span className="text-[12px] font-semibold text-slate-500 px-2 flex items-center gap-1.5 whitespace-nowrap">
               <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
@@ -429,7 +410,6 @@ export const InspectionPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Download Template */}
           <button
             onClick={handleDownloadTemplate}
             className="btn-secondary !h-[40px]"
@@ -438,7 +418,6 @@ export const InspectionPage: React.FC = () => {
             <span>Download Template</span>
           </button>
 
-          {/* Refresh Data */}
           <button
             onClick={loadData}
             title="Reload inspection data"
@@ -449,7 +428,6 @@ export const InspectionPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Global Alerts */}
       {errorBanner && (
         <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[13.5px] flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2.5">
@@ -474,7 +452,6 @@ export const InspectionPage: React.FC = () => {
         </div>
       )}
 
-      {/* Navigation Tabs */}
       <div className="flex border-b border-[#E3E8EF] bg-white rounded-t-xl px-4 pt-2 gap-2 text-[13.5px] font-semibold">
         <button
           onClick={() => setActiveTab("file_upload")}
@@ -522,7 +499,6 @@ export const InspectionPage: React.FC = () => {
         </button>
       </div>
 
-      {/* TAB 1: CSV & EXCEL DRAG-AND-DROP UPLOAD */}
       {activeTab === "file_upload" && (
         <div className="space-y-6">
           <div className="bg-white border border-[#E3E8EF] rounded-xl p-6 shadow-xs">
@@ -560,7 +536,6 @@ export const InspectionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Drag & Drop Upload Zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -569,7 +544,7 @@ export const InspectionPage: React.FC = () => {
                 e.stopPropagation();
                 if (e.dataTransfer.files && e.dataTransfer.files[0]) {
                   const droppedFile = e.dataTransfer.files[0];
-                  // Dispatch file upload
+
                   const dummyEvent = { target: { files: [droppedFile] } } as any;
                   handleFileUpload(dummyEvent);
                 }
@@ -603,7 +578,6 @@ export const InspectionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* STRUCTURED VALIDATION REPORT PANEL (Check 5, 6, 8) */}
           {validationReport && (
             <div
               className={`border rounded-xl p-5 shadow-xs transition-all ${
@@ -640,7 +614,6 @@ export const InspectionPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Summary KPIs */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 <div className="bg-white p-3 rounded-lg border border-slate-200">
                   <div className="text-[10px] uppercase font-semibold text-slate-400">Total Rows</div>
@@ -660,7 +633,6 @@ export const InspectionPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Missing Values List (Check 5) */}
               {validationReport.missing_values && validationReport.missing_values.length > 0 && (
                 <div className="mb-4 bg-white rounded-lg p-3.5 border border-rose-200">
                   <div className="text-xs font-bold text-rose-900 mb-2 flex items-center gap-1.5">
@@ -677,7 +649,6 @@ export const InspectionPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Unit Conversions Applied (Check 6) */}
               {validationReport.unit_conversions && validationReport.unit_conversions.length > 0 && (
                 <div className="mb-4 bg-white rounded-lg p-3.5 border border-blue-200">
                   <div className="text-xs font-bold text-blue-900 mb-2 flex items-center gap-1.5">
@@ -715,7 +686,6 @@ export const InspectionPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Errors List */}
               {validationReport.errors && validationReport.errors.length > 0 && (
                 <div className="mb-3 bg-white rounded-lg p-3 border border-rose-200">
                   <div className="text-xs font-bold text-rose-800 mb-1">Errors ({validationReport.errors.length}):</div>
@@ -727,7 +697,6 @@ export const InspectionPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Warnings List */}
               {validationReport.warnings && validationReport.warnings.length > 0 && (
                 <div className="bg-white rounded-lg p-3 border border-amber-200">
                   <div className="text-xs font-bold text-amber-800 mb-1">Warnings ({validationReport.warnings.length}):</div>
@@ -741,7 +710,6 @@ export const InspectionPage: React.FC = () => {
             </div>
           )}
 
-          {/* ACTIVE IMPORTED MEASUREMENTS TABLE */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -821,10 +789,9 @@ export const InspectionPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: MANUAL MEASUREMENT ENTRY GRID (Check 3) */}
       {activeTab === "manual_entry" && (
         <div className="space-y-6">
-          {/* Add Measurement Inline Form */}
+
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
             <h3 className="text-sm font-bold text-slate-900 mb-1">Add Manual Measurement (Single Entry)</h3>
             <p className="text-xs text-slate-500 mb-4">
@@ -879,7 +846,6 @@ export const InspectionPage: React.FC = () => {
             </form>
           </div>
 
-          {/* Persisted Measurements Grid with Edit & Delete */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -1018,7 +984,6 @@ export const InspectionPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: IMAGE UPLOAD & VISION AGENT (Check 4) */}
       {activeTab === "image_upload" && (
         <div className="space-y-6">
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
@@ -1061,7 +1026,6 @@ export const InspectionPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* AI Defect Prediction Card */}
               <div>
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                   Computer Vision Finding (Agent 2)
@@ -1111,7 +1075,6 @@ export const InspectionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Uploaded Images Registry */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -1145,7 +1108,6 @@ export const InspectionPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 4: SPEC LIMITS & CHARTS (Functional Requirement 4) */}
       {activeTab === "charts" && (
         !report || report.total_inspected === 0 ? (
           <div className="p-12 text-center bg-white border border-slate-200 rounded-xl space-y-3 shadow-xs">
@@ -1157,7 +1119,7 @@ export const InspectionPage: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* SIX SUMMARY ITEMS (Check 5 & Check 8) */}
+
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
             <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
               <div className="text-[11px] font-semibold text-slate-500">1. Total Inspected</div>
@@ -1193,7 +1155,6 @@ export const InspectionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* EPISTEMIC LABELLING & HUMAN DISPOSITION NOTICE (Check 6) */}
           <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-3">
               <span className="px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-300 text-xs font-bold rounded-md uppercase tracking-wider shrink-0 flex items-center gap-1.5">
@@ -1212,7 +1173,6 @@ export const InspectionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* DISTRIBUTION METRICS SUMMARY STRIP (Check 5) */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-xs">
             <div>
               <span className="text-slate-400 text-[10px] uppercase font-bold block">Sample Mean (x̄)</span>
@@ -1246,9 +1206,8 @@ export const InspectionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* HISTOGRAM WITH LSL & USL VERTICAL BOUNDARIES & DISTINCT OUT-OF-SPEC BARS (Check 8) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* HISTOGRAM BAR CHART */}
+
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -1309,7 +1268,6 @@ export const InspectionPage: React.FC = () => {
               )}
             </div>
 
-            {/* RUN CHART: SAMPLES VS SPECIFICATION LIMITS */}
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -1371,7 +1329,6 @@ export const InspectionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* TABLE OF NONCONFORMING COMPONENTS (Check 5 & Check 8) */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
               <div className="flex items-center gap-2">

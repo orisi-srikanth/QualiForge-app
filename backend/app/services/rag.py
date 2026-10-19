@@ -1,9 +1,3 @@
-"""
-Hybrid RAG Knowledge Retrieval Service
-Performs chunking, TF-IDF / vector semantic search, and metadata filtering across
-historical NCRs, engineering specifications, manufacturing SOPs, and machine manuals.
-Strictly frames retrieved matches as historical context, never as proven causation.
-"""
 import os
 import re
 import json
@@ -14,7 +8,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from backend.app.core.guardrails import EpistemicLabel
 
 class HybridRAGService:
-    """Enterprise Knowledge Base retrieval engine for Quality Engineers and RCA agents."""
 
     def __init__(self, kb_dir: Optional[str] = None):
         self.kb_dir = kb_dir or os.path.abspath(
@@ -26,10 +19,8 @@ class HybridRAGService:
         self._load_and_index_documents()
 
     def _load_and_index_documents(self):
-        """Reads all markdown files in kb/ and historical_ncrs.json and chunks them."""
         self.chunks.clear()
 
-        # 1. Ingest markdown documents
         if os.path.exists(self.kb_dir):
             for fname in os.listdir(self.kb_dir):
                 if fname.endswith(".md"):
@@ -41,7 +32,6 @@ class HybridRAGService:
                     except Exception:
                         pass
 
-        # 2. Ingest structured historical NCRs if present
         base_dir = os.path.dirname(self.kb_dir)
         ncr_json = os.path.join(base_dir, "historical_ncrs.json")
         if os.path.exists(ncr_json):
@@ -71,20 +61,16 @@ class HybridRAGService:
             except Exception:
                 pass
 
-        # 3. Fit TF-IDF Vectorizer
         if self.chunks:
             corpus = [c["text"] for c in self.chunks]
             self.matrix = self.vectorizer.fit_transform(corpus)
 
     def _chunk_and_add(self, text: str, source_file: str):
-        """Chunks document text with sliding window ~350 tokens and extracts metadata."""
         doc_type = "sop" if "SOP" in source_file else ("spec" if "SPEC" in source_file else ("manual" if "MANUAL" in source_file else "ncr"))
 
-        # Extract title from first markdown header
         title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
         title = title_match.group(1).strip() if title_match else source_file
 
-        # Paragraph split
         paragraphs = text.split("\n\n")
         chunk_buf = []
         current_len = 0
@@ -133,14 +119,9 @@ class HybridRAGService:
         top_k: int = 3,
         metadata_filters: Optional[Dict[str, str]] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Executes hybrid similarity search with cosine similarity and metadata filtering.
-        Always returns results framed with the mandatory context-only disclaimer.
-        """
         if not self.chunks:
             return []
 
-        # Optional Hosted Embedding Retrieval (Gemini text-embedding-004 / OpenAI)
         from backend.app.core.llm import universal_llm
         hosted_scores = None
         if hasattr(self, "_chunk_embeddings") and self._chunk_embeddings:
@@ -166,7 +147,6 @@ class HybridRAGService:
             score = float(scores[idx])
             chunk = self.chunks[idx]
 
-            # Apply metadata filters if provided
             if metadata_filters:
                 match = True
                 for k, v in metadata_filters.items():
@@ -176,7 +156,6 @@ class HybridRAGService:
                 if not match:
                     continue
 
-            # Produce snippet
             snippet = chunk["text"][:300] + ("..." if len(chunk["text"]) > 300 else "")
 
             results.append({

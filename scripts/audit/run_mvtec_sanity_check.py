@@ -1,8 +1,3 @@
-"""
-External Sanity Check: MVTec AD Benchmark (metal_nut and screw)
-Evaluates trained synthetic shaft model on real MVTec AD scratch vs normal images
-with documented domain gap caveat.
-"""
 import os
 import glob
 from pathlib import Path
@@ -23,7 +18,6 @@ def run_sanity_check():
     mvtec_base = Path(r"D:\Projects Local\BV-DATASETS\mvtec_anomaly_detection")
     sample_dir = PROJECT_ROOT / "backend" / "app" / "static" / "uploads" / "samples"
 
-    # Verify if MVTec exists
     categories = ["metal_nut", "screw"]
     available = {}
     for cat in categories:
@@ -57,7 +51,6 @@ def run_sanity_check():
     for cat in ["metal_nut", "screw"]:
         cat_path = available[cat]
         good_imgs = sorted(glob.glob(str(cat_path / "test" / "good" / "*.png")))[:15]
-        # Scratch images
         scratch_dirs = [d for d in glob.glob(str(cat_path / "test" / "*")) if "scratch" in os.path.basename(d).lower()]
         scratch_imgs = []
         for sd in scratch_dirs:
@@ -69,7 +62,6 @@ def run_sanity_check():
         cat_correct = 0
         cat_total = 0
 
-        # Good images: expect 'no_defect'
         for g_img in good_imgs:
             im = Image.open(g_img).convert("RGB")
             t_in = transform(im).unsqueeze(0).to(device)
@@ -78,14 +70,12 @@ def run_sanity_check():
                 probs = F.softmax(out, dim=1).squeeze().numpy()
             pred_idx = int(np.argmax(probs))
             pred_cls = SHAFT_CLASSES[pred_idx]
-            # Scratch vs normal binary decision
             is_good = (pred_cls == "no_defect")
             if is_good:
                 cat_correct += 1
             cat_total += 1
             results.append({"category": cat, "true": "good", "pred": pred_cls, "prob": float(probs[pred_idx])})
 
-        # Scratch images: expect 'surface_scratch' or any defect
         for s_img in scratch_imgs:
             im = Image.open(s_img).convert("RGB")
             t_in = transform(im).unsqueeze(0).to(device)
@@ -103,7 +93,6 @@ def run_sanity_check():
         acc = (cat_correct / max(cat_total, 1)) * 100.0
         print(f"  {cat} Binary Anomaly Accuracy: {acc:.1f}% ({cat_correct}/{cat_total})")
 
-    # Overall Summary
     total_corr = sum(1 for r in results if (r["true"] == "good" and r["pred"] == "no_defect") or (r["true"] == "scratch" and r["pred"] != "no_defect"))
     overall_acc = (total_corr / len(results)) * 100.0 if results else 0.0
 

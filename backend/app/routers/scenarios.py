@@ -1,7 +1,3 @@
-"""
-Platform Telemetry & Evaluation Scenarios Endpoints
-Runs mandated test scenarios (TC-01..TC-08) and provides version diagnostics.
-"""
 from fastapi import APIRouter
 from backend.app.scenarios.test_scenarios import run_test_scenario, run_all_scenarios
 

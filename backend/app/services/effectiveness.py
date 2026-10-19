@@ -1,15 +1,3 @@
-"""
-CAPA Effectiveness Monitoring & Statistical Verification Engine (Agent 7)
-Fully compliant with IATF 16949:2016 Clause 10.2.3, ISO 9001:2015 Clause 10.2, and PDF Problem Statement:
-- Two-proportion z-test (pooled p-bar) and Fisher's exact test for small counts
-- Equal length / equal count before-and-after window partitioning using completion date as dividing line
-- Strict machine and product isolation (batches from other machines/products excluded)
-- Minimum sample size threshold guardrails (minimum 30 inspected parts, minimum 5 defect events)
-- Anti-causal overreach wording: 'Observed association; causation not established without randomized control group'
-- Direction handling: honest reporting of improvement, no change, and worsening with escalation recommendation
-- Post-intervention defect recurrence detection (Agent 7 recurrence detector)
-- Database persistence in effectiveness_checks table and CAPA action linkage
-"""
 import re
 import json
 import logging
@@ -28,7 +16,6 @@ from backend.app.core.guardrails import EpistemicLabel
 
 logger = logging.getLogger("effectiveness_engine")
 
-# Prohibited causal overreach phrases (must use word boundaries to avoid false positives like 'approved')
 PROHIBITED_CAUSAL_PATTERNS = [
     r"\bproved\b",
     r"\bproves\b",
@@ -38,9 +25,7 @@ PROHIBITED_CAUSAL_PATTERNS = [
     r"\bdefinitely solved\b"
 ]
 
-
 class EffectivenessEngine:
-    """Verifies defect rate reduction following CAPA implementation."""
 
     @staticmethod
     def evaluate_capa_effectiveness(
@@ -57,29 +42,16 @@ class EffectivenessEngine:
         custom_batches_before: Optional[List[str]] = None,
         custom_batches_after: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """
-        Calculates before-and-after statistical verification of CAPA efficacy.
-        - Partitions batches into before/after windows using completion date as dividing line.
-        - Enforces equal length or equal inspected counts, same product and same machine.
-        - Excludes batches from other machines and rejects overlapping windows.
-        - Computes rejection rates = (nonconforming / inspected) * 100.
-        - Executes Two-Proportion Z-Test or Fisher's Exact Test.
-        - Enforces minimum sample size threshold (n >= 30, events >= 5).
-        - Enforces epistemic disclaimer: 'Observed association; causation not established'.
-        - Checks for post-intervention defect recurrence.
-        """
         close_db = False
         if db is None:
             db = SessionLocal()
             close_db = True
 
         try:
-            # 1. Action lookup
             action = db.query(CAPAAction).filter(
                 (CAPAAction.action_code == capa_id) | (CAPAAction.id == capa_id)
             ).first()
 
-            # If action found, verify status trigger (Check 1)
             if action:
                 if action.status not in ["completed", "verified"]:
                     return {
@@ -110,7 +82,6 @@ class EffectivenessEngine:
                         "audit_notice": "Conforms to IATF 16949 Clause 10.2.3: Completion date is required as the dividing baseline."
                     }
 
-            # 2. Windows & Target Definition (Check 2)
             target_machine_id = "mach-04"
             target_product_id = "prod-ps-101"
             comp_dt = None
@@ -126,7 +97,6 @@ class EffectivenessEngine:
                 except ValueError:
                     comp_dt = datetime.now(timezone.utc)
 
-                # Trace target machine and product from incident and batch
                 if action.incident_id:
                     inc = db.query(QualityIncident).filter(QualityIncident.id == action.incident_id).first()
                     if inc and inc.batch_id:
@@ -136,7 +106,6 @@ class EffectivenessEngine:
                             target_product_id = b_inc.product_id or target_product_id
 
                 if custom_batches_before is not None or custom_batches_after is not None:
-                    # Explicit custom batch lists passed (e.g. for testing window rules)
                     if custom_batches_before:
                         batches_before = db.query(Batch).filter(
                             (Batch.id.in_(custom_batches_before)) | (Batch.batch_number.in_(custom_batches_before))
@@ -146,7 +115,6 @@ class EffectivenessEngine:
                             (Batch.id.in_(custom_batches_after)) | (Batch.batch_number.in_(custom_batches_after))
                         ).all()
                 else:
-                    # Check if dedicated baseline and verified batches exist for equal count comparison
                     b_pre_spec = db.query(Batch).filter(
                         Batch.machine_id == target_machine_id,
                         Batch.product_id == target_product_id,
@@ -163,14 +131,12 @@ class EffectivenessEngine:
                         batches_before = [b_pre_spec]
                         batches_after = [b_post_spec]
                     else:
-                        # Before window: Same machine and product, strictly before completion date (excluding triggering incident batch)
                         batches_before = db.query(Batch).filter(
                             Batch.machine_id == target_machine_id,
                             Batch.product_id == target_product_id,
                             Batch.start_time < comp_dt
                         ).order_by(Batch.start_time.desc()).all()
 
-                        # After window: Same machine and product, strictly on or after completion date
                         batches_after = db.query(Batch).filter(
                             Batch.machine_id == target_machine_id,
                             Batch.product_id == target_product_id,
@@ -178,14 +144,11 @@ class EffectivenessEngine:
                         ).order_by(Batch.start_time.asc()).all()
 
                         if not include_recurrence_batch:
-                            # Filter out test recurrence batches unless explicitly requested
                             batches_after = [b for b in batches_after if b.scenario_label != "POST_CORRECTIVE_RECURRENCE"]
 
-                # Strict machine and product isolation: exclude batches from different machine/product
                 batches_before = [b for b in batches_before if b.machine_id == target_machine_id and b.product_id == target_product_id]
                 batches_after = [b for b in batches_after if b.machine_id == target_machine_id and b.product_id == target_product_id]
 
-                # Check for overlapping windows
                 b_ids_before = [b.id for b in batches_before]
                 b_ids_after = [b.id for b in batches_after]
                 overlap = set(b_ids_before) & set(b_ids_after)
@@ -200,7 +163,6 @@ class EffectivenessEngine:
                         "is_statistically_significant": False
                     }
 
-                # Check for missing before window
                 if not batches_before and n_before is None:
                     return {
                         "capa_id": capa_id,
@@ -213,7 +175,6 @@ class EffectivenessEngine:
                         "is_statistically_significant": False
                     }
 
-                # Check for missing after window
                 if not batches_after and n_after is None:
                     return {
                         "capa_id": capa_id,
@@ -226,7 +187,6 @@ class EffectivenessEngine:
                         "is_statistically_significant": False
                     }
 
-                # Collect batch numbers and count measurements
                 batch_numbers_before = [b.batch_number for b in batches_before]
                 batch_numbers_after = [b.batch_number for b in batches_after]
 
@@ -244,20 +204,17 @@ class EffectivenessEngine:
                         Measurement.status == "nonconforming"
                     ).count()
 
-            # Ensure valid counts (Check 3 & Check 5)
             n_before = int(n_before or 0)
             defects_before = int(defects_before or 0)
             n_after = int(n_after or 0)
             defects_after = int(defects_after or 0)
 
-            # Calculate rejection rates
             p1 = (defects_before / n_before) if n_before > 0 else 0.0
             p2 = (defects_after / n_after) if n_after > 0 else 0.0
             p1_pct = round(p1 * 100.0, 2)
             p2_pct = round(p2 * 100.0, 2)
             relative_reduction_pct = round(((p1 - p2) / p1 * 100.0), 1) if p1 > 0 else 0.0
 
-            # 3. Small sample detection (Check 5)
             min_sample_threshold = 30
             min_events_threshold = 5
             is_small_sample = (
@@ -273,7 +230,6 @@ class EffectivenessEngine:
                     f"and {min_events_threshold} events per window). Too little data to draw confident conclusions."
                 )
 
-            # 4. Statistical Tests: Two-Proportion Z-Test vs Fisher's Exact Test (Check 4)
             test_type = "two_proportion_z_test"
             z_stat = 0.0
             p_value = 1.0
@@ -289,16 +245,13 @@ class EffectivenessEngine:
             else:
                 p_pool = total_defects / total_n if total_n > 0 else 0.0
 
-                # Expected cell counts for 2x2 contingency table
                 e11 = n_before * p_pool
                 e21 = n_after * p_pool
 
-                # Select Fisher's Exact Test if expected cell counts < 5 or sample size is small
                 use_fisher = is_small_sample or (e11 < 5.0) or (e21 < 5.0)
 
                 if use_fisher:
                     test_type = "fisher_exact_test"
-                    # Contingency table: [[nonconforming_1, conforming_1], [nonconforming_2, conforming_2]]
                     table = [
                         [defects_before, max(0, n_before - defects_before)],
                         [defects_after, max(0, n_after - defects_after)]
@@ -315,7 +268,6 @@ class EffectivenessEngine:
                     statistic = z_stat
                     p_value = float(2.0 * (1.0 - stats.norm.cdf(abs(z_calc))))
 
-                # 95% Confidence Interval for difference in proportions (p1 - p2)
                 se_diff = np.sqrt((p1 * (1.0 - p1) / n_before) + (p2 * (1.0 - p2) / n_after)) if (n_before > 0 and n_after > 0) else 0.0
                 z_crit = float(stats.norm.ppf(1.0 - (1.0 - confidence_level) / 2.0))
                 diff = p1 - p2
@@ -324,7 +276,6 @@ class EffectivenessEngine:
 
                 is_significant = (p_value < (1.0 - confidence_level)) and (not is_small_sample)
 
-            # 5. Direction Handling (Check 7)
             if is_small_sample:
                 outcome = "INSUFFICIENT_SAMPLE_SIZE"
                 direction = "undetermined"
@@ -342,12 +293,10 @@ class EffectivenessEngine:
                 direction = "unchanged"
                 recommendation = "No statistically significant defect reduction detected. Recommend re-evaluation or alternative corrective actions."
 
-            # 6. Recurrence Detection (Check 8 - Agent 7)
             recurrence_detected = False
             recurrence_details = f"No recurrence of defect detected on machine '{target_machine_id}' across subsequent production."
 
             if check_recurrence and batches_after:
-                # Check subsequent batches for recurrence scenario label or elevated defect rate (>= 5.0%)
                 recur_candidates = []
                 for b in batches_after:
                     if b.scenario_label == "POST_CORRECTIVE_RECURRENCE":
@@ -367,7 +316,6 @@ class EffectivenessEngine:
                         f"{rec_cnt} parts exceeded specification limits on {target_machine_id}."
                     )
 
-            # 7. Epistemic Labelling & Anti-Causal Language Guardrail (Check 6)
             conclusion_label = (
                 f"Observed association (before/after comparison, no control group); "
                 f"causation not established. Defect rate changed from {p1_pct}% to {p2_pct}% "
@@ -381,14 +329,11 @@ class EffectivenessEngine:
                 "shift or ambient temperature variation, operator reassignment, or routine maintenance performed concurrently."
             )
 
-            # Verify no prohibited causal phrases exist in conclusion (using word boundaries to avoid false positives like 'approved')
             for pattern in PROHIBITED_CAUSAL_PATTERNS:
                 conclusion_label = re.sub(pattern, "[UNSUBSTANTIATED]", conclusion_label, flags=re.IGNORECASE)
 
-            # 8. Persistence & Links (Check 9)
             if action:
                 try:
-                    # Window definitions JSON
                     window_before_data = {
                         "dividing_line": action.completion_date,
                         "batches": batch_numbers_before,
@@ -408,7 +353,6 @@ class EffectivenessEngine:
                         "product": target_product_id
                     }
 
-                    # Check if matching check already exists with same data for this CAPA action
                     existing_check = None
                     if not force_recompute:
                         existing_check = db.query(EffectivenessCheck).filter(
@@ -433,11 +377,9 @@ class EffectivenessEngine:
                         )
                         db.add(chk)
                     else:
-                        # Re-run with unchanged data: update in place without creating duplicate records
                         existing_check.conclusion_label = conclusion_label
                         existing_check.notes = confounding_explanations
 
-                    # Link summary into CAPA action record
                     action.effectiveness_result = conclusion_label
                     db.commit()
                 except Exception as e:
@@ -485,6 +427,5 @@ class EffectivenessEngine:
         finally:
             if close_db:
                 db.close()
-
 
 effectiveness_engine = EffectivenessEngine()

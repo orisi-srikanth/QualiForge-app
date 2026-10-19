@@ -1,8 +1,3 @@
-"""
-Grad-CAM Explainability & Defect Localisation Module
-Computes Class Activation Maps from convolutional layers to produce visual heatmaps
-and derive defect bounding boxes for explainable AI decision support.
-"""
 import cv2
 import numpy as np
 import torch
@@ -27,7 +22,6 @@ class GradCAM:
         self.target_layer.register_full_backward_hook(backward_hook)
 
     def generate_heatmap(self, input_tensor: torch.Tensor, class_idx: int) -> np.ndarray:
-        """Generates normalized [0, 1] 2D Grad-CAM heatmap."""
         self.model.eval()
         output = self.model(input_tensor)
         self.model.zero_grad()
@@ -51,7 +45,6 @@ class GradCAM:
 
     @staticmethod
     def overlay_heatmap(image: np.ndarray, heatmap: np.ndarray, alpha: float = 0.4) -> np.ndarray:
-        """Overlays Grad-CAM heatmap on original BGR image using COLORMAP_JET."""
         h, w = image.shape[:2]
         resized_heatmap = cv2.resize(heatmap, (w, h))
         colored_heatmap = cv2.applyColorMap(np.uint8(255 * resized_heatmap), cv2.COLORMAP_JET)
@@ -60,7 +53,6 @@ class GradCAM:
 
     @staticmethod
     def derive_bounding_box(heatmap: np.ndarray, threshold: float = 0.45) -> tuple:
-        """Derives [x, y, w, h] bounding box from peak activation region in heatmap."""
         binary = (heatmap > threshold).astype(np.uint8) * 255
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:

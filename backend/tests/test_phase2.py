@@ -1,6 +1,3 @@
-"""
-Unit Tests for Phase 2: Data Generation and Anchor Scenario Verification
-"""
 import os
 import json
 import pytest
@@ -18,7 +15,6 @@ def test_anchor_scenario_batch_and_spec():
         assert b245.shift == "Night Shift"
         assert b245.scenario_label == "ANCHOR_TOOL_WEAR"
 
-        # Check measurements
         measurements = db.query(Measurement).filter_by(batch_id=b245.id).order_by(Measurement.component_id).all()
         assert len(measurements) == 5, f"Expected exactly 5 measurements for anchor sample, found {len(measurements)}"
 
@@ -33,13 +29,11 @@ def test_anchor_scenario_batch_and_spec():
             exp_val = expected_map[m.component_id]
             assert abs(m.value - exp_val) < 1e-4, f"Sample {m.component_id} value mismatch: {m.value} vs {exp_val}"
 
-        # Check conformance calculations
         conforming = [m for m in measurements if m.status == "conforming"]
         nonconforming = [m for m in measurements if m.status == "nonconforming"]
         assert len(conforming) == 2, "Expected 2 conforming parts (P001, P002)"
         assert len(nonconforming) == 3, "Expected 3 nonconforming parts (P003, P004, P005)"
 
-        # Verify deviation beyond USL (50.05 mm)
         p003 = next(m for m in measurements if m.component_id == "P003")
         p004 = next(m for m in measurements if m.component_id == "P004")
         p005 = next(m for m in measurements if m.component_id == "P005")
@@ -48,7 +42,6 @@ def test_anchor_scenario_batch_and_spec():
         assert abs(p004.deviation_from_limit - 0.03) < 1e-4
         assert abs(p005.deviation_from_limit - 0.02) < 1e-4
 
-        # Check telemetry readings for BATCH-0245
         readings = db.query(ProcessReading).filter_by(batch_id=b245.id).all()
         assert len(readings) > 0, "Telemetry readings for BATCH-0245 must exist"
 
@@ -57,7 +50,6 @@ def test_anchor_scenario_batch_and_spec():
         assert max_vib >= 3.7, f"Expected peak vibration >= 3.7 mm/s, found {max_vib}"
         assert max_tool >= 1150, f"Expected peak tool cycles >= 1150, found {max_tool}"
 
-        # Unchanged parameters: spindle speed and feed rate
         for r in readings:
             assert r.spindle_speed == 1200.0, "Spindle speed must remain unchanged at 1200 RPM"
             assert r.feed_rate == 0.20, "Feed rate must remain unchanged at 0.20 mm/rev"
@@ -87,7 +79,6 @@ def test_historical_ncrs_and_ncr019():
     assert ncr019["machine"] == "CNC-02"
 
 def test_mvtec_manifest_and_splits_no_leakage():
-    """Verify MVTec manifest and splits integrity with zero train/val/test data leakage."""
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
     manifest_file = os.path.join(base_dir, "mvtec_manifest.csv")
     splits_file = os.path.join(base_dir, "splits.json")
@@ -108,7 +99,6 @@ def test_mvtec_manifest_and_splits_no_leakage():
     assert len(train_paths) + len(val_paths) + len(test_paths) == 1502
 
 def test_held_out_curated_samples_exist():
-    """Verify held-out proxy samples exist in static/uploads/samples/ including IMG-001.png."""
     samples_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "app", "static", "uploads", "samples")
     )
@@ -125,9 +115,7 @@ def test_held_out_curated_samples_exist():
         assert item["source"] == "MVTec AD (proxy part)"
 
 def test_out_of_domain_handling():
-    """Verify non-proxy images return out_of_domain classification."""
     from backend.app.cv_model.defect_detector import vision_model
-    # Test path that does not match any of the 4 approved categories
     dummy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app", "static", "uploads", "samples", "IMG-001.png"))
     res = vision_model.inspect_image(dummy_path, category="gear_assembly")
     assert res["category"] == "out_of_domain"

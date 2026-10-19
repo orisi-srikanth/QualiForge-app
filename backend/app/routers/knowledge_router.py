@@ -1,11 +1,3 @@
-"""
-Knowledge Router for QualityMind Agent 3 / RAG Pipeline
-Exposes standard endpoints for status, ingestion, and semantic retrieval over manufacturing knowledge bases.
-Routes:
-- GET  /agent3/knowledge/status
-- POST /agent3/knowledge/ingest
-- POST /agent3/knowledge/query
-"""
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
@@ -22,7 +14,6 @@ router = APIRouter(prefix="/agent3/knowledge", tags=["RAG"])
 
 @router.get("/status", response_model=KnowledgeStatusResponse)
 def get_knowledge_status():
-    """Returns operational information about the ChromaDB knowledge collection and LLM state."""
     try:
         status_data = quality_knowledge_agent.get_status()
         return status_data
@@ -31,10 +22,6 @@ def get_knowledge_status():
 
 @router.post("/ingest", response_model=KnowledgeIngestResponse)
 def ingest_knowledge_documents(payload: Optional[KnowledgeIngestRequest] = None):
-    """
-    Ingests manufacturing CSVs, JSONs, Markdown SOPs, TXTs, and digital PDFs into persistent ChromaDB.
-    Preserves complete CSV rows as single cohesive records.
-    """
     try:
         source_paths = payload.source_paths if payload else None
         force_reindex = payload.force_reindex if payload else False
@@ -45,11 +32,6 @@ def ingest_knowledge_documents(payload: Optional[KnowledgeIngestRequest] = None)
 
 @router.post("/query", response_model=KnowledgeQueryResponse)
 def query_knowledge_base(payload: KnowledgeQueryRequest):
-    """
-    Performs semantic retrieval against the knowledge collection.
-    Supports metadata filters (category, record_id, machine_id, part_number).
-    In offline mode (LLM_PROVIDER='none'), returns deterministic evidence summaries without external API calls.
-    """
     if not payload.query or not payload.query.strip():
         raise HTTPException(status_code=400, detail="Query string cannot be empty or whitespace.")
 

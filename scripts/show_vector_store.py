@@ -1,14 +1,8 @@
-"""
-Vector Store Inspector Script for QualityMind (In-Process ChromaDB)
-Inspects persisted Chroma collections, chunk statistics, metadata fields,
-and demonstrates semantic retrieval without requiring any external services or containers.
-"""
 
 import sys
 import os
 from pathlib import Path
 
-# Ensure root directory is in python path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -20,7 +14,6 @@ def main():
     print(" QUALITYMIND VECTOR STORE INSPECTOR (IN-PROCESS CHROMADB)")
     print("=" * 80)
 
-    # Search known chroma store locations in order
     candidate_paths = [
         Path("backend/data/knowledge_db"),
         Path(settings.CHROMA_PATH),
@@ -45,7 +38,6 @@ def main():
                 continue
 
     if not client or not collections:
-        # Fallback to default
         active_path = Path("backend/data/knowledge_db")
         client = chromadb.PersistentClient(path=str(active_path))
         collections = client.list_collections()
@@ -67,14 +59,12 @@ def main():
         print(f"Total Document Chunks: {count}")
         print("-" * 50)
 
-        # Sample peek
         sample = col.peek(limit=1)
         if sample and "metadatas" in sample and sample["metadatas"]:
             print("Sample Chunk Metadata Fields:")
             for k, v in sample["metadatas"][0].items():
                 print(f"  - {k:<20}: {v}")
 
-        # Semantic query demo
         test_queries = [
             "oversized shaft diameter tool wear CNC-04",
             "cutting tool replacement interval SOP",

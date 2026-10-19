@@ -47,7 +47,7 @@ export const LoginPage: React.FC<Props> = ({
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-md border border-slate-200 rounded-2xl">
-          {/* Logo integrated directly inside the main card */}
+
           <button
             onClick={onNavigateToLanding}
             className="w-full flex items-center justify-center group cursor-pointer focus:outline-none mb-4"
@@ -73,7 +73,6 @@ export const LoginPage: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Quick Select Persona Bar */}
           <div className="mb-6 pb-6 border-b border-slate-100">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
               Select Enterprise Persona

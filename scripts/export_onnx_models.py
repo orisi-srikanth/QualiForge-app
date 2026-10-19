@@ -1,13 +1,8 @@
-"""
-Export Lightweight ONNX Models for QualityMind (<512 MB RAM on Render)
-Exports YOLO and Deep CNN models to optimized ONNX binaries with CPU runtime compatibility.
-"""
 import os
 import torch
 import torch.nn as nn
 
 class LightweightYOLOHead(nn.Module):
-    """Ultra-lightweight detector head conforming to YOLO output tensor specifications [1, 84, 8400]."""
     def __init__(self, num_classes=6):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1)
@@ -20,12 +15,11 @@ class LightweightYOLOHead(nn.Module):
         feat = self.conv1(x)
         feat = self.conv2(feat)
         feat = self.conv3(feat)
-        feat = self.pool(feat).squeeze(2) # [1, 64, 8400]
-        out = self.head(feat)             # [1, 10, 8400]
+        feat = self.pool(feat).squeeze(2)
+        out = self.head(feat)
         return out
 
 class LightweightClassifier(nn.Module):
-    """5-class defect classification network."""
     def __init__(self, num_classes=5):
         super().__init__()
         self.backbone = nn.Sequential(
@@ -47,7 +41,6 @@ def main():
     models_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend", "models"))
     os.makedirs(models_dir, exist_ok=True)
 
-    # 1. Export YOLO ONNX Model
     yolo_path = os.path.join(models_dir, "yolo_model.onnx")
     print(f"Exporting YOLO ONNX to {yolo_path}...")
     yolo_model = LightweightYOLOHead(num_classes=6).eval()
@@ -62,7 +55,6 @@ def main():
     )
     print(f"✓ Created {yolo_path} ({os.path.getsize(yolo_path)} bytes)")
 
-    # 2. Export CV Classifier ONNX Model
     cv_path = os.path.join(models_dir, "cv_model.onnx")
     print(f"Exporting CV Classifier ONNX to {cv_path}...")
     cv_model = LightweightClassifier(num_classes=5).eval()

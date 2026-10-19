@@ -1,11 +1,3 @@
-"""
-LangGraph Multi-Agent Orchestration Graph for QualityMind
-Implements the 8-agent stateful workflow with:
-- Checkpointed shared state (MemorySaver)
-- Conditional routing (conforming batch skip, needs_info gate, critic reassessment loop)
-- Human-in-the-Loop approval gate (LangGraph interrupt pattern)
-- Full execution tracing
-"""
 import uuid
 import time
 from typing import Dict, Any, List, Optional, TypedDict
@@ -47,10 +39,7 @@ class QualityWorkflowGraphState(TypedDict, total=False):
     product_mismatch_warning: Optional[str]
     error_message: Optional[str]
 
-# --- Graph Node Functions ---
-
 def node_intake(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Agent 1: Fast deterministic intake with forced JSON schema."""
     batch_meta = state.get("batch_metadata", {})
     raw_m = state.get("measurements")
     res = data_intake_agent.process_batch_and_measurements(batch_meta=batch_meta, raw_measurements=raw_m)
@@ -65,7 +54,6 @@ def node_intake(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     }
 
 def node_visual(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Agent 2: Computer Vision defect inspection (YOLO / CNN)."""
     img_path = state.get("image_path")
     batch_id = state.get("batch_id", "BATCH-0245")
     trace = list(state.get("execution_trace", []))
@@ -106,7 +94,6 @@ def node_visual(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     }
 
 def node_compliance(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Agent 3: 100% deterministic dimensional compliance check."""
     batch_id = state.get("batch_id", "BATCH-0245")
     meta = state.get("batch_metadata", {})
     meas = meta.get("measurements", [])
@@ -127,7 +114,6 @@ def node_compliance(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     }
 
 def node_anomaly(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Agent 4: 5-layer hybrid telemetry anomaly detector."""
     batch_id = state.get("batch_id", "BATCH-0245")
     meta = state.get("batch_metadata", {})
     machine = meta.get("machine", "CNC-04")
@@ -147,7 +133,6 @@ def node_anomaly(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     }
 
 def node_spc(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Agent 5: Statistical Process Control & capability engine."""
     batch_id = state.get("batch_id", "BATCH-0245")
     meta = state.get("batch_metadata", {})
     meas = meta.get("measurements", [])
@@ -170,7 +155,6 @@ def node_spc(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     }
 
 def node_rca(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Agent 6: Root Cause Analysis with Gemini 3.8 Flash reasoning & ChromaDB RAG."""
     batch_id = state.get("batch_id", "BATCH-0245")
     proc = state.get("process_report", {})
     vib = proc.get("vibration_current", 3.8)
@@ -187,7 +171,6 @@ def node_rca(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     elif d_rep and d_rep.get("nonconforming", 0) > 0:
         dt = "Oversized shaft diameter"
     
-    # Ensure QualityIncident is recorded in database without duplicate on re-run
     try:
         from backend.app.database.session import SessionLocal
         from backend.app.database.models import QualityIncident, Batch
@@ -241,7 +224,6 @@ def node_rca(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     }
 
 def node_capa(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Agent 7: 3-tier CAPA recommendation generator."""
     batch_id = state.get("batch_id", "BATCH-0245")
     meta = state.get("batch_metadata", {})
     machine = meta.get("machine", "CNC-04")
@@ -265,7 +247,6 @@ def node_capa(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     }
 
 def node_critic(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Agent 8: Adversarial Quality Critic (Groq model family) auditing math and causal claims."""
     meta = state.get("batch_metadata", {})
     dim = state.get("dimensional_report", {})
     vis = state.get("visual_prediction")
@@ -294,14 +275,12 @@ def node_critic(state: QualityWorkflowGraphState) -> Dict[str, Any]:
     }
 
 def node_approval_gate(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Human-in-the-Loop decision gate: workflow pauses awaiting authorized engineering disposition."""
     return {
         "status": "AWAITING_HUMAN_APPROVAL",
         "current_agent": "Human Gatekeeper"
     }
 
 def node_report(state: QualityWorkflowGraphState) -> Dict[str, Any]:
-    """Final dossier compilation node."""
     is_conforming = not state.get("has_defects", False) and not state.get("has_anomalies", False)
     final_status = "CONFORMING_AUDITED" if is_conforming else "DISPOSITION_READY"
     return {
@@ -309,23 +288,18 @@ def node_report(state: QualityWorkflowGraphState) -> Dict[str, Any]:
         "current_agent": "Report Compiler"
     }
 
-# --- Routing Functions ---
-
 def route_after_intake(state: QualityWorkflowGraphState) -> str:
-    """If critical fields are missing, route to END with needs_info gating."""
     meta = state.get("batch_metadata", {})
     if meta.get("needs_info", False):
         return END
     return "visual_inspection"
 
 def route_after_spc(state: QualityWorkflowGraphState) -> str:
-    """Conditional Edge: If batch is 100% conforming with no anomalies or SPC signals, skip RCA and CAPA (TC-01)."""
     if not state.get("has_defects", False) and not state.get("has_anomalies", False) and not state.get("has_spc_violations", False):
         return "final_report"
     return "root_cause_analysis"
 
 def route_after_critic(state: QualityWorkflowGraphState) -> str:
-    """Conditional Loop: If Critic requests reassessment, loop back to RCA (max 2 loops)."""
     rev = state.get("critic_review", {})
     loops = state.get("reassessment_loops", 0)
     if rev.get("critic_verdict") in ("REASSESS", "REASSESSMENT_REQUIRED") and loops < 2:
@@ -333,13 +307,9 @@ def route_after_critic(state: QualityWorkflowGraphState) -> str:
         return "root_cause_analysis"
     return "capa_management"
 
-# --- Build & Compile LangGraph StateGraph ---
-
 def create_qualitymind_graph():
-    """Builds the complete LangGraph StateGraph with checkpointing."""
     builder = StateGraph(QualityWorkflowGraphState)
 
-    # 1. Register Nodes
     builder.add_node("intake", node_intake)
     builder.add_node("visual_inspection", node_visual)
     builder.add_node("compliance", node_compliance)
@@ -351,7 +321,6 @@ def create_qualitymind_graph():
     builder.add_node("approval_gate", node_approval_gate)
     builder.add_node("final_report", node_report)
 
-    # 2. Add Edges & Conditional Routing
     builder.add_edge(START, "intake")
     builder.add_conditional_edges("intake", route_after_intake, {
         "visual_inspection": "visual_inspection",
@@ -361,7 +330,6 @@ def create_qualitymind_graph():
     builder.add_edge("compliance", "anomaly_detection")
     builder.add_edge("anomaly_detection", "spc")
     
-    # Conditional routing after SPC: skip RCA/CAPA if conforming
     builder.add_conditional_edges("spc", route_after_spc, {
         "root_cause_analysis": "root_cause_analysis",
         "final_report": "final_report"
@@ -369,7 +337,6 @@ def create_qualitymind_graph():
 
     builder.add_edge("root_cause_analysis", "critic")
     
-    # Conditional loop: critic can send back to RCA
     builder.add_conditional_edges("critic", route_after_critic, {
         "root_cause_analysis": "root_cause_analysis",
         "capa_management": "capa_management"
@@ -379,11 +346,9 @@ def create_qualitymind_graph():
     builder.add_edge("approval_gate", "final_report")
     builder.add_edge("final_report", END)
 
-    # 3. Checkpointer for state persistence & HITL interrupts
     checkpointer = MemorySaver()
     graph = builder.compile(checkpointer=checkpointer, interrupt_before=["approval_gate"])
     return graph
 
-# Pre-compiled global LangGraph workflow
 qualitymind_langgraph = create_qualitymind_graph()
 

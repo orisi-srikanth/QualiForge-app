@@ -1,7 +1,3 @@
-"""
-SQLAlchemy Database Setup & Seed Repository for Agentic Quality System
-Persists all batches, measurements, telemetry, RCA, CAPA, and audit traces in SQLite.
-"""
 import os
 import json
 from datetime import datetime
@@ -118,7 +114,7 @@ class DBCAPA(Base):
     action_id = Column(String, primary_key=True)
     incident_id = Column(String, ForeignKey("incidents.incident_id"))
     batch_id = Column(String, nullable=False)
-    type = Column(String, nullable=False)  # Containment, Corrective, Preventive
+    type = Column(String, nullable=False)
     description = Column(String, nullable=False)
     assigned_role = Column(String, nullable=False)
     due_date = Column(String, nullable=False)

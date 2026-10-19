@@ -4,7 +4,6 @@ import time
 
 sys.path.insert(0, ".")
 
-# Measure memory via Windows API
 import ctypes
 from ctypes import wintypes
 

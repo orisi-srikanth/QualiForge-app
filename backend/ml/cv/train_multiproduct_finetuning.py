@@ -1,16 +1,3 @@
-"""
-Multi-Product Defect Classifier and Visual Domain Recognition Engine
-Fine-tuning transfer learning across 5 industrial product categories:
-- precision_shaft (Primary manufactured part PS-2026-101)
-- screw (MVTec AD fastener benchmark)
-- metal_nut (MVTec AD hex fastener benchmark)
-- cable (MVTec AD wiring harness benchmark)
-- transistor (MVTec AD semiconductor benchmark)
-
-Architecture: MobileNetV3-Small Backbone + Multi-Head Architecture:
-1. Product Recognition Head: Visually classifies category (screw, nut, cable, etc.) directly from image pixels
-2. Domain-Specific Defect Classification Heads: Predicts defect vs. conforming for each product
-"""
 import os
 import sys
 import json
@@ -91,17 +78,14 @@ TRANSISTOR_DEFECT_MAP = {
     "bent_lead": "bent_lead"
 }
 
-
 def collect_dataset(mvtec_dir: Path, shaft_dir: Path) -> List[Dict[str, Any]]:
     records = []
 
-    # 1. Collect MVTec categories
     for cat in ["screw", "metal_nut", "cable", "transistor"]:
         cat_path = mvtec_dir / cat
         if not cat_path.exists():
             continue
 
-        # Train good
         train_good_dir = cat_path / "train" / "good"
         if train_good_dir.exists():
             for f in sorted(os.listdir(train_good_dir)):
@@ -113,7 +97,6 @@ def collect_dataset(mvtec_dir: Path, shaft_dir: Path) -> List[Dict[str, Any]]:
                         "defect_class": "no_defect"
                     })
 
-        # Test good and defects
         test_dir = cat_path / "test"
         if test_dir.exists():
             for defect_folder in sorted(os.listdir(test_dir)):
@@ -139,7 +122,6 @@ def collect_dataset(mvtec_dir: Path, shaft_dir: Path) -> List[Dict[str, Any]]:
                                 "defect_class": d_class
                             })
 
-    # 2. Collect Synthetic Shafts
     shaft_sub = shaft_dir / "images"
     if shaft_sub.exists():
         shaft_files = sorted(os.listdir(shaft_sub))
@@ -165,7 +147,6 @@ def collect_dataset(mvtec_dir: Path, shaft_dir: Path) -> List[Dict[str, Any]]:
 
     return records
 
-
 class ImageListDataset(Dataset):
     def __init__(self, records: List[Dict[str, Any]], transform):
         self.records = records
@@ -180,13 +161,7 @@ class ImageListDataset(Dataset):
         tensor = self.transform(img)
         return tensor, idx
 
-
 class MultiProductModel(nn.Module):
-    """
-    MobileNetV3-Small backbone with two-stage multi-task heads:
-    1. Product Recognition Head: classifies visual product domain (screw, nut, etc.)
-    2. Category Defect Heads: specialized classifier for each product
-    """
     def __init__(self, pretrained: bool = False):
         super().__init__()
         weights = models.MobileNet_V3_Small_Weights.DEFAULT if pretrained else None
@@ -195,7 +170,6 @@ class MultiProductModel(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         in_features = 576
 
-        # Product Classifier Head
         self.product_head = nn.Sequential(
             nn.Linear(in_features, 256),
             nn.Hardswish(),
@@ -203,7 +177,6 @@ class MultiProductModel(nn.Module):
             nn.Linear(256, len(PRODUCT_CATEGORIES))
         )
 
-        # Defect Classifier Heads
         self.defect_heads = nn.ModuleDict({
             cat: nn.Sequential(
                 nn.Linear(in_features, 128),
@@ -232,7 +205,6 @@ class MultiProductModel(nn.Module):
         pooled = self.avgpool(feat)
         return torch.flatten(pooled, 1)
 
-
 def train_fine_tuned_model():
     print("=" * 70)
     print("Starting Multi-Product Fine-Tuning Pipeline (QualityMind Engine)")
@@ -243,7 +215,6 @@ def train_fine_tuned_model():
     records = collect_dataset(mvtec_dir, shaft_dir)
     print(f"Total collected images: {len(records)}")
 
-    # Split into Train, Val, Test (70/15/15 stratified)
     rng = random.Random(SEED)
     rng.shuffle(records)
 
@@ -294,7 +265,6 @@ def train_fine_tuned_model():
     X_test = extract_features_batched(test_recs, batch_size=32)
     print(f"Feature Extraction Complete in {time.time() - start_feat:.2f}s! (Tensors: X_train {X_train.shape}, X_test {X_test.shape})")
 
-    # 2. Train Product Classifier Head
     print("\n[Phase 2] Fine-Tuning Visual Product Category Classifier Head...")
     y_train_prod = torch.tensor([CATEGORY_TO_IDX[r["product_category"]] for r in train_recs], dtype=torch.long)
     y_test_prod = torch.tensor([CATEGORY_TO_IDX[r["product_category"]] for r in test_recs], dtype=torch.long)
@@ -328,7 +298,6 @@ def train_fine_tuned_model():
         prod_acc = (test_prod_preds == y_test_prod).float().mean().item()
     print(f"\n=> Visual Product Category Recognition Test Accuracy: {prod_acc*100:.2f}%")
 
-    # 3. Train Category-Specific Defect Heads
     print("\n[Phase 3] Fine-Tuning Domain-Specific Defect Classification Heads...")
     defect_metrics = {}
 
@@ -349,7 +318,6 @@ def train_fine_tuned_model():
         X_cat_test = X_test[test_indices]
         y_cat_test = torch.tensor([cls_to_idx[test_recs[i]["defect_class"]] for i in test_indices], dtype=torch.long)
 
-        # Class weights to balance defect vs good
         class_counts = torch.bincount(y_cat_train, minlength=len(classes)).float()
         weights = 1.0 / torch.clamp(class_counts, min=1.0)
         weights = weights / weights.sum()
@@ -369,7 +337,6 @@ def train_fine_tuned_model():
                 loss.backward()
                 optimizer.step()
 
-        # Evaluate on Test Split
         head.eval()
         with torch.no_grad():
             preds = head(X_cat_test).argmax(dim=1).cpu().numpy()
@@ -389,7 +356,6 @@ def train_fine_tuned_model():
         }
         print(f"  [{cat.upper():<15}] Accuracy: {acc*100:6.2f}% | F1: {f1:.4f} | Prec: {prec:.4f} | Rec: {rec:.4f} (Samples: {len(test_indices)})")
 
-    # 4. Save Model Checkpoint
     output_model_path = Path("models/multiproduct_cv_model.pt")
     torch.save(model.state_dict(), output_model_path)
     print(f"\n[Saved] Multi-product model saved to: {output_model_path.resolve()}")
@@ -405,7 +371,6 @@ def train_fine_tuned_model():
     with open("models/multiproduct_classes.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
 
-    # 5. Direct Verification on the User's Real Images:
     print("\n" + "=" * 70)
     print("Testing Specifically on User Uploaded Test Cases (007.PNG & 001.PNG):")
     print("=" * 70)
@@ -438,7 +403,6 @@ def train_fine_tuned_model():
         print(f"File: {os.path.basename(p):<10} | Target: {desc:<40} => Category: {pred_cat.upper():<15} ({prod_prob*100:.1f}%) | Defect: {pred_def_class:<20} ({def_prob*100:.1f}%) | Defect Detected: {is_defect}")
 
     print("\nFine-Tuning pipeline completed successfully.")
-
 
 if __name__ == "__main__":
     train_fine_tuned_model()

@@ -1,10 +1,3 @@
-"""
-Dataset Splitting Module for MVTec AD in QualityMind
-Produces data/splits.json conforming to strict guidelines:
-- Classifier defect images come ONLY from test/<defect_type>, stratified 70/15/15 per defect class (seed 42).
-- no_defect: train/good for train, a held-out portion (~15%) of train/good for val, test/good for test.
-- Asserts ZERO overlap between train, val, and test, and fails loudly if any leakage is detected.
-"""
 import os
 import csv
 import json
@@ -30,12 +23,10 @@ def make_splits(manifest_path: Path = None, output_json_path: Path = None) -> Di
 
     records = load_manifest(manifest_path)
 
-    # Separate normal (good) images and defect images
     train_good = [r for r in records if r["split"] == "train" and r["defect_type"] == "good"]
     test_good = [r for r in records if r["split"] == "test" and r["defect_type"] == "good"]
     defect_records = [r for r in records if r["split"] == "test" and r["defect_type"] != "good"]
 
-    # 1. Stratified split for defect images by (category, defect_type)
     rng = random.Random(SEED)
     defect_groups: Dict[str, List[Dict[str, str]]] = {}
     for r in defect_records:
@@ -52,7 +43,6 @@ def make_splits(manifest_path: Path = None, output_json_path: Path = None) -> Di
         n = len(items)
         n_train = max(1, int(round(n * 0.70)))
         n_val = max(1, int(round(n * 0.15)))
-        # Ensure at least 1 for test if n >= 3
         if n >= 3 and (n_train + n_val >= n):
             n_train = n - n_val - 1
 
@@ -60,7 +50,6 @@ def make_splits(manifest_path: Path = None, output_json_path: Path = None) -> Di
         val_part = items[n_train:n_train + n_val]
         test_part = items[n_train + n_val:]
 
-        # Edge case: if test_part is empty and n >= 2, adjust
         if len(test_part) == 0 and n >= 2:
             test_part = [val_part.pop()]
 
@@ -68,8 +57,6 @@ def make_splits(manifest_path: Path = None, output_json_path: Path = None) -> Di
         val_defects.extend(val_part)
         test_defects.extend(test_part)
 
-    # 2. Normal (good) split:
-    # train/good -> 85% train, 15% held-out val for threshold calibration & validation
     cat_train_good: Dict[str, List[Dict[str, str]]] = {}
     for r in train_good:
         cat_train_good.setdefault(r["category"], []).append(r)
@@ -87,15 +74,12 @@ def make_splits(manifest_path: Path = None, output_json_path: Path = None) -> Di
         val_normal.extend(val_part)
         train_normal.extend(train_part)
 
-    # test/good -> 100% test normal
     test_normal = list(test_good)
 
-    # 3. Assemble splits
     train_split = train_normal + train_defects
     val_split = val_normal + val_defects
     test_split = test_normal + test_defects
 
-    # 4. Strict leakage assertion
     train_paths = {r["path"] for r in train_split}
     val_paths = {r["path"] for r in val_split}
     test_paths = {r["path"] for r in test_split}
@@ -117,7 +101,6 @@ def make_splits(manifest_path: Path = None, output_json_path: Path = None) -> Di
             f"FATAL: Total split image count ({total_split_paths}) != total manifest records ({len(records)})."
         )
 
-    # Format output dictionary
     splits_data = {
         "metadata": {
             "dataset": "MVTec AD",
@@ -140,7 +123,6 @@ def make_splits(manifest_path: Path = None, output_json_path: Path = None) -> Di
         "test": test_split
     }
 
-    # Save to data/splits.json and backend/data/splits.json
     output_json_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_json_path, "w", encoding="utf-8") as f:
         json.dump(splits_data, f, indent=2)
@@ -164,8 +146,7 @@ def make_splits(manifest_path: Path = None, output_json_path: Path = None) -> Di
     return splits_data
 
 def verify_shaft_splits(splits_path: Path = None) -> Dict[str, Any]:
-    """Audits synthetic shaft splits for zero SHA-256 and perceptual hash leakage."""
-    repo_root = Path(__file__).resolve().parents[3]  # QualiForge app
+    repo_root = Path(__file__).resolve().parents[3]
     project_root = repo_root / "backend"
     if splits_path is None:
         candidates = [

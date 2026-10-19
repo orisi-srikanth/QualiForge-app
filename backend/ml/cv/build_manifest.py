@@ -1,8 +1,3 @@
-"""
-MVTec AD Dataset Manifest Builder for QualityMind
-Builds data/mvtec_manifest.csv containing image paths, categories, splits, raw defect types,
-unified defect types, and ground truth mask paths for the 4 approved categories only.
-"""
 import os
 import csv
 import yaml
@@ -15,7 +10,6 @@ def get_mvtec_root() -> Path:
     if env_path:
         return Path(env_path)
     
-    # Check .env file
     project_root = Path(__file__).resolve().parent.parent.parent
     dotenv_file = project_root / ".env"
     if dotenv_file.exists():
@@ -58,7 +52,6 @@ def build_manifest(output_csv_path: Path = None):
 
         cat_cfg = categories_cfg.get(cat, {}).get("defects", {})
 
-        # 1. Train Good
         train_good_dir = cat_dir / "train" / "good"
         if train_good_dir.exists():
             for img_file in sorted(train_good_dir.glob("*.png")):
@@ -71,7 +64,6 @@ def build_manifest(output_csv_path: Path = None):
                     "mask_path": ""
                 })
 
-        # 2. Test Good
         test_good_dir = cat_dir / "test" / "good"
         if test_good_dir.exists():
             for img_file in sorted(test_good_dir.glob("*.png")):
@@ -84,7 +76,6 @@ def build_manifest(output_csv_path: Path = None):
                     "mask_path": ""
                 })
 
-        # 3. Test Defects
         test_dir = cat_dir / "test"
         if test_dir.exists():
             for defect_dir in sorted(test_dir.iterdir()):
@@ -107,14 +98,12 @@ def build_manifest(output_csv_path: Path = None):
                         "mask_path": mask_str
                     })
 
-    # Write CSV
     fieldnames = ["path", "category", "split", "defect_type", "unified_type", "mask_path"]
     with open(output_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(records)
 
-    # Mirror to backend/data/mvtec_manifest.csv as well
     backend_csv = project_root / "backend" / "data" / "mvtec_manifest.csv"
     backend_csv.parent.mkdir(parents=True, exist_ok=True)
     with open(backend_csv, "w", newline="", encoding="utf-8") as f:
@@ -125,7 +114,6 @@ def build_manifest(output_csv_path: Path = None):
     print(f"Manifest written to {output_csv_path} ({len(records)} total records).")
     print(f"Mirrored to {backend_csv}.")
 
-    # Summary
     summary = {}
     for r in records:
         key = (r["category"], r["split"], r["unified_type"])

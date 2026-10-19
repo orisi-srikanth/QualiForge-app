@@ -1,8 +1,3 @@
-"""
-Document Loader & Record Extraction Service
-Extracts and chunks manufacturing records from CSV, PDF, Markdown, and JSON files
-for RAG indexing in ChromaDB, preserving complete tabular rows as unified chunks.
-"""
 import os
 import re
 import csv
@@ -10,9 +5,7 @@ import json
 from typing import List, Dict, Any, Tuple, Optional
 import pymupdf
 
-
 def infer_document_category(fname: str, row_dict: Optional[dict] = None) -> str:
-    """Determines semantic category based on filename or contents."""
     name_lower = fname.lower()
     if "ncr" in name_lower:
         return "previous_ncr"
@@ -41,12 +34,7 @@ def infer_document_category(fname: str, row_dict: Optional[dict] = None) -> str:
 
     return "quality_standard"
 
-
 def extract_records_from_file(fpath: str, ext: str) -> Tuple[List[Dict[str, Any]], List[str]]:
-    """
-    Parses a source file and extracts records with source metadata.
-    Preserves entire CSV rows as single cohesive records.
-    """
     fname = os.path.basename(fpath)
     records: List[Dict[str, Any]] = []
     warnings: List[str] = []
@@ -61,7 +49,7 @@ def extract_records_from_file(fpath: str, ext: str) -> Tuple[List[Dict[str, Any]
 
                 for idx, row in enumerate(reader):
                     if not any(row.values()):
-                        continue  # Skip blank row
+                        continue
 
                     rec_id = row.get("record_id") or row.get("id") or row.get("ncr_id") or f"ROW-{idx+1:03d}"
                     part_no = row.get("part_number") or ""
@@ -74,7 +62,6 @@ def extract_records_from_file(fpath: str, ext: str) -> Tuple[List[Dict[str, Any]
                     proxy_cat = row.get("proxy_category") or "none"
                     prov = row.get("data_provenance") or row.get("provenance") or "synthetic_illustrative"
 
-                    # Build complete self-contained narrative text for row
                     row_items = [f"{k}: {v}" for k, v in row.items() if v is not None and str(v).strip()]
                     record_text = f"[{category.upper()} RECORD {rec_id}] From file: {fname}\n" + "\n".join(row_items)
 

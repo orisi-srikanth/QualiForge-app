@@ -42,7 +42,6 @@ export const ProductionDashboard: React.FC<Props> = ({
     loadBatches();
   }, []);
 
-  // Filter batches
   const filteredBatches = batches.filter((b) => {
     const batchId = (b.batch_id || (b as any).batch_number || "").toLowerCase();
     const productId = (b.product_id || b.part_number || "").toLowerCase();
@@ -58,7 +57,6 @@ export const ProductionDashboard: React.FC<Props> = ({
     return matchesSearch && matchesShift && matchesStatus;
   });
 
-  // Calculate real summary statistics from batches
   const totalBatches = batches.length;
   const inProgressBatches = batches.filter((b) => b.status === "IN_PROGRESS" || b.status === "ACTIVE").length;
   const holdBatches = batches.filter((b) => b.status === "QUALITY_HOLD" || b.status === "HELD").length;
@@ -67,7 +65,7 @@ export const ProductionDashboard: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* -------------------- OPERATIONAL CALLOUT -------------------- */}
+
       <div className="p-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
@@ -100,7 +98,6 @@ export const ProductionDashboard: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* -------------------- A. PRIMARY ACTION TILES -------------------- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <button
           onClick={() => onNavigate("batch-intake")}
@@ -163,7 +160,6 @@ export const ProductionDashboard: React.FC<Props> = ({
         </button>
       </div>
 
-      {/* -------------------- B. PRODUCTION SUMMARY ROW -------------------- */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
           <div className="text-xs font-semibold text-slate-500">Tracked Batches</div>
@@ -190,9 +186,8 @@ export const ProductionDashboard: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* -------------------- C. BATCH MANAGEMENT TABLE -------------------- */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
-        {/* Table Controls */}
+
         <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Layers className="w-5 h-5 text-slate-600" />
@@ -201,7 +196,7 @@ export const ProductionDashboard: React.FC<Props> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            {/* Search Input */}
+
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
               <input
@@ -213,7 +208,6 @@ export const ProductionDashboard: React.FC<Props> = ({
               />
             </div>
 
-            {/* Shift Filter */}
             <select
               value={filterShift}
               onChange={(e) => setFilterShift(e.target.value)}
@@ -225,7 +219,6 @@ export const ProductionDashboard: React.FC<Props> = ({
               <option value="Night">Night</option>
             </select>
 
-            {/* Status Filter */}
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -239,7 +232,6 @@ export const ProductionDashboard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Table Content */}
         {loading ? (
           <div className="p-12 text-center text-xs text-slate-500 space-y-2">
             <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
@@ -350,9 +342,8 @@ export const ProductionDashboard: React.FC<Props> = ({
         )}
       </div>
 
-      {/* -------------------- D. RECENT UPLOADS & ACTION CENTER -------------------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Uploads Panel */}
+
         <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
@@ -386,7 +377,6 @@ export const ProductionDashboard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Action Center */}
         <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>

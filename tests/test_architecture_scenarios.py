@@ -1,8 +1,3 @@
-"""
-Comprehensive Architecture Verification Test Suite: Scenarios A through L
-Verifies the complete 9-stage QualityMind architecture end-to-end against real models,
-engines, databases, and APIs without hardcoded mock results.
-"""
 import os
 import io
 import math
@@ -28,12 +23,7 @@ from backend.app.database.models import (
 )
 from backend.app.schemas.schemas import HumanApprovalRequest, CertaintyLevel
 
-
-# ============================================================================
-# SCENARIO A: Conforming Batch
-# ============================================================================
 def test_scenario_a_conforming_batch():
-    """Valid product, nominal measurements within tolerance, no anomalies -> clean routing to report."""
     batch_meta = {
         "batch_id": "BATCH-CONF-001",
         "part_number": "PS-2026-101",
@@ -45,12 +35,10 @@ def test_scenario_a_conforming_batch():
         "usl": 50.05,
         "lsl": 49.95
     }
-    # 5 measurements perfectly centered
     meas = [
         {"sample_id": f"P00{i}", "measured_value": 50.00 + (i - 3) * 0.01, "unit": "mm"}
         for i in range(1, 6)
     ]
-    # Telemetry with normal values
     tele = [
         {
             "timestamp": "2026-10-12T01:00:00",
@@ -69,13 +57,11 @@ def test_scenario_a_conforming_batch():
         image_path=None
     )
 
-    # 1. State must route directly to CONFORMING_AUDITED
     assert state.status == "CONFORMING_AUDITED"
     assert state.has_defects is False
     assert state.has_anomalies is False
     assert state.has_spc_violations is False
 
-    # 2. Stage statuses: intake & parallel analyses completed; RCA/CAPA/HITL skipped; report completed
     assert state.stage_statuses["intake"] == "COMPLETED"
     assert state.stage_statuses["compliance"] == "COMPLETED"
     assert state.stage_statuses["anomaly"] == "COMPLETED"
@@ -86,27 +72,21 @@ def test_scenario_a_conforming_batch():
     assert state.stage_statuses["approval"] == "SKIPPED"
     assert state.stage_statuses["report"] == "COMPLETED"
 
-    # 3. No RCA or CAPA fabricated
     assert state.rca_report is None
     assert state.capa_report is None
 
-
-# ============================================================================
-# SCENARIO B: Dimensional Nonconformance & Independent Boundary Math
-# ============================================================================
 def test_scenario_b_dimensional_nonconformance_boundary_math():
-    """Verify exact boundary behavior: below LSL, at LSL, nominal, at USL, and above USL."""
     nom = 50.00
     tol = 0.05
-    usl = nom + tol  # 50.05
-    lsl = nom - tol  # 49.95
+    usl = nom + tol
+    lsl = nom - tol
 
     test_samples = [
-        {"sample_id": "P-BELOW-LSL", "measured_value": 49.90, "unit": "mm"},  # Nonconforming (undersized)
-        {"sample_id": "P-EXACT-LSL", "measured_value": 49.95, "unit": "mm"},  # Conforming (boundary inclusive)
-        {"sample_id": "P-NOMINAL",   "measured_value": 50.00, "unit": "mm"},  # Conforming
-        {"sample_id": "P-EXACT-USL", "measured_value": 50.05, "unit": "mm"},  # Conforming (boundary inclusive)
-        {"sample_id": "P-ABOVE-USL", "measured_value": 50.08, "unit": "mm"},  # Nonconforming (oversized)
+        {"sample_id": "P-BELOW-LSL", "measured_value": 49.90, "unit": "mm"},
+        {"sample_id": "P-EXACT-LSL", "measured_value": 49.95, "unit": "mm"},
+        {"sample_id": "P-NOMINAL",   "measured_value": 50.00, "unit": "mm"},
+        {"sample_id": "P-EXACT-USL", "measured_value": 50.05, "unit": "mm"},
+        {"sample_id": "P-ABOVE-USL", "measured_value": 50.08, "unit": "mm"},
     ]
 
     res = compliance_agent.evaluate_compliance(
@@ -117,7 +97,6 @@ def test_scenario_b_dimensional_nonconformance_boundary_math():
     )
     rep = res["report"]
 
-    # Independent verification
     nonconforming_expected = [s for s in test_samples if s["measured_value"] < lsl or s["measured_value"] > usl]
     conforming_expected = [s for s in test_samples if lsl <= s["measured_value"] <= usl]
 
@@ -126,7 +105,6 @@ def test_scenario_b_dimensional_nonconformance_boundary_math():
     assert rep.accepted == len(conforming_expected) == 3
     assert math.isclose(rep.rejection_rate_percent, (2 / 5) * 100.0, rel_tol=1e-3)
 
-    # Detailed deviation checks
     details_map = {d.sample_id: d for d in rep.measurements}
     assert details_map["P-BELOW-LSL"].is_conforming is False
     assert math.isclose(details_map["P-BELOW-LSL"].deviation_from_nominal, -0.10, rel_tol=1e-3)
@@ -135,12 +113,7 @@ def test_scenario_b_dimensional_nonconformance_boundary_math():
     assert details_map["P-ABOVE-USL"].is_conforming is False
     assert math.isclose(details_map["P-ABOVE-USL"].deviation_from_nominal, 0.08, rel_tol=1e-3)
 
-
-# ============================================================================
-# SCENARIO C: Visual Defect Execution
-# ============================================================================
 def test_scenario_c_visual_defect_execution():
-    """Verify configured CV model executes on real sample, returning classification and confidence."""
     img_path = os.path.abspath("backend/app/static/uploads/samples/screw_thread.png")
     assert os.path.exists(img_path)
 
@@ -153,12 +126,7 @@ def test_scenario_c_visual_defect_execution():
     assert pred.location_zone == "mid_region"
     assert pred.certainty.value == "Model Prediction"
 
-
-# ============================================================================
-# SCENARIO D: Product/Image Mismatch Quarantine
-# ============================================================================
 def test_scenario_d_product_image_mismatch_quarantine():
-    """Image of screw submitted for shaft batch -> quarantined from batch evidence."""
     screw_img = os.path.abspath("backend/app/static/uploads/samples/screw_thread.png")
     state = orchestrator.run_full_pipeline(
         batch_meta={
@@ -178,25 +146,18 @@ def test_scenario_d_product_image_mismatch_quarantine():
     assert "screw" in state.product_mismatch_warning.lower()
     assert state.visual_prediction.product_mismatch is True
 
-    # Root cause must NOT attribute thread damage to the shaft batch
     top_hypo = state.rca_report.ranked_hypotheses[0]
     assert "thread" not in top_hypo.title.lower()
 
-
-# ============================================================================
-# SCENARIO E: Telemetry Anomaly Detection
-# ============================================================================
 def test_scenario_e_telemetry_anomaly_detection():
-    """Verify process anomaly detection detects vibration surge and tool cycle threshold."""
     telemetry = [
         {"timestamp": f"2026-10-12T0{i}:00:00", "vibration_mm_s": 2.0, "tool_wear_cycles": 500, "spindle_speed_rpm": 1200, "feed_rate_mm_rev": 0.20, "temperature_c": 24.0}
         for i in range(1, 5)
     ]
-    # Late surge in vibration and tool wear
     telemetry.append({
         "timestamp": "2026-10-12T05:00:00",
-        "vibration_mm_s": 3.8,  # > 2.8 threshold
-        "tool_wear_cycles": 1150,  # > 1000 threshold
+        "vibration_mm_s": 3.8,
+        "tool_wear_cycles": 1150,
         "spindle_speed_rpm": 1200,
         "feed_rate_mm_rev": 0.20,
         "temperature_c": 25.0
@@ -214,13 +175,7 @@ def test_scenario_e_telemetry_anomaly_detection():
     assert rep.vibration_status in ["ELEVATED_WARNING", "ABNORMAL_CRITICAL"]
     assert rep.tool_cycles_current >= 1000
 
-
-# ============================================================================
-# SCENARIO F: Statistical Process Control & Control Limits Distinct from Spec
-# ============================================================================
 def test_scenario_f_spc_and_distinct_limits():
-    """Verify statistical control limits (UCL/LCL) are computed from sample variation, NOT spec limits."""
-    # Data with mean 50.05, std ~ 0.028
     values = [50.01, 50.03, 50.06, 50.08, 50.07]
     usl = 50.05
     lsl = 49.95
@@ -235,19 +190,12 @@ def test_scenario_f_spc_and_distinct_limits():
     )
     rep = res["report"]
 
-    # Statistical limits must be computed from sample variation (d2 moving range)
-    # They MUST NOT equal the engineering spec limits!
     assert rep.ucl != usl
     assert rep.lcl != lsl
     assert rep.capability_assessment is not None
     assert "statistical control limits" in rep.distinction_warning.lower()
 
-
-# ============================================================================
-# SCENARIO G: Historical Evidence Retrieval & RCA
-# ============================================================================
 def test_scenario_g_historical_evidence_and_rca():
-    """Verify RCA retrieves historical NCRs (e.g., NCR-019) and ranks evidence-supported hypotheses."""
     res = rca_agent.analyze_incident(
         incident_id="INC-SCENARIO-G",
         batch_id="BATCH-0245",
@@ -266,17 +214,11 @@ def test_scenario_g_historical_evidence_and_rca():
     assert top_hypo.epistemic_label == "HYPOTHESIS"
     assert len(top_hypo.supporting_evidence) > 0
 
-    # Historical evidence matches
     assert len(rep.historical_matches) > 0
     ncr_ids = [m.incident_id for m in rep.historical_matches]
     assert any("019" in nid or "NCR" in nid for nid in ncr_ids)
 
-
-# ============================================================================
-# SCENARIO H: Reviewer Correction Loop
-# ============================================================================
 def test_scenario_h_reviewer_correction_loop():
-    """Verify Quality Reviewer detects unconfirmed status anomalies and bounds reassessments."""
     intake = {"batch_data": {"nominal_mm": 50.0, "tolerance_mm": 0.05}}
     comp = {"report": {"usl": 50.05, "lsl": 49.95}}
     rca = {
@@ -285,7 +227,7 @@ def test_scenario_h_reviewer_correction_loop():
                 {
                     "title": "Unverified Tool Breakage",
                     "description": "Tool definitely broke causing defect",
-                    "status": "Confirmed",  # VIOLATION: Claiming Confirmed without physical verification
+                    "status": "Confirmed",
                     "supporting_evidence": ["Statistical correlation"],
                     "required_confirmation": "Microscope check"
                 }
@@ -307,23 +249,16 @@ def test_scenario_h_reviewer_correction_loop():
     assert rev.critic_verdict in ["REASSESS", "REASSESSMENT_REQUIRED", "NEEDS_REVISION"]
     assert any("Confirmed prior to physical" in c or "Unsupported" in c or "CRITIC" in c for c in rev.review_comments)
 
-
-# ============================================================================
-# SCENARIO I: Human Approval Gate & State Transitions
-# ============================================================================
 def test_scenario_i_human_approval_gate_and_reassessment():
-    """Verify HITL gate: pending approval, reassessment routing, and authorized sign-off."""
     state = orchestrator.run_full_pipeline(
         batch_meta={"batch_id": "BATCH-HITL-TEST", "nominal_mm": 50.00, "tolerance_mm": 0.05},
         measurements=[{"sample_id": "P01", "measured_value": 50.08, "unit": "mm"}]
     )
     w_id = state.workflow_id
 
-    # 1. Pipeline pauses awaiting human approval
     assert state.status == "PENDING_HUMAN_APPROVAL"
     assert state.stage_statuses["approval"] == "PENDING"
 
-    # 2. Rejection without comments must be rejected by validation
     with pytest.raises(Exception):
         orchestrator.resume_workflow(
             workflow_id=w_id,
@@ -331,7 +266,6 @@ def test_scenario_i_human_approval_gate_and_reassessment():
             current_user={"id": "usr-qe", "name": "QE", "role": "quality_engineer"}
         )
 
-    # 3. Authorized sign-off completes the workflow
     signoff = orchestrator.resume_workflow(
         workflow_id=w_id,
         payload=HumanApprovalRequest(
@@ -348,18 +282,12 @@ def test_scenario_i_human_approval_gate_and_reassessment():
     assert signoff["decision"] == "QUARANTINE_BATCH"
     assert signoff["certainty"] == "Confirmed Root Cause"
 
-    # Verify workflow state updated
     final_wf = orchestrator.get_workflow(w_id)
     assert final_wf.stage_statuses["approval"] == "COMPLETED"
     assert final_wf.stage_statuses["effectiveness"] == "COMPLETED"
     assert final_wf.stage_statuses["report"] == "COMPLETED"
 
-
-# ============================================================================
-# SCENARIO J: Effectiveness Monitoring Two-Proportion Z-Test
-# ============================================================================
 def test_scenario_j_effectiveness_monitoring_two_proportion_z_test():
-    """Verify two-proportion z-test calculation: before (82/1000) vs after (11/1000)."""
     db = SessionLocal()
     eff = effectiveness_engine.evaluate_capa_effectiveness(capa_id="CAPA-2026-001", db=db)
     db.close()
@@ -372,7 +300,6 @@ def test_scenario_j_effectiveness_monitoring_two_proportion_z_test():
     assert eff["defects_after_count"] == 11
     assert math.isclose(eff["rejection_rate_after_percent"], 1.1, rel_tol=1e-3)
 
-    # Independent two-proportion z-test recomputation
     n1, x1 = 1000, 82
     n2, x2 = 1000, 11
     p1 = x1 / n1
@@ -385,34 +312,22 @@ def test_scenario_j_effectiveness_monitoring_two_proportion_z_test():
     assert eff["p_value"] < 0.0001
     assert "causation not established" in eff["conclusion_label"].lower()
 
-
-# ============================================================================
-# SCENARIO K: API & Workflow Checkpoint Retrieval
-# ============================================================================
 def test_scenario_k_api_checkpoint_retrieval():
-    """Verify that workflow state can be retrieved by batch ID and workflow ID."""
     state = orchestrator.run_full_pipeline(
         batch_meta={"batch_id": "BATCH-REOPEN-TEST", "nominal_mm": 50.00, "tolerance_mm": 0.05},
         measurements=[{"sample_id": "P01", "measured_value": 50.07, "unit": "mm"}]
     )
     w_id = state.workflow_id
 
-    # Retrieve by ID
     loaded_wf = orchestrator.get_workflow(w_id)
     assert loaded_wf is not None
     assert getattr(loaded_wf, "workflow_id", None) == w_id or loaded_wf.get("workflow_id") == w_id
 
-    # Retrieve latest by batch
     latest_wf = orchestrator.get_latest_workflow_for_batch("BATCH-REOPEN-TEST")
     assert latest_wf is not None
     assert getattr(latest_wf, "workflow_id", None) == w_id or latest_wf.get("workflow_id") == w_id
 
-
-# ============================================================================
-# SCENARIO L: 13-Section PDF and Dashboard Reconciliation
-# ============================================================================
 def test_scenario_l_pdf_all_13_sections_and_reconciliation():
-    """Verify that the generated PDF contains all 13 sections with accurate epistemic badges."""
     state = orchestrator.run_full_pipeline(
         batch_meta={
             "batch_id": "BATCH-0245",
@@ -433,7 +348,6 @@ def test_scenario_l_pdf_all_13_sections_and_reconciliation():
     for page in reader.pages:
         full_text += page.extract_text() + "\n"
 
-    # Verify all 13 required sections
     required_sections = [
         "1. Product Details",
         "2. Batch Information",
@@ -453,6 +367,5 @@ def test_scenario_l_pdf_all_13_sections_and_reconciliation():
     for sec in required_sections:
         assert any(term.lower() in full_text.lower() for term in sec.split()), f"Missing section: {sec}"
 
-    # Verify distinction between Hypothesis and Confirmed Root Cause
     assert "hypothesis" in full_text.lower()
     assert "decision-support only" in full_text.lower()

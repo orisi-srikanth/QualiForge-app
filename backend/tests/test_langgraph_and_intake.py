@@ -1,6 +1,3 @@
-"""
-Unit and Integration Tests for Agent 1 Data Intake Schema and LangGraph Orchestration
-"""
 import pytest
 from backend.app.agents.data_intake_agent import data_intake_agent
 from backend.app.models.schemas import DataIntakeOutput
@@ -8,12 +5,11 @@ from backend.app.orchestrator.langgraph_orchestration import qualitymind_langgra
 from backend.app.orchestrator.engine import orchestrator
 
 def test_data_intake_deterministic_unit_normalization():
-    """Verify fast deterministic processing normalizes inches and microns to millimeters."""
     raw_samples = [
-        {"sample_id": "P001", "measured_value": 1.9685, "unit": "in"},      # ~50.00 mm
-        {"sample_id": "P002", "measured_value": 50030.0, "unit": "um"},     # 50.03 mm
-        {"sample_id": "P003", "measured_value": 5.006, "unit": "cm"},       # 50.06 mm
-        {"sample_id": "P004", "measured_value": 50.08, "unit": "mm"},       # 50.08 mm
+        {"sample_id": "P001", "measured_value": 1.9685, "unit": "in"},
+        {"sample_id": "P002", "measured_value": 50030.0, "unit": "um"},
+        {"sample_id": "P003", "measured_value": 5.006, "unit": "cm"},
+        {"sample_id": "P004", "measured_value": 50.08, "unit": "mm"},
     ]
     batch_meta = {
         "batch_id": "BATCH-UNIT-TEST",
@@ -31,7 +27,6 @@ def test_data_intake_deterministic_unit_normalization():
     assert len(schema.unit_conversions) == 3
     assert len(schema.measurements) == 4
     
-    # Check converted values in mm
     p1 = next(m for m in schema.measurements if m["sample_id"] == "P001")
     assert abs(p1["measured_value"] - 50.00) < 0.01
     
@@ -42,10 +37,8 @@ def test_data_intake_deterministic_unit_normalization():
     assert abs(p3["measured_value"] - 50.06) < 0.01
 
 def test_data_intake_missing_fields_gating():
-    """Missing critical fields sets needs_info=True with explicit warnings."""
     incomplete_meta = {
         "batch_id": "BATCH-INCOMPLETE",
-        # missing part_number, machine, quantity, tolerance_mm
         "nominal_mm": 50.00
     }
     res = data_intake_agent.process_batch_and_measurements(batch_meta=incomplete_meta)
@@ -55,7 +48,6 @@ def test_data_intake_missing_fields_gating():
     assert any("CRITICAL INTAKE ERROR" in w for w in schema.warnings)
 
 def test_langgraph_orchestration_state_graph_execution():
-    """Verify LangGraph executes across nodes, records checkpointed trace, and reaches gate."""
     init_state = {
         "workflow_id": "WF-LG-TEST",
         "batch_id": "BATCH-0245",
@@ -84,7 +76,6 @@ def test_langgraph_orchestration_state_graph_execution():
     assert "critic_review" in result
 
 def test_orchestrator_engine_langgraph_method():
-    """Verify orchestrator.run_langgraph_pipeline executes cleanly."""
     res = orchestrator.run_langgraph_pipeline(
         batch_meta={
             "batch_id": "BATCH-0245",

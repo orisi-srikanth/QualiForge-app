@@ -1,7 +1,3 @@
-"""
-Unit Tests for Phase 4: Machine Learning & Computer Vision
-Tests CV Inference, Grad-CAM integration, and Hybrid Anomaly Detection.
-"""
 import os
 import pytest
 from backend.app.ml.cv.infer import vision_inference
@@ -39,7 +35,6 @@ def test_cv_inference_normal_conforming():
     assert res["label"] == EpistemicLabel.MODEL_PREDICTION.value
 
 def test_no_leakage_between_splits():
-    """Verify strictly zero SHA-256 and pHash leakage across train, val, test, and hard test splits."""
     from ml.cv.make_splits import verify_shaft_splits
     stats = verify_shaft_splits()
     assert stats["sha256_overlap_count"] == 0, "SHA-256 overlap must be strictly 0"
@@ -50,7 +45,6 @@ def test_no_leakage_between_splits():
     assert stats["hard_test_count"] == 300
 
 def test_cv_hard_split_performance_drop():
-    """Verify evaluation records Macro-F1 drop between normal and hard test splits."""
     import json
     metrics_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "models", "cv_metrics.json"))
     assert os.path.exists(metrics_path), "cv_metrics.json must exist"
@@ -63,7 +57,6 @@ def test_cv_hard_split_performance_drop():
     assert metrics["normal_test_split"]["macro_f1"] > 0.90, "Normal test Macro-F1 must be > 0.90"
 
 def test_cv_honest_disclosure_payload():
-    """Verify vision inspection response carries data_source: 'synthetic' and honest disclosure."""
     sample_path = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "app", "static", "uploads", "samples", "IMG-001.png")
     )
@@ -71,7 +64,6 @@ def test_cv_honest_disclosure_payload():
     assert res.get("data_source") == "synthetic"
     assert "metrics" in res
     assert res["metrics"].get("uncalibrated_probability") is True
-
 
 def test_anomaly_detector_anchor_telemetry():
     telemetry = [
@@ -90,7 +82,6 @@ def test_anomaly_detector_anchor_telemetry():
     assert res["vibration_current"] == 3.8
     assert res["tool_cycles_current"] == 1150
 
-    # Test changed vs unchanged table
     tbl = res["changed_vs_unchanged"]
     spindle_entry = next(e for e in tbl if e["parameter"] == "spindle_speed")
     feed_entry = next(e for e in tbl if e["parameter"] == "feed_rate")

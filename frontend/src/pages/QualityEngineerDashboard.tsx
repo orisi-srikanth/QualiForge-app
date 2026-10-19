@@ -25,7 +25,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Date Filters
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -69,13 +68,11 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
     loadAllData("", "");
   };
 
-  // Derive charts purely from real data
   const batches = summaryData?.production_batches || { total_count: 0, status_split: {}, active_batches_count: 0 };
   const inspection = summaryData?.inspection_quantity || { total_inspected_parts: 0, accepted_parts: 0, nonconforming_parts: 0 };
   const spc = summaryData?.process_control_status || { status: "UNKNOWN", is_in_control: true, reason: "No SPC telemetry" };
   const topDefects = summaryData?.top_defect_categories || [];
 
-  // CAPA Status Breakdown from real capaActions
   const capaStatusCounts = capaActions.reduce((acc: Record<string, number>, act: any) => {
     const st = act.status || "OPEN";
     acc[st] = (acc[st] || 0) + 1;
@@ -88,20 +85,18 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
     color: status === "APPROVED" || status === "CLOSED" ? "#10B981" : status === "PENDING_APPROVAL" ? "#F59E0B" : "#3B82F6"
   }));
 
-  // Inspection conformance data from real inspection quantity
   const conformanceChartData = [
     { name: "Conforming (Accepted)", parts: inspection.accepted_parts, color: "#10B981" },
     { name: "Non-conforming (Defective)", parts: inspection.nonconforming_parts, color: "#EF4444" }
   ].filter(d => d.parts > 0);
 
-  // Filter pending engineering queue items
   const pendingIncidents = incidents.filter((inc) => inc.status !== "CLOSED");
   const pendingCapaApprovals = capaActions.filter((act) => act.status === "PENDING_APPROVAL" || act.status === "PROPOSED");
   const unreviewedVision = visionFindings.filter((vf) => vf.human_review_status === "PENDING" || vf.confidence < 0.90);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* -------------------- TOP BAR & DATE FILTER -------------------- */}
+
       <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5 text-slate-800 font-semibold">
@@ -161,7 +156,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
         </div>
       </div>
 
-      {/* Loading state */}
       {loading && !summaryData && (
         <div className="p-12 bg-white border border-slate-200 rounded-xl text-center space-y-3">
           <Activity className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
@@ -169,7 +163,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
         </div>
       )}
 
-      {/* Error state */}
       {error && !summaryData && (
         <div className="p-6 bg-rose-50 border border-rose-200 rounded-xl space-y-2 text-rose-800 text-xs">
           <div className="flex items-center gap-2 font-bold text-sm">
@@ -188,7 +181,7 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
 
       {summaryData && (
         <>
-          {/* -------------------- ACTIVE DEVIATION CALLOUT -------------------- */}
+
           {summaryData.active_quality_incidents > 0 && (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -238,9 +231,8 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
             </div>
           )}
 
-          {/* -------------------- A. PRIMARY KPI ROW (API BACKED ONLY) -------------------- */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Acceptance Rate */}
+
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Acceptance Rate</span>
@@ -262,7 +254,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
               </div>
             </div>
 
-            {/* Card 2: Rejection Rate */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Rejection Rate</span>
@@ -284,7 +275,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
               </div>
             </div>
 
-            {/* Card 3: Active Quality Incidents */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">Active Incidents (NCRs)</span>
@@ -306,7 +296,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
               </div>
             </div>
 
-            {/* Card 4: Open & Overdue CAPAs */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">CAPA Actions</span>
@@ -331,7 +320,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
             </div>
           </div>
 
-          {/* Secondary Metric Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-xs flex items-center justify-between text-xs">
               <div>
@@ -370,9 +358,8 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
             </div>
           </div>
 
-          {/* -------------------- B. MAIN RECHARTS VISUALIZATIONS -------------------- */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Chart 1: Inspection Conformance Distribution */}
+
             <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
@@ -408,7 +395,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
               )}
             </div>
 
-            {/* Chart 2: Defect-Category Pareto Chart */}
             <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
@@ -448,7 +434,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
               )}
             </div>
 
-            {/* Chart 3: Machine Sensor Anomaly Status */}
             <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
@@ -534,7 +519,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
               )}
             </div>
 
-            {/* Chart 4: CAPA Action Status Distribution */}
             <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
@@ -582,7 +566,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
             </div>
           </div>
 
-          {/* -------------------- C. ENGINEERING WORK QUEUE -------------------- */}
           <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
@@ -595,7 +578,7 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
             </div>
 
             <div className="space-y-3">
-              {/* Queue Section: Active Incidents */}
+
               {pendingIncidents.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -631,7 +614,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
                 </div>
               )}
 
-              {/* Queue Section: CAPAs Pending Approval */}
               {pendingCapaApprovals.length > 0 && (
                 <div className="space-y-2 pt-2">
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -664,7 +646,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
                 </div>
               )}
 
-              {/* Queue Section: Vision Predictions for Review */}
               {unreviewedVision.length > 0 && (
                 <div className="space-y-2 pt-2">
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -707,7 +688,6 @@ export const QualityEngineerDashboard: React.FC<Props> = ({ onNavigate, onSelect
             </div>
           </div>
 
-          {/* -------------------- D. RECENT AUDIT ACTIVITY -------------------- */}
           <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>

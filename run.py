@@ -1,7 +1,3 @@
-"""
-Single-Command Launcher for Enterprise Quality Inspection System
-Runs FastAPI on port 8000 (serving both API and compiled React White-Theme Frontend).
-"""
 import os
 import sys
 import uvicorn

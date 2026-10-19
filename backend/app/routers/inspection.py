@@ -1,8 +1,3 @@
-"""
-Inspection & Dimensional Compliance Endpoints (Agents 1 & 3)
-100% deterministic evaluation of measurements against engineering limits (USL/LSL).
-Supports CSV and Excel uploads, unit normalization, manual entry CRUD, and verified image intake.
-"""
 import io
 import os
 import hashlib
@@ -30,9 +25,7 @@ from backend.app.services.inspection_service import (
     SUPPORTED_UNITS
 )
 
-
 router = APIRouter()
-
 
 class ManualInspectionPayload(BaseModel):
     batch_id: str = Field("BATCH-0245", json_schema_extra={"example": "BATCH-0245"})
@@ -57,23 +50,16 @@ class ManualInspectionPayload(BaseModel):
         }
     )
 
-
 class SingleMeasurementCreatePayload(BaseModel):
     batch_id: str = Field(..., description="Batch number or ID", json_schema_extra={"example": "BATCH-0245"})
     component_id: str = Field(..., description="Sample or piece identifier", json_schema_extra={"example": "P006"})
     value: float = Field(..., description="Measured dimensional value", json_schema_extra={"example": 50.02})
     unit: str = Field("mm", description="Measurement unit (mm, in, um, cm)", json_schema_extra={"example": "mm"})
 
-
 class SingleMeasurementUpdatePayload(BaseModel):
     component_id: Optional[str] = Field(None, description="Sample identifier")
     value: Optional[float] = Field(None, description="Measured dimensional value")
     unit: Optional[str] = Field(None, description="Measurement unit")
-
-
-# ==============================================================================
-# 1. Measurement Upload Endpoints (CSV & Excel)
-# ==============================================================================
 
 @router.post(
     "/inspection/measurements/upload",
@@ -102,7 +88,6 @@ async def upload_inspection_measurements(
     )
     return result
 
-
 @router.post(
     "/inspection/upload-csv",
     tags=["Inspection"],
@@ -124,7 +109,6 @@ async def upload_csv_inspection(
         db=db,
         user=username
     )
-    # Ensure backward compatibility structure
     result["batch_data"] = {
         "batch_id": result["batch_id"],
         "measurements": result["measurements"],
@@ -132,7 +116,6 @@ async def upload_csv_inspection(
         "tolerance_mm": result["specification"]["tolerance_mm"]
     }
     return result
-
 
 @router.post(
     "/inspection/upload-excel",
@@ -155,11 +138,6 @@ async def upload_excel_inspection(
         db=db,
         user=username
     )
-
-
-# ==============================================================================
-# 2. Manual Measurement Entry Endpoints (CRUD)
-# ==============================================================================
 
 @router.get("/inspection/measurements", tags=["Inspection"], summary="List inspection measurements for a batch", description="Retrieves persisted dimensional measurements with source traceability (CSV, Excel, Manual).")
 def list_batch_measurements(
@@ -189,7 +167,6 @@ def list_batch_measurements(
         for m in measurements
     ]
 
-
 @router.post("/inspection/measurements", tags=["Inspection"], status_code=status.HTTP_201_CREATED, summary="Add single measurement manually", description="Manually register a single dimensional measurement. Validates unit, checks bounds, and links to batch spec.")
 def add_manual_measurement(
     payload: SingleMeasurementCreatePayload,
@@ -205,12 +182,10 @@ def add_manual_measurement(
     if not c_id:
         raise HTTPException(status_code=422, detail="Field 'component_id' is required.")
 
-    # Unit validation
     unit_clean = payload.unit.strip().lower()
     if unit_clean not in SUPPORTED_UNITS:
         raise HTTPException(status_code=422, detail=f"Unsupported unit '{payload.unit}'. Supported units: mm, in, um, cm.")
 
-    # Value normalization and bounds check
     mult = SUPPORTED_UNITS[unit_clean]
     val_mm = round(payload.value * mult, 4)
 
@@ -219,7 +194,6 @@ def add_manual_measurement(
     if val_mm > 1000.0:
         raise HTTPException(status_code=422, detail=f"Measurement value exceeds maximum threshold limit (1,000 mm), received {val_mm} mm.")
 
-    # Get characteristic
     char = db.query(InspectionCharacteristic).filter(InspectionCharacteristic.product_id == b.product_id).first()
     if not char:
         nom = 50.00
@@ -252,7 +226,6 @@ def add_manual_measurement(
     db.commit()
     db.refresh(meas)
 
-    # Automatic Quality Incident handling (Requirement 4 Check 7)
     if not is_conforming:
         clean_char = (char.name if char else "dimension").replace("_", " ")
         if val_mm > usl:
@@ -295,7 +268,6 @@ def add_manual_measurement(
         "uploaded_by": meas.uploaded_by
     }
 
-
 @router.put("/inspection/measurements/{measurement_id}", tags=["Inspection"], summary="Update single measurement", description="Edit an existing measurement value or unit with recalculation of tolerance compliance.")
 def update_manual_measurement(
     measurement_id: str,
@@ -328,7 +300,6 @@ def update_manual_measurement(
         meas.value = val_mm
         meas.unit = "mm"
 
-        # Re-evaluate conformance
         char = db.query(InspectionCharacteristic).filter(InspectionCharacteristic.id == meas.characteristic_id).first()
         usl = char.usl if char else 50.05
         lsl = char.lsl if char else 49.95
@@ -340,7 +311,6 @@ def update_manual_measurement(
     db.commit()
     db.refresh(meas)
 
-    # Automatic Quality Incident handling (Requirement 4 Check 7)
     if meas.status == "nonconforming":
         inc = db.query(QualityIncident).filter(QualityIncident.batch_id == meas.batch_id).first()
         if not inc:
@@ -364,7 +334,6 @@ def update_manual_measurement(
         "deviation_from_limit": meas.deviation_from_limit
     }
 
-
 @router.delete("/inspection/measurements/{measurement_id}", tags=["Inspection"], summary="Delete single measurement", description="Removes a measurement from the batch.")
 def delete_manual_measurement(
     measurement_id: str,
@@ -379,12 +348,7 @@ def delete_manual_measurement(
     db.commit()
     return {"status": "DELETED", "id": measurement_id}
 
-
-# ==============================================================================
-# 3. Image Upload & Content Verification Endpoints (Agent 2)
-# ==============================================================================
-
-MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB limit
+MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 
 @router.post(
     "/inspection/images/upload",
@@ -401,14 +365,12 @@ async def upload_inspection_image(
 ):
     content = await file.read()
 
-    # 1. Size limit check
     if len(content) > MAX_IMAGE_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"Image file size ({len(content)/(1024*1024):.2f} MB) exceeds maximum allowed limit ({MAX_IMAGE_SIZE_BYTES // (1024*1024)} MB)."
         )
 
-    # 2. Content verification by reading magic bytes / PIL verify (rejects spoofed text files and corrupt images)
     try:
         pil_img = Image.open(io.BytesIO(content))
         pil_img.verify()
@@ -426,9 +388,7 @@ async def upload_inspection_image(
             detail=f"Invalid image content: file is corrupted or not a valid image format. ({str(e)})"
         )
 
-    # 3. Safe filename generation (Guards against path traversal ../../)
     raw_name = os.path.basename(file.filename or "part_image.png")
-    # Clean non-alphanumeric except dots and dashes
     clean_name = "".join(c for c in raw_name if c.isalnum() or c in ".-_")
     unique_prefix = uuid.uuid4().hex[:8]
     safe_filename = f"{unique_prefix}_{clean_name}"
@@ -440,10 +400,8 @@ async def upload_inspection_image(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # 4. SHA-256 duplicate detection
     sha256 = hashlib.sha256(content).hexdigest()
 
-    # 5. DB Persistence
     b_ref = batch_id or "BATCH-0245"
     db_batch = db.query(Batch).filter((Batch.batch_number == b_ref) | (Batch.id == b_ref)).first()
     batch_pk = db_batch.id if db_batch else b_ref
@@ -462,7 +420,6 @@ async def upload_inspection_image(
     db.commit()
     db.refresh(img_record)
 
-    # 6. Computer Vision Inspection (Agent 2)
     cv_res = visual_agent.inspect(
         image_path=file_path,
         batch_id=b_ref,
@@ -481,7 +438,6 @@ async def upload_inspection_image(
         "sha256_hash": sha256,
         "vision_prediction": cv_res
     }
-
 
 @router.get("/inspection/images", tags=["Inspection"], summary="List inspection images for a batch", description="Retrieves registered component images and links to findings.")
 def list_inspection_images(
@@ -505,11 +461,6 @@ def list_inspection_images(
         for img in images
     ]
 
-
-# ==============================================================================
-# 4. Specification Check & Template Download Endpoints
-# ==============================================================================
-
 @router.get("/inspection/measurements/template", tags=["Inspection"], summary="Download inspection CSV template", description="Returns downloadable CSV template formatted with expected headers for inspection measurement intake.")
 def download_inspection_template(batch_id: str = "BATCH-0245"):
     csv_text = generate_csv_template(batch_id=batch_id)
@@ -520,7 +471,6 @@ def download_inspection_template(batch_id: str = "BATCH-0245"):
             "Content-Disposition": f'attachment; filename="inspection_template_{batch_id}.csv"'
         }
     )
-
 
 @router.get(
     "/inspection/{batch_id}/spec-check",
@@ -596,7 +546,6 @@ def get_batch_spec_check(batch_id: str = "BATCH-0245", db: Session = Depends(get
     usl = spec_info.get("usl_mm", 50.05) if spec_info else 50.05
     lsl = spec_info.get("lsl_mm", 49.95) if spec_info else 49.95
 
-    # Check database measurements for this batch
     db_batch = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
     db_measurements = []
     if db_batch:
@@ -655,7 +604,6 @@ def get_batch_spec_check(batch_id: str = "BATCH-0245", db: Session = Depends(get
     )
     spec_data = comp["spec_data"]
 
-    # Check 7: A nonconformance automatically creates or updates a quality incident
     if spec_data["nonconforming"] > 0 and db_batch:
         inc = db.query(QualityIncident).filter(QualityIncident.batch_id == db_batch.id).first()
         if not inc:
@@ -708,7 +656,6 @@ def get_batch_spec_check(batch_id: str = "BATCH-0245", db: Session = Depends(get
         "disposition_notice": "Observed sample result. Final physical product disposition is an authorized human decision. System does not automatically reject batches."
     }
 
-
 @router.post("/inspection/evaluate", tags=["Inspection"], summary="Evaluate dimensional tolerance compliance", description="100% deterministic evaluation of sample measurements against engineering limits (USL/LSL).")
 def evaluate_measurements(payload: ManualInspectionPayload):
     res = dimensional_agent.evaluate_compliance(
@@ -719,12 +666,10 @@ def evaluate_measurements(payload: ManualInspectionPayload):
     )
     return {"report": res["report"], "log": res["log"]}
 
-
 class FindingDecisionPayload(BaseModel):
     finding_type: str = Field("dimensional", description="Type of finding: dimensional or visual", example="dimensional")
     decision: str = Field(..., description="Decision: CONFIRM or REJECT", example="CONFIRM")
     comment: Optional[str] = Field(None, description="Mandatory if REJECT", example="Confirmed dimensional nonconformance beyond upper spec limit.")
-
 
 @router.post(
     "/inspection/findings/{finding_id}/decision",
@@ -785,7 +730,6 @@ def decide_inspection_finding(
     else:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Invalid finding_type '{payload.finding_type}'. Must be 'dimensional' or 'visual'.")
 
-    # Log immutable decision into human_decisions table
     rec = HumanDecision(
         workflow_id=f"WF-FINDING-{finding_id}",
         entity_type=f"{f_type}_finding",

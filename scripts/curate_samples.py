@@ -1,9 +1,3 @@
-"""
-Curate 15-20 Real MVTec AD Demo Samples from Held-Out Test Split
-Copies selected test samples to backend/app/static/uploads/samples/
-Sets IMG-001.png to a held-out metal_nut/scratch image.
-Tags all images with source: "MVTec AD (proxy part)" and associates them with BATCH-0245.
-"""
 import os
 import json
 import shutil
@@ -21,29 +15,24 @@ def curate_samples():
 
     test_records = splits["test"]
 
-    # Filter held-out test images per category & defect
     curated = []
 
-    # 1. metal_nut
     nut_scratch = next(r for r in test_records if r["category"] == "metal_nut" and r["defect_type"] == "scratch")
     nut_bent = next(r for r in test_records if r["category"] == "metal_nut" and r["defect_type"] == "bent")
     nut_flip = next(r for r in test_records if r["category"] == "metal_nut" and r["defect_type"] == "flip")
     nut_color = next(r for r in test_records if r["category"] == "metal_nut" and r["defect_type"] == "color")
     nut_good = next(r for r in test_records if r["category"] == "metal_nut" and r["unified_type"] == "no_defect")
 
-    # 2. screw
     screw_head = next(r for r in test_records if r["category"] == "screw" and r["defect_type"] == "scratch_head")
     screw_thread = next(r for r in test_records if r["category"] == "screw" and r["defect_type"] == "thread_side")
     screw_front = next(r for r in test_records if r["category"] == "screw" and r["defect_type"] == "manipulated_front")
     screw_good = next(r for r in test_records if r["category"] == "screw" and r["unified_type"] == "no_defect")
 
-    # 3. transistor
     tran_dam = next(r for r in test_records if r["category"] == "transistor" and r["defect_type"] == "damaged_case")
     tran_mis = next(r for r in test_records if r["category"] == "transistor" and r["defect_type"] == "misplaced")
     tran_cut = next(r for r in test_records if r["category"] == "transistor" and r["defect_type"] == "cut_lead")
     tran_good = next(r for r in test_records if r["category"] == "transistor" and r["unified_type"] == "no_defect")
 
-    # 4. cable
     cable_miss = next(r for r in test_records if r["category"] == "cable" and r["defect_type"] == "missing_wire")
     cable_swap = next(r for r in test_records if r["category"] == "cable" and r["defect_type"] == "cable_swap")
     cable_bent = next(r for r in test_records if r["category"] == "cable" and r["defect_type"] == "bent_wire")
@@ -51,7 +40,7 @@ def curate_samples():
     cable_good = next(r for r in test_records if r["category"] == "cable" and r["unified_type"] == "no_defect")
 
     selected = [
-        ("IMG-001.png", nut_scratch),          # Required Primary Held-Out Test Image
+        ("IMG-001.png", nut_scratch),
         ("metal_nut_scratch.png", nut_scratch),
         ("metal_nut_bent.png", nut_bent),
         ("metal_nut_flip.png", nut_flip),
@@ -91,7 +80,6 @@ def curate_samples():
             "original_path": rec["path"]
         })
 
-    # Save manifest
     with open(SAMPLES_DIR / "samples_manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest_entries, f, indent=2)
 

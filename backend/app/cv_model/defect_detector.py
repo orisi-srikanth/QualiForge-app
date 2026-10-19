@@ -1,28 +1,3 @@
-"""
-Industrial Precision Shaft Defect Inspection Engine for QualityMind
-Executes MobileNetV3-Small Transfer Learning Classifier with Grad-CAM Localization
-on synthetic machined shaft inspection images.
-Retains PatchCore and MVTec AD proxy pipeline as an optional external benchmark.
-
-Outputs exact JSON contract:
-{
-  "image_id": "...",
-  "source": "synthetic",
-  "data_source": "synthetic",
-  "category": "precision_shaft",
-  "defect_detected": True,
-  "anomaly_score": 0.935,
-  "defect_type": "surface_scratch",
-  "raw_class": "surface_scratch",
-  "confidence": 0.935,
-  "location": "mid_body_circumference",
-  "bbox": {"x": 10, "y": 20, "width": 50, "height": 60},
-  "bounding_box": {"x": 10, "y": 20, "width": 50, "height": 60},
-  "model_version": "synthetic-shaft-v1.0",
-  "label": "MODEL_PREDICTION"
-}
-Handles 'uncertain' (< 0.70 confidence threshold) and 'out_of_domain' categories.
-"""
 import os
 import sys
 import json
@@ -40,7 +15,6 @@ try:
 except ImportError:
     HAS_ONNX = False
 
-# Shaft Defect Classes
 SHAFT_CLASSES = [
     "no_defect",
     "surface_scratch",
@@ -96,11 +70,6 @@ def _ensure_torch_classes():
     models = _models
 
     class _MultiProductModel(nn.Module):
-        """
-        MobileNetV3-Small backbone with two-stage multi-task heads:
-        1. Product Recognition Head: classifies visual product domain (screw, nut, etc.)
-        2. Category Defect Heads: specialized classifier for each product
-        """
         def __init__(self, pretrained: bool = False):
             super().__init__()
             weights = models.MobileNet_V3_Small_Weights.DEFAULT if pretrained else None
@@ -109,7 +78,6 @@ def _ensure_torch_classes():
             self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
             in_features = 576
 
-            # Product Classifier Head
             self.product_head = nn.Sequential(
                 nn.Linear(in_features, 256),
                 nn.Hardswish(),
@@ -117,7 +85,6 @@ def _ensure_torch_classes():
                 nn.Linear(256, len(PRODUCT_CATEGORIES))
             )
 
-            # Defect Classifier Heads
             self.defect_heads = nn.ModuleDict({
                 cat: nn.Sequential(
                     nn.Linear(in_features, 128),
@@ -146,16 +113,14 @@ def _ensure_torch_classes():
             pooled = self.avgpool(feat)
             return torch.flatten(pooled, 1)
 
-
     class _DefectClassifier(nn.Module):
-        """MobileNetV3-Small backbone with fine-tuned defect classification head."""
         def __init__(self, num_classes: int = len(SHAFT_CLASSES), pretrained: bool = False):
             super().__init__()
             weights = models.MobileNet_V3_Small_Weights.DEFAULT if pretrained else None
             base = models.mobilenet_v3_small(weights=weights)
             self.features = base.features
             self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-            in_features = base.classifier[0].in_features  # 576
+            in_features = base.classifier[0].in_features
             self.classifier = nn.Sequential(
                 nn.Linear(in_features, 256),
                 nn.Hardswish(),
@@ -170,9 +135,7 @@ def _ensure_torch_classes():
             x = self.classifier(x)
             return x
 
-
     class _GradCAM:
-        """Computes class-activation maps for interpretability and bounding box localization without backward graphs."""
         def __init__(self, model: _DefectClassifier, target_layer: Optional[nn.Module] = None):
             self.model = model
             self.target_layer = target_layer if target_layer is not None else model.features[-1]
@@ -201,9 +164,7 @@ def _ensure_torch_classes():
             cam = cv2.resize(cam, (512, 512))
             return cam
 
-
     class _MultiProductGradCAM:
-        """Computes class-activation maps for multi-head multi-product model without memory-intensive backward graph."""
         def __init__(self, model):
             self.model = model
             self.target_layer = model.features[-1]
@@ -238,13 +199,11 @@ def _ensure_torch_classes():
     MultiProductGradCAM = _MultiProductGradCAM
     _torch_initialized = True
 
-
 def __getattr__(name: str):
     if name in ("MultiProductModel", "DefectClassifier", "GradCAM", "MultiProductGradCAM", "torch", "nn", "models"):
         _ensure_torch_classes()
         return globals()[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 class TwoStageDefectInspector:
     def __init__(self, models_dir: Optional[str] = None):
@@ -289,7 +248,6 @@ class TwoStageDefectInspector:
         self._initialized = True
 
     def _initialize_models(self):
-        # 0. Load Fine-Tuned Multi-Product Model
         mp_path = self.models_dir / "multiproduct_cv_model.pt"
         if not mp_path.exists():
             alt_mp = Path(__file__).resolve().parent.parent.parent.parent / "models" / "multiproduct_cv_model.pt"
@@ -306,7 +264,6 @@ class TwoStageDefectInspector:
             except Exception as e:
                 print(f"[DefectInspector] Error loading multi-product model: {e}")
 
-        # Load multi-product classes JSON
         mp_json = self.models_dir / "multiproduct_classes.json"
         if not mp_json.exists():
             alt_mp_json = Path(__file__).resolve().parent.parent.parent.parent / "models" / "multiproduct_classes.json"
@@ -319,7 +276,6 @@ class TwoStageDefectInspector:
             except Exception as e:
                 print(f"[DefectInspector] Error loading multi-product classes json: {e}")
 
-        # 1. Load PyTorch Shaft Classifier ONLY if multi-product model is not loaded
         if self.multiproduct_model is None:
             pt_path = self.models_dir / "cv_model.pt"
             if not pt_path.exists():
@@ -336,7 +292,6 @@ class TwoStageDefectInspector:
                 except Exception as e:
                     print(f"[DefectInspector] Error loading PyTorch classifier: {e}")
 
-        # 2. Load ONNX Session ONLY if both PyTorch models are unavailable
         if self.multiproduct_model is None and self.classifier is None:
             onnx_path = self.models_dir / "cv_model.onnx"
             if not onnx_path.exists():
@@ -352,7 +307,6 @@ class TwoStageDefectInspector:
                 except Exception as e:
                     print(f"[DefectInspector] Error loading ONNX session: {e}")
 
-        # 3. Load Thresholds
         thresh_path = self.models_dir / "thresholds.json"
         if thresh_path.exists():
             try:
@@ -361,7 +315,6 @@ class TwoStageDefectInspector:
             except Exception as e:
                 print(f"[DefectInspector] Error loading thresholds: {e}")
 
-        # 4. Load Samples Manifest (for benchmark ground truths)
         self.samples_manifest = {}
         manifest_path = Path(__file__).resolve().parent.parent / "static" / "uploads" / "samples" / "samples_manifest.json"
         if manifest_path.exists():
@@ -374,12 +327,10 @@ class TwoStageDefectInspector:
                 print(f"[DefectInspector] Error loading manifest: {e}")
 
     def infer_category(self, image_path: str, tensor_in: Optional[Any] = None) -> str:
-        """Determines product category visually from image pixels or path heuristics."""
         path_lower = image_path.lower()
         if "gear" in path_lower or ("assembly" in path_lower and "shaft" not in path_lower):
             return "out_of_domain"
 
-        # 1. Visual classification via fine-tuned model
         if tensor_in is not None and self.multiproduct_model is not None:
             try:
                 import torch
@@ -397,7 +348,6 @@ class TwoStageDefectInspector:
             except Exception as e:
                 print(f"[DefectInspector] Visual category classification error: {e}")
 
-        # 2. Heuristics fallback from path or filename
         if "nut" in path_lower:
             return "metal_nut"
         if "screw" in path_lower or "bolt" in path_lower:
@@ -415,12 +365,6 @@ class TwoStageDefectInspector:
         category: Optional[str] = None,
         output_annotated_dir: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Runs visual inspection:
-        - Fine-tuned visual category recognition & category-specific defect classification.
-        - Bounding box extraction with Grad-CAM and MVTec ground-truth alignment.
-        - Conforms strictly to required JSON schema.
-        """
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found at {image_path}")
 
@@ -445,7 +389,6 @@ class TwoStageDefectInspector:
             tensor_in = self.clf_transform(img_pil).unsqueeze(0).to(self.device)
             cat = category or self.infer_category(image_path, tensor_in=tensor_in)
 
-        # Check out_of_domain
         if cat == "out_of_domain" or (cat not in SUPPORTED_CATEGORIES and cat not in ["precision_shaft", "shaft"]):
             return {
                 "image_id": image_id,
@@ -473,8 +416,6 @@ class TwoStageDefectInspector:
 
         fn_lower = base_fn.lower()
         is_proxy = cat in PROXY_CATEGORIES
-
-        # Execute Defect Classification
 
         if manifest_item and manifest_item.get("category") == cat:
             if manifest_item.get("defect_type") == "no_defect" or manifest_item.get("raw_defect") == "good":
@@ -521,7 +462,6 @@ class TwoStageDefectInspector:
             pred_prob = 0.95
             pred_class_name = "no_defect"
 
-        # Conformance vs Defect Decision
         if pred_class_idx == 0 or pred_class_name == "no_defect":
             defect_detected = False
             defect_type = "no_defect"
@@ -539,7 +479,6 @@ class TwoStageDefectInspector:
             confidence = round(pred_prob, 3)
             anomaly_score = round(float(pred_prob), 4)
 
-            # Localization: 1. Try MVTec AD ground truth mask matching
             selected_bbox = None
             bin_cam_map = None
             base_stem = Path(image_path).stem
@@ -570,7 +509,6 @@ class TwoStageDefectInspector:
                         selected_bbox = {"x": bx, "y": by, "width": bw, "height": bh}
                         bin_cam_map = (gt_mat > 100).astype(np.uint8)
 
-            # 2. Known sample ROI or Grad-CAM localization fallback
             if selected_bbox is None:
                 if manifest_item or base_fn == "IMG-001.png":
                     if cat == "screw":
@@ -632,7 +570,6 @@ class TwoStageDefectInspector:
                     except Exception as e:
                         print(f"[DefectInspector] Grad-CAM error: {e}")
 
-            # 3. Category ROI Fallback
             if selected_bbox is None:
                 if cat == "screw" and "head" in defect_type:
                     selected_bbox = {"x": int(w_orig * 0.06), "y": int(h_orig * 0.40), "width": int(w_orig * 0.16), "height": int(h_orig * 0.22)}
@@ -640,7 +577,6 @@ class TwoStageDefectInspector:
                     cw, ch = int(w_orig * 0.25), int(h_orig * 0.25)
                     selected_bbox = {"x": int(w_orig * 0.375), "y": int(h_orig * 0.375), "width": cw, "height": ch}
 
-            # Zone and Location determination
             if cat == "screw":
                 if "head" in defect_type:
                     location_zone = "upper_region"
@@ -682,7 +618,6 @@ class TwoStageDefectInspector:
                 location = self._infer_location(selected_bbox, w_orig, h_orig)
                 location_zone = self._infer_location_zone(selected_bbox, w_orig, h_orig, defect_type)
 
-        # Draw Annotated Overlay & Segmentation Mask
         annotated_img = img_bgr.copy()
         mask_filename = None
         base_fn_clean = os.path.splitext(os.path.basename(image_path))[0]
@@ -695,7 +630,6 @@ class TwoStageDefectInspector:
             cv2.putText(annotated_img, label_text, (bx + 5, max(16, by - 6)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
 
-            # Generate segmentation mask
             mask_filename = f"mask_{base_fn_clean}.png"
             if output_annotated_dir:
                 try:
@@ -722,7 +656,6 @@ class TwoStageDefectInspector:
             except Exception as e:
                 print(f"[DefectInspector] Error saving annotated image: {e}")
 
-        # Ground truth / data source labeling
         if base_fn == "IMG-001.png":
             source_label = "synthetic"
             data_source_label = "synthetic"
@@ -730,7 +663,6 @@ class TwoStageDefectInspector:
             source_label = "MVTec AD (fine-tuned)" if is_proxy else "synthetic"
             data_source_label = "mvtec_ad" if is_proxy else "synthetic"
 
-        # Build defects array
         defects = []
         if defect_detected and selected_bbox:
             bx, by, bw, bh = selected_bbox["x"], selected_bbox["y"], selected_bbox["width"], selected_bbox["height"]
@@ -806,6 +738,4 @@ class TwoStageDefectInspector:
             return "lower_region"
         return "mid_region"
 
-
-# Global singleton
 vision_model = TwoStageDefectInspector()

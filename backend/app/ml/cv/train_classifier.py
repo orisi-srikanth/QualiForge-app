@@ -1,6 +1,3 @@
-"""
-Stage B Defect Classifier training module alias.
-"""
 from ml.cv.train_classifier import (
     DefectClassifier,
     GradCAM,

@@ -1,40 +1,19 @@
-"""
-Independent QA Evaluation Script: RAG Retrieval Metrics for Requirement 11
-Module: scripts/evaluate_rag_retrieval.py
-
-Evaluates:
-- 25 In-domain labelled manufacturing queries covering:
-  * shaft oversize -> NCR-019 (TC-06)
-  * each visual defect type present in the project (MVTec unified classes)
-  * tool-change SOP (SOP-044)
-  * vibration limit in machine manual (Machine_Guidelines / MANUAL)
-  * calibration & gauge drift (NCR-084 / Calibration)
-  * maintenance lookups (maintenance_records)
-  * decoys with different confirmed causes (NCR-042, NCR-073, NCR-024, NCR-055, NCR-031, NCR-140, NCR-141)
-- 3 Out-of-domain queries (similarity floor / no relevant incident response)
-- Computes: Hit@1, Hit@3, Recall@5, MRR
-- Verifies Hit@3 >= 0.80 and TC-06 passes.
-"""
 import sys
 import os
 from pathlib import Path
 from typing import Dict, List, Any
 
-# Add project root to sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.app.agents.quality_knowledge_agent import quality_knowledge_agent
 
-# 25 Labeled In-Domain Queries + 3 Out-of-Domain Queries
 EVALUATION_QUERY_SET = [
-    # 1. Shaft oversize & Tool wear (Anchor / TC-06)
     {"id": "Q01", "category": "shaft_oversize", "query": "oversized shaft diameter CNC-04 tool wear", "target": "NCR-019"},
     {"id": "Q02", "category": "shaft_oversize", "query": "shaft outer diameter positive drift past USL 50.05 mm", "target": "NCR-019"},
     {"id": "Q03", "category": "shaft_oversize", "query": "progressive tool flank wear cutting force increase", "target": "NCR-019"},
 
-    # 2. Each visual defect type present in the project
     {"id": "Q04", "category": "visual_defect", "query": "metal_nut surface scratch linear abrasion marks", "target": "surface_scratch"},
     {"id": "Q05", "category": "visual_defect", "query": "metal_nut rim dent deformation impact damage", "target": "dent_deformation"},
     {"id": "Q06", "category": "visual_defect", "query": "metal_nut incorrect assembly inverted orientation flipped", "target": "incorrect_assembly"},
@@ -43,23 +22,18 @@ EVALUATION_QUERY_SET = [
     {"id": "Q09", "category": "visual_defect", "query": "transistor missing component cut lead wire missing", "target": "missing_component"},
     {"id": "Q10", "category": "visual_defect", "query": "cable insulation or wire damage cut outer jacket", "target": "insulation_or_wire_damage"},
 
-    # 3. Tool-change SOP
     {"id": "Q11", "category": "sop", "query": "cutting tool life management replacement interval cycle limit", "target": "SOP-044"},
     {"id": "Q12", "category": "sop", "query": "tool wear offset compensation procedure and maximum cycles", "target": "SOP-044"},
 
-    # 4. Vibration limit in machine manual
     {"id": "Q13", "category": "manual", "query": "spindle radial vibration trip threshold warning level mm/s", "target": "Machine_Guidelines"},
     {"id": "Q14", "category": "manual", "query": "turning center spindle vibration alarm limit 3.5 mm/s", "target": "Machine_Guidelines"},
 
-    # 5. Calibration and gauge questions
     {"id": "Q15", "category": "calibration", "query": "snap gauge calibration master anvil loosened false nonconformance", "target": "NCR-084"},
     {"id": "Q16", "category": "calibration", "query": "calibration certificate verification micrometer anvil wear", "target": "Calibration"},
 
-    # 6. Maintenance lookups
     {"id": "Q17", "category": "maintenance", "query": "CNC-04 hydraulic chuck pressure service tailstock live center", "target": "NCR-031"},
     {"id": "Q18", "category": "maintenance", "query": "spindle bearing scheduled maintenance preventive service record", "target": "maintenance_records"},
 
-    # 7. Decoys with similar symptoms but different confirmed causes
     {"id": "Q19", "category": "decoy", "query": "oversized shaft diameter incorrect tool offset register input typed", "target": "NCR-042"},
     {"id": "Q20", "category": "decoy", "query": "shaft diameter variation raw material lot hardness 245 HB", "target": "NCR-073"},
     {"id": "Q21", "category": "decoy", "query": "bore dimension undersized thermal contraction cooling soak", "target": "NCR-024"},
@@ -166,7 +140,6 @@ def run_evaluation():
     print(f"  MRR (Mean Reciprocal)   : {mrr:.4f}")
     print(f"  TC-06 Passed (NCR-019)  : {tc06_passed}")
 
-    # Out-of-Domain Evaluation
     print("\n" + "=" * 95)
     print("OUT-OF-DOMAIN QUERY EVALUATION (SIMILARITY FLOOR & REJECTION):")
     print("=" * 95)

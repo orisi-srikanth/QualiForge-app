@@ -1,8 +1,3 @@
-"""
-Independent Statistical Verification Script for Functional Requirement 9 (Process Capability Analysis)
-Standards: AIAG SPC Reference Manual (2nd Ed), ISO 21747, IATF 16949:2016 Section 8.5.1
-CRITICAL RULE: Calculations in this script use PURE NUMPY ONLY (no imports of app code for formulas).
-"""
 import os
 import sys
 sys.path.insert(0, os.path.abspath("."))
@@ -67,7 +62,6 @@ if __name__ == "__main__":
     print("  REQUIREMENT 9 PROCESS CAPABILITY VERIFICATION — INDEPENDENT RECALCULATION")
     print("=" * 80)
 
-    # 1. BATCH-0245 Anchor Case
     anchor_vals = [50.01, 50.03, 50.06, 50.08, 50.07]
     usl, lsl = 50.05, 49.95
     app_res = capability_engine.calculate_capability(anchor_vals, usl=usl, lsl=lsl)
@@ -93,7 +87,6 @@ if __name__ == "__main__":
     for w in app_res["warnings"]:
         print(f"  • {w}")
 
-    # 2. Centred in-control 100 points
     rng = np.random.RandomState(42)
     vals_100 = [round(float(x), 4) for x in rng.normal(50.00, 0.01, 100)]
     app_100 = capability_engine.calculate_capability(vals_100, usl=usl, lsl=lsl)

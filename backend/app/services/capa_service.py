@@ -1,10 +1,3 @@
-"""
-CAPA Management Service (Agent 7 & IATF 16949 Section 10.2)
-Handles 3-tiered action plans (Containment, Corrective, Preventive),
-strict human-in-the-loop engineering approvals, deterministic status workflows,
-safety guardrails against autonomous machine execution, sequential non-reusable IDs,
-and defect recurrence detection.
-"""
 import re
 import os
 import json
@@ -19,43 +12,27 @@ from backend.app.database.models import (
     HumanDecision, ReviewerComment, Batch, Machine, User
 )
 
-# ---------------------------------------------------------------------------
-# Safety Guardrails: Strictly human decision support (IATF 16949)
-# ---------------------------------------------------------------------------
 FORBIDDEN_AUTONOMOUS_PATTERNS = [
-    # Direct machine control / stopping
     r"\b(e-?stop|emergency\s+stop)\b",
     r"\b(stop|halt|shut\s*down)\s+(the\s+)?(machine|spindle|line|lathe|mill|production|feed)\b",
-    # Direct CNC/PLC manipulation
     r"\b(change|modify|override|set|update|write|alter)\s+(the\s+)?(cnc|plc|ladder|register|offset|parameter|g-?code|m-?code)\b",
     r"\b(adjust|reset)\s+(the\s+)?(machine\s+offset|spindle\s+speed)\s+directly\b",
-    # Autonomous disposition / release
     r"\b(auto-?release|automatically\s+release|system\s+release)\s+(batch|product|lot)?\b",
     r"\b(auto-?scrap|automatically\s+scrap|auto-?reject|automatically\s+reject)\s+(batch|parts|lot)?\b",
     r"\b(override|bypass)\s+quality\s+hold\b",
-    # Autonomous execution
     r"\bautonomous(ly)?\s+(execute|actuate|control|change|stop|release|scrap)\b",
     r"\bexecute\s+g-?code\b"
 ]
 
 def check_safety_guardrails(description: str) -> Optional[str]:
-    """
-    Scans action description for forbidden autonomous machine actions.
-    Returns matched offending phrase if detected, otherwise None.
-    """
     for pat in FORBIDDEN_AUTONOMOUS_PATTERNS:
         match = re.search(pat, description, re.IGNORECASE)
         if match:
             return match.group(0)
     return None
 
-
 class CAPAManagementService:
-    """Enterprise CAPA Lifecycle Engine compliant with IATF 16949 Section 10.2."""
 
-    # Documented status transitions:
-    # proposed -> approved -> in_progress -> completed -> verified
-    # proposed -> rejected
     ALLOWED_TRANSITIONS = {
         "proposed": ["approved", "rejected"],
         "approved": ["in_progress"],
@@ -66,15 +43,9 @@ class CAPAManagementService:
     }
 
     def generate_next_action_code(self, db: Session, year: Optional[int] = None) -> str:
-        """
-        Generates sequential, unique action IDs formatted as CAPA-{YYYY}-{NNN}.
-        Monotonically tracked in capa_sequences table so numbers are never reused
-        even if an action record is deleted.
-        """
         current_year = year or datetime.now(timezone.utc).year
         seq_record = db.query(CAPASequence).filter(CAPASequence.year == current_year).with_for_update().first()
         if not seq_record:
-            # Determine existing max in database for baseline
             existing_codes = db.query(CAPAAction.action_code).filter(
                 CAPAAction.action_code.like(f"CAPA-{current_year}-%")
             ).all()
@@ -96,10 +67,8 @@ class CAPAManagementService:
         return code
 
     def validate_action_description(self, description: str, db: Session, user_id: str, action_code: str = ""):
-        """Enforces safety guardrail against autonomous machine commands."""
         forbidden_phrase = check_safety_guardrails(description)
         if forbidden_phrase:
-            # Log blocking safety audit record
             audit_log = HumanDecision(
                 workflow_id="wf-capa-safety-guardrail",
                 entity_type="capa",
@@ -142,11 +111,6 @@ class CAPAManagementService:
         suggested_role: Optional[str] = None,
         responsible_role: Optional[str] = None
     ) -> CAPAAction:
-        """
-        Creates a new CAPA action in 'proposed' status.
-        Requires Quality Engineer or Admin authorization.
-        Responsible role is assigned ONLY after approval.
-        """
         pass
 
         valid_types = ["containment", "corrective", "preventive"]
@@ -157,10 +121,8 @@ class CAPAManagementService:
                 detail=f"Invalid action type '{action_type}'. Allowed types: {valid_types}."
             )
 
-        # Enforce safety guardrail
         self.validate_action_description(description, db, user.get("id", "usr-unknown"))
 
-        # Enforce date formatting
         try:
             parsed_due = datetime.strptime(due_date.strip(), "%Y-%m-%d").date()
         except ValueError:
@@ -178,7 +140,6 @@ class CAPAManagementService:
 
         action_code = self.generate_next_action_code(db)
 
-        # Proposed actions carry a suggested role; responsible_role assigned upon approval
         action = CAPAAction(
             incident_id=incident_id,
             hypothesis_id=hypothesis_id,
@@ -186,7 +147,7 @@ class CAPAManagementService:
             type=clean_type,
             description=description.strip(),
             suggested_role=suggested_role or responsible_role or "Quality Engineer",
-            responsible_role=None,  # Not assigned until engineering approval
+            responsible_role=None,
             due_date=due_date.strip(),
             status="proposed",
             evidence="",
@@ -201,7 +162,6 @@ class CAPAManagementService:
         db.add(action)
         db.flush()
 
-        # Audit logging
         decision_log = HumanDecision(
             workflow_id=f"wf-capa-{action_code}",
             entity_type="capa",
@@ -224,11 +184,6 @@ class CAPAManagementService:
         responsible_role: Optional[str] = None,
         comment: Optional[str] = None
     ) -> CAPAAction:
-        """
-        Approves a proposed action.
-        Transitions proposed -> approved.
-        Records who, when, and formally assigns the responsible person/role.
-        """
         pass
 
         action = self.get_action(db, action_id_or_code)
@@ -251,7 +206,6 @@ class CAPAManagementService:
         action.approved_by = user.get("id", "usr-qe-01")
         action.approved_at = datetime.now(timezone.utc)
 
-        # Audit log
         decision_log = HumanDecision(
             workflow_id=f"wf-capa-{action.action_code}",
             entity_type="capa",
@@ -273,11 +227,6 @@ class CAPAManagementService:
         user: Dict[str, Any],
         reason: str
     ) -> CAPAAction:
-        """
-        Rejects a proposed action.
-        Transitions proposed -> rejected.
-        Records reviewer and reason.
-        """
         pass
 
         action = self.get_action(db, action_id_or_code)
@@ -304,7 +253,6 @@ class CAPAManagementService:
         action.approved_by = user.get("id", "usr-qe-01")
         action.approved_at = datetime.now(timezone.utc)
 
-        # Audit log
         decision_log = HumanDecision(
             workflow_id=f"wf-capa-{action.action_code}",
             entity_type="capa",
@@ -332,9 +280,6 @@ class CAPAManagementService:
         description: Optional[str] = None,
         comment: Optional[str] = None
     ) -> CAPAAction:
-        """
-        Validates state transitions and updates action fields according to industrial QMS rules.
-        """
         pass
 
         action = self.get_action(db, action_id_or_code)
@@ -345,7 +290,6 @@ class CAPAManagementService:
             self.validate_action_description(description, db, user.get("id", "usr-unknown"), action.action_code)
             action.description = description.strip()
 
-        # Check if status transition is requested
         if target_status not in [old_status, "no_change", ""]:
             allowed = self.ALLOWED_TRANSITIONS.get(old_status, [])
             if target_status not in allowed:
@@ -357,7 +301,6 @@ class CAPAManagementService:
                     )
                 )
 
-            # Specific transition rules
             if target_status == "approved":
                 return self.approve_action(db, action.id, user, responsible_role, comment)
             elif target_status == "rejected":
@@ -371,7 +314,6 @@ class CAPAManagementService:
                 action.status = "in_progress"
 
             elif target_status == "completed":
-                # Evidence (text or file) is MANDATORY
                 submitted_ev = (evidence or "").strip()
                 if not submitted_ev and not action.evidence and not action.evidence_file_path:
                     raise HTTPException(
@@ -381,7 +323,6 @@ class CAPAManagementService:
                 if submitted_ev:
                     action.evidence = submitted_ev
 
-                # Completion date validation
                 comp_dt = completion_date.strip() if completion_date else datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 try:
                     parsed_comp = datetime.strptime(comp_dt, "%Y-%m-%d").date()
@@ -401,7 +342,6 @@ class CAPAManagementService:
                 action.completion_date = comp_dt
                 action.status = "completed"
 
-                # Automatic effectiveness monitoring trigger (FR-15 Check 1)
                 try:
                     from backend.app.services.effectiveness import effectiveness_engine
                     eff_eval = effectiveness_engine.evaluate_capa_effectiveness(action.action_code, db=db)
@@ -423,7 +363,6 @@ class CAPAManagementService:
                     )
                 action.status = "verified"
 
-        # Field updates
         if due_date:
             try:
                 parsed_due = datetime.strptime(due_date.strip(), "%Y-%m-%d").date()
@@ -452,7 +391,6 @@ class CAPAManagementService:
         if evidence and target_status != "completed":
             action.evidence = evidence.strip()
 
-        # Audit log entry
         audit_entry = HumanDecision(
             workflow_id=f"wf-capa-{action.action_code}",
             entity_type="capa",
@@ -468,12 +406,10 @@ class CAPAManagementService:
         return action
 
     def delete_action(self, db: Session, action_id_or_code: str, user: Dict[str, Any]) -> Dict[str, Any]:
-        """Deletes an action record. Preserves sequence counter so ID is never reused."""
         pass
         action = self.get_action(db, action_id_or_code)
         action_code = action.action_code
 
-        # Log deletion audit
         audit_entry = HumanDecision(
             workflow_id=f"wf-capa-{action_code}",
             entity_type="capa",
@@ -489,7 +425,6 @@ class CAPAManagementService:
         return {"deleted": True, "action_code": action_code, "note": "Sequence counter preserved; ID will not be reused."}
 
     def get_action(self, db: Session, action_id_or_code: str) -> CAPAAction:
-        """Retrieves action by either UUID or action_code."""
         action = db.query(CAPAAction).filter(
             (CAPAAction.id == action_id_or_code) | (CAPAAction.action_code == action_id_or_code)
         ).first()
@@ -509,10 +444,6 @@ class CAPAManagementService:
         incident_id: Optional[str] = None,
         is_overdue: Optional[bool] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Queries and filters CAPA actions.
-        Enriches output with computed overdue status, incident title, and hypothesis details.
-        """
         query = db.query(CAPAAction)
         if action_type:
             query = query.filter(CAPAAction.type == action_type.strip().lower())
@@ -528,7 +459,6 @@ class CAPAManagementService:
 
         results = []
         for act in actions:
-            # Overdue rule: due date has passed and status is not completed, verified, or rejected
             act_overdue = (act.due_date < today_str) and (act.status not in ["completed", "verified", "rejected"])
             if is_overdue is not None and act_overdue != is_overdue:
                 continue
@@ -537,14 +467,13 @@ class CAPAManagementService:
         return results
 
     def serialize_action(self, act: CAPAAction, is_overdue: Optional[bool] = None) -> Dict[str, Any]:
-        """Serializes CAPAAction instance with all eight fields and contextual audit data."""
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if is_overdue is None:
             is_overdue = (act.due_date < today_str) and (act.status not in ["completed", "verified", "rejected"])
 
         return {
             "id": act.id,
-            "action_id": act.action_code,  # Documented alias
+            "action_id": act.action_code,
             "action_code": act.action_code,
             "incident_id": act.incident_id,
             "hypothesis_id": act.hypothesis_id,
@@ -572,16 +501,10 @@ class CAPAManagementService:
         machine_code: str,
         defect_type: str
     ) -> Dict[str, Any]:
-        """
-        Recurrence detector:
-        Flags if the same defect type on the same machine returns after a completed CAPA action.
-        """
-        # 1. Resolve machine
         mach = db.query(Machine).filter((Machine.code == machine_code) | (Machine.id == machine_code)).first()
         mach_id = mach.id if mach else machine_code
         mach_name = mach.code if mach else machine_code
 
-        # 2. Find completed or verified CAPA actions associated with this machine and defect
         completed_capas = db.query(CAPAAction).join(QualityIncident, CAPAAction.incident_id == QualityIncident.id)\
             .join(Batch, QualityIncident.batch_id == Batch.id)\
             .filter(
@@ -599,7 +522,6 @@ class CAPAManagementService:
                 "message": f"No completed CAPA actions found for defect '{defect_type}' on machine {mach_name}."
             }
 
-        # Check for incidents occurring after the latest completion date
         recurrence_events = []
         for capa in completed_capas:
             comp_dt = capa.completion_date or "2026-01-01"
@@ -634,13 +556,6 @@ class CAPAManagementService:
         }
 
     def seed_batch_0245_benchmark_proposals(self, db: Session) -> List[CAPAAction]:
-        """
-        Seeds/ensures the 11 benchmark CAPA proposals for BATCH-0245 from the problem statement:
-        - 5 Containment actions
-        - 4 Corrective actions (conditional on physical wear confirmation)
-        - 2 Preventive actions
-        All created in 'proposed' status, linked to hyp-conf-inc-ncr-019 and inc-ncr-019.
-        """
         inc = db.query(QualityIncident).filter(
             (QualityIncident.id == "inc-ncr-019") | (QualityIncident.title.like("%BATCH-0245%"))
         ).first()
@@ -652,7 +567,6 @@ class CAPAManagementService:
         hyp_id = hyp.id if hyp else "hyp-conf-inc-ncr-019"
 
         proposals = [
-            # Containment (5 items)
             {
                 "type": "containment",
                 "description": "Hold affected production batch BATCH-0245 for 100% inspection and quarantine in Quality Hold area.",
@@ -683,7 +597,6 @@ class CAPAManagementService:
                 "suggested_role": "Quality Systems Auditor",
                 "due_date": "2026-10-19"
             },
-            # Corrective (4 items - conditional wording where wear confirmation is required)
             {
                 "type": "corrective",
                 "description": "Replace worn carbide cutting insert on CNC-04 turret position 2 IF tool inspection confirms flank wear exceeding 0.3mm criterion.",
@@ -708,7 +621,6 @@ class CAPAManagementService:
                 "suggested_role": "Quality Inspector",
                 "due_date": "2026-10-21"
             },
-            # Preventive (2 items)
             {
                 "type": "preventive",
                 "description": "Introduce an automated tool-life monitoring warning and cycle lockout threshold at 800 cycles on CNC-04.",
@@ -725,7 +637,6 @@ class CAPAManagementService:
 
         created_actions = []
         for p in proposals:
-            # Check if identical proposal already exists
             existing = db.query(CAPAAction).filter(
                 CAPAAction.incident_id == inc_id,
                 CAPAAction.description == p["description"]
@@ -739,7 +650,7 @@ class CAPAManagementService:
                     type=p["type"],
                     description=p["description"],
                     suggested_role=p["suggested_role"],
-                    responsible_role=None,  # Unassigned until approval
+                    responsible_role=None,
                     due_date=p["due_date"],
                     status="proposed",
                     evidence="",
@@ -759,6 +670,5 @@ class CAPAManagementService:
 
         db.commit()
         return created_actions
-
 
 capa_service = CAPAManagementService()

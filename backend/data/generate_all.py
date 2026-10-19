@@ -1,9 +1,3 @@
-"""
-Master Synthetic Dataset Generator for QualityMind Enterprise Platform
-Generates reproducible production batches, physical measurements, telemetry time series,
-technical knowledge base documents, and synthetic brushed-metal computer vision images.
-Seed: 42. Supports CLI: python -m backend.data.generate_all --seed 42
-"""
 import os
 import sys
 import json
@@ -14,7 +8,6 @@ from decimal import Decimal
 import numpy as np
 import pandas as pd
 
-# Set random seeds for strict reproducibility
 SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)
@@ -28,12 +21,7 @@ KB_DIR = os.path.join(BASE_DATA_DIR, "kb")
 for d in [PROD_DIR, INSP_DIR, PROC_DIR, KB_DIR]:
     os.makedirs(d, exist_ok=True)
 
-# -----------------------------------------------------------------------------
-# 1. GENERATE KNOWLEDGE BASE DOCUMENTS (SOPs, Specs, Manuals, >= 20 NCRs, 15 CAPAs)
-# -----------------------------------------------------------------------------
 def generate_knowledge_base():
-    """Generates technical manuals, engineering specs, SOPs, historical NCRs, and CAPAs."""
-    # 1. Product Specifications
     with open(os.path.join(KB_DIR, "SPEC-PS-101_Precision_Shaft.md"), "w", encoding="utf-8") as f:
         f.write("""# Engineering Specification: Precision Shaft PS-2026-101
 ## Part Family: Precision Ground Shafts
@@ -70,7 +58,6 @@ def generate_knowledge_base():
 - **Tolerance:** +/- 0.080 mm (LSL: 12.420 mm, USL: 12.580 mm)
 """)
 
-    # 2. Manufacturing SOP
     with open(os.path.join(KB_DIR, "SOP-044_CNC_Tool_Life_Management.md"), "w", encoding="utf-8") as f:
         f.write("""# Standard Operating Procedure SOP-044: Cutting Tool Management & Offset Compensation
 ## Machine Types: Okuma LB3000-EX, Mori Seiki NLX-2500, Mazak QT-250
@@ -80,7 +67,6 @@ def generate_knowledge_base():
 4. **Tool Replacement Verification:** After indexing or replacing an insert, the operator MUST touch off tool setter probe, verify tool wear register offset is cleared to 0.000, and run 1 sacrificial test piece with 100% CMM verification.
 """)
 
-    # 3. Machine Manual
     with open(os.path.join(KB_DIR, "MANUAL_Okuma_LB3000_Vibration_Limits.md"), "w", encoding="utf-8") as f:
         f.write("""# Machine Maintenance Manual: Okuma LB3000-EX II Turning Center
 ## Spindle & Vibration Thresholds (ISO 10816-3 Industrial Machinery Standards)
@@ -89,7 +75,6 @@ def generate_knowledge_base():
 - **Critical Trip Alarm Limit:** **3.5 mm/s**. Machine controller registers high vibration alarm. Continued cutting at >= 3.8 mm/s accelerates spindle bearing degradation and generates chatter.
 """)
 
-    # 4. Generate >= 20 Historical NCRs (Nonconformance Reports)
     ncrs = [
         {
             "id": "NCR-019",
@@ -203,7 +188,6 @@ def generate_knowledge_base():
         }
     ]
 
-    # Add 10 additional decoys to satisfy >= 20 historical NCRs
     for i in range(11, 22):
         ncrs.append({
             "id": f"NCR-{110 + i}",
@@ -217,7 +201,6 @@ def generate_knowledge_base():
             "date": f"2026-0{min(9, (i % 8) + 1)}-{random.randint(10, 28)}"
         })
 
-    # Save all NCRs as markdown files in data/kb/
     for ncr in ncrs:
         filepath = os.path.join(KB_DIR, f"{ncr['id']}.md")
         with open(filepath, "w", encoding="utf-8") as f:
@@ -233,11 +216,9 @@ def generate_knowledge_base():
 - **Epistemic Classification:** CONFIRMED_ROOT_CAUSE (Approved by Lead Quality Engineer)
 """)
 
-    # Save historical NCRs JSON for RAG ingestion
     with open(os.path.join(BASE_DATA_DIR, "historical_ncrs.json"), "w", encoding="utf-8") as f:
         json.dump(ncrs, f, indent=2)
 
-    # 5. Generate >= 15 CAPA Records
     capas = []
     for i in range(1, 16):
         capas.append({
@@ -254,11 +235,7 @@ def generate_knowledge_base():
     with open(os.path.join(BASE_DATA_DIR, "capa_records.json"), "w", encoding="utf-8") as f:
         json.dump(capas, f, indent=2)
 
-# -----------------------------------------------------------------------------
-# 2. GENERATE 25 MANUFACTURING BATCHES & MEASUREMENTS & TELEMETRY
-# -----------------------------------------------------------------------------
 def generate_manufacturing_data():
-    """Generates 25 labeled batches, dimensional measurements, and 1-min telemetry readings."""
     batches_data = []
     measurements_data = []
     telemetry_data = []
@@ -273,7 +250,6 @@ def generate_manufacturing_data():
 
     start_date = datetime(2026, 8, 10, 2, 0, tzinfo=timezone.utc)
 
-    # 1. BATCH-0245: THE MANDATORY ANCHOR SCENARIO
     b245 = {
         "batch_number": "BATCH-0245",
         "product_id": "prod-ps-101",
@@ -291,7 +267,6 @@ def generate_manufacturing_data():
     }
     batches_data.append(b245)
 
-    # Anchor Measurements: P001=50.01, P002=50.03, P003=50.06, P004=50.08, P005=50.07
     anchor_vals = [50.01, 50.03, 50.06, 50.08, 50.07]
     for idx, val in enumerate(anchor_vals):
         dev_nom = round(val - 50.00, 4)
@@ -309,17 +284,15 @@ def generate_manufacturing_data():
             "deviation_from_limit": dev_lim
         })
 
-    # Anchor Telemetry: vibration 2.1 -> 3.8 mm/s, tool cycles 600 -> 1,150, spindle 1200, feed 0.20, coolant 24->25
     telemetry_records_count = 60
     for m in range(telemetry_records_count):
         t_time = (start_date + timedelta(days=61, hours=2, minutes=m*4)).strftime("%Y-%m-%d %H:%M:%S")
-        # Shift occurs around minute 30
         is_late = (m >= 35)
         vib = round(3.8 + np.random.normal(0, 0.08), 2) if is_late else round(2.1 + np.random.normal(0, 0.05), 2)
         tool_cycles = 1150 if is_late else 600 + (m * 8)
         coolant = round(25.0 + np.random.normal(0, 0.2), 1) if is_late else round(24.0 + np.random.normal(0, 0.2), 1)
-        spindle = 1200.0  # unchanged
-        feed = 0.20       # unchanged
+        spindle = 1200.0
+        feed = 0.20
         motor = round(16.8 + np.random.normal(0, 0.2), 1) if is_late else round(14.5 + np.random.normal(0, 0.2), 1)
         cycle_t = round(46.2 + np.random.normal(0, 0.3), 1) if is_late else 45.0
         is_anom = is_late and (vib >= 3.5 or tool_cycles > 1000)
@@ -338,7 +311,6 @@ def generate_manufacturing_data():
             "pressure": 5.5
         })
 
-    # 2. GENERATE 24 ADDITIONAL BATCHES ACROSS SCENARIOS
     scenarios = [
         "NORMAL_PRODUCTION", "NORMAL_PRODUCTION", "NORMAL_PRODUCTION", "NORMAL_PRODUCTION", "NORMAL_PRODUCTION",
         "DIMENSIONAL_DEFECTS", "DIMENSIONAL_DEFECTS",
@@ -375,7 +347,6 @@ def generate_manufacturing_data():
             "scenario_label": sc
         })
 
-        # Generate 10-20 measurements per batch
         n_meas = 15
         for i in range(n_meas):
             comp_id = f"P{i+1:03d}"
@@ -389,7 +360,6 @@ def generate_manufacturing_data():
             elif sc == "MEASUREMENT_BIAS":
                 val = round(prod["nom"] + 0.035 + np.random.normal(0, 0.008), 3)
             elif sc == "POST_CORRECTIVE_ACTION":
-                # Rejection rate drops from 8.2% to 1.1%
                 val = round(prod["nom"] + np.random.normal(0, 0.010), 3)
             else:
                 val = round(prod["nom"] + np.random.normal(0, 0.014), 3)
@@ -409,7 +379,6 @@ def generate_manufacturing_data():
                 "deviation_from_limit": dev_lim
             })
 
-        # Generate telemetry for batch
         for t_min in range(30):
             t_stamp = (b_date + timedelta(minutes=t_min * 6)).strftime("%Y-%m-%d %H:%M:%S")
             spindle = 1200.0
@@ -424,8 +393,6 @@ def generate_manufacturing_data():
                 coolant = round(24.0 + ((t_min - 14) * 0.22) + np.random.normal(0, 0.04), 1)
                 vib = round(2.1 + ((t_min - 14) * 0.04) + np.random.normal(0, 0.02), 2)
             elif sc == "MULTIVARIATE_ANOMALY" and t_min >= 15:
-                # Unusual parameter combination: high feed (0.23 mm/rev), low spindle speed (1160 RPM), high motor current (17.8 A), vibration 2.45 mm/s.
-                # Individually, each is strictly within operational limits ([0.15..0.25], [1100..1300], [13.0..22.0], [2.1..3.5])
                 feed = 0.23
                 spindle = 1160.0
                 motor = 17.8
@@ -445,7 +412,6 @@ def generate_manufacturing_data():
                 "pressure": 5.5
             })
 
-    # Save to CSV and Excel
     df_batches = pd.DataFrame(batches_data)
     df_batches.to_csv(os.path.join(PROD_DIR, "batches.csv"), index=False)
     df_batches.to_excel(os.path.join(PROD_DIR, "batches.xlsx"), index=False)
@@ -459,27 +425,16 @@ def generate_manufacturing_data():
 
     print(f"Generated {len(df_batches)} batches, {len(df_meas)} measurements, {len(df_proc)} process readings.")
 
-# -----------------------------------------------------------------------------
-# 3. GENERATE SYNTHETIC COMPUTER VISION DATASET (>= 1,500 Images, Stratified Split)
-# -----------------------------------------------------------------------------
-# 3. COMPUTER VISION DATASET NOTE (Real MVTec AD Migration)
-# -----------------------------------------------------------------------------
 def verify_cv_dataset():
-    """Notice: QualityMind uses exclusively the real MVTec AD benchmark dataset."""
     print("Computer Vision Dataset: Migrated 100% to real MVTec AD (metal_nut, screw, transistor, cable).")
     print("Zero synthetic computer vision images generated or retained.")
 
-# -----------------------------------------------------------------------------
-# 4. LOAD GENERATED BATCHES AND SAMPLES INTO SQL DATABASE
-# -----------------------------------------------------------------------------
 def load_all_into_db():
-    """Imports generated synthetic batches, measurements, telemetry, and KB directly into SQLite."""
     from backend.app.db.session import SessionLocal
     from backend.app.db.models import Batch, Measurement, ProcessReading, HistoricalIncident, KBDocument
 
     db = SessionLocal()
     try:
-        # Load Batches
         df_batches = pd.read_csv(os.path.join(PROD_DIR, "batches.csv"))
         for _, r in df_batches.iterrows():
             if not db.query(Batch).filter_by(batch_number=r["batch_number"]).first():
@@ -499,7 +454,6 @@ def load_all_into_db():
                 db.add(b)
         db.commit()
 
-        # Load Measurements
         df_meas = pd.read_csv(os.path.join(INSP_DIR, "measurements.csv"))
         for _, r in df_meas.iterrows():
             batch_obj = db.query(Batch).filter_by(batch_number=r["batch_id"]).first()
@@ -518,7 +472,6 @@ def load_all_into_db():
                 db.add(m)
         db.commit()
 
-        # Load Process Readings for Anchor Batch BATCH-0245
         df_proc = pd.read_csv(os.path.join(PROC_DIR, "process_readings.csv"))
         b245 = db.query(Batch).filter_by(batch_number="BATCH-0245").first()
         if b245:

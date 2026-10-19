@@ -1,8 +1,3 @@
-"""
-Automated Quality Inspection & RCA Audit Report Generator (PDF)
-Generates ISO 9001 / IATF 16949 compliant 13-section Quality Audit Reports with ReportLab and Matplotlib.
-Explicitly distinguishes the 5 Certainty Levels across all sections with embedded charts and safety notices.
-"""
 import os
 import io
 from typing import Dict, Any, Optional, List
@@ -19,9 +14,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
-
 class AuditReportCanvas(canvas.Canvas):
-    """Custom canvas that adds dynamic running headers, footers with page numbers, and mandatory decision-support disclaimer."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
@@ -44,7 +37,6 @@ class AuditReportCanvas(canvas.Canvas):
         self.setFont("Helvetica", 7.5)
         self.setFillColor(colors.HexColor("#64748b"))
 
-        # Running header on subsequent pages
         if self._pageNumber > 1:
             self.drawString(36, 762, f"QualityMind Audit Dossier | Batch: {self.batch_id} | IATF 16949 Compliant")
             self.drawRightString(576, 762, "CONFIDENTIAL QUALITY AUDIT")
@@ -52,7 +44,6 @@ class AuditReportCanvas(canvas.Canvas):
             self.setLineWidth(0.5)
             self.line(36, 756, 576, 756)
 
-        # Mandatory running footer on every page
         self.setStrokeColor(colors.HexColor("#cbd5e1"))
         self.setLineWidth(0.5)
         self.line(36, 32, 576, 32)
@@ -60,9 +51,7 @@ class AuditReportCanvas(canvas.Canvas):
         self.drawRightString(576, 22, f"Page {self._pageNumber} of {page_count}")
         self.restoreState()
 
-
 def render_dimensional_histogram(measurements: List[Dict[str, Any]], lsl: float, usl: float, nominal: float) -> Optional[io.BytesIO]:
-    """Generates a clean matplotlib histogram of sample measurements relative to engineering specification limits."""
     try:
         values = [m.get("measured_value", 50.0) for m in measurements]
         if not values:
@@ -91,9 +80,7 @@ def render_dimensional_histogram(measurements: List[Dict[str, Any]], lsl: float,
     except Exception:
         return None
 
-
 def render_spc_control_chart(chart_data: List[Dict[str, Any]], ucl: float, lcl: float, cl: float, usl: float, lsl: float) -> Optional[io.BytesIO]:
-    """Generates SPC Individuals chart with statistical control limits distinct from engineering specification limits."""
     try:
         if not chart_data:
             samples = [1, 2, 3, 4, 5]
@@ -105,16 +92,13 @@ def render_spc_control_chart(chart_data: List[Dict[str, Any]], ucl: float, lcl: 
         fig, ax = plt.subplots(figsize=(6.2, 2.4), dpi=150)
         ax.plot(samples, values, marker='o', color="#2563eb", linewidth=1.5, markersize=5, label="Sample Measurements")
 
-        # Statistical Control Limits (from process variation)
         ax.axhline(cl, color="#059669", linestyle="-", linewidth=1.2, label=f"CL Center Line ({cl:.4f})")
         ax.axhline(ucl, color="#7c3aed", linestyle="--", linewidth=1.3, label=f"UCL Statistical Limit ({ucl:.4f})")
         ax.axhline(lcl, color="#7c3aed", linestyle="--", linewidth=1.3, label=f"LCL Statistical Limit ({lcl:.4f})")
 
-        # Engineering Specification Limits (from design)
         ax.axhline(usl, color="#dc2626", linestyle=":", linewidth=1.5, label=f"USL Spec Limit ({usl:.2f})")
         ax.axhline(lsl, color="#dc2626", linestyle=":", linewidth=1.5, label=f"LSL Spec Limit ({lsl:.2f})")
 
-        # Flag out of spec points
         for s, v in zip(samples, values):
             if v > usl or v < lsl:
                 ax.plot(s, v, marker='o', color="#dc2626", markersize=7)
@@ -135,7 +119,6 @@ def render_spc_control_chart(chart_data: List[Dict[str, Any]], ucl: float, lcl: 
     except Exception:
         return None
 
-
 def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optional[str] = None) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -149,7 +132,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
 
     styles = getSampleStyleSheet()
 
-    # Enterprise typography styles
     title_style = ParagraphStyle(
         "DocTitle",
         parent=styles["Normal"],
@@ -250,7 +232,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     story.append(header_table)
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#0f172a"), spaceAfter=6))
 
-    # Mandatory Legend & Governance Banner for 5 Epistemic Labels
     legend_text = (
         "<b>MANDATORY AUDIT GOVERNANCE & EPISTEMIC LABELS:</b> This dossier enforces strict epistemic labeling: "
         "<b>[OBSERVED FACT]</b> verified direct measurements; "
@@ -271,7 +252,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     story.append(legend_table)
     story.append(Spacer(1, 4))
 
-    # SECTION 1: Product Details
     story.append(Paragraph("1. Product Details [OBSERVED_FACT]", section_h1))
     prod_data = [
         ["Part Number:", part_no, "Product Name:", batch_meta.get("product_name", "Precision Shaft")],
@@ -291,7 +271,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     ]))
     story.append(t1)
 
-    # SECTION 2: Batch Information
     story.append(Paragraph("2. Batch Information [OBSERVED_FACT]", section_h1))
     batch_data = [
         ["Batch ID:", batch_id, "Machine Assigned:", batch_meta.get("machine", "CNC-04")],
@@ -310,7 +289,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     ]))
     story.append(t2)
 
-    # SECTION 3: Inspection Summary
     story.append(Paragraph("3. Inspection Summary [OBSERVED_FACT]", section_h1))
     tot_insp = dim_rep.get("total_inspected", 5)
     non_conf = dim_rep.get("nonconforming", dim_rep.get("nonconforming_count", dim_rep.get("non_conforming_count", 0)))
@@ -327,7 +305,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     )
     story.append(Paragraph(summary_p, body_style))
 
-    # SECTION 4: Visual Inspection Results
     story.append(Paragraph("4. Visual Inspection Results [MODEL_PREDICTION]", section_h1))
     if vis_pred:
         is_mm = vis_pred.get("product_mismatch") or state_data.get("product_mismatch")
@@ -365,7 +342,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
         vis_text = "No visual defect imagery submitted for this lot."
     story.append(Paragraph(vis_text, body_style))
 
-    # SECTION 5: Dimensional Analysis (with Matplotlib Histogram)
     story.append(Paragraph("5. Dimensional Analysis [OBSERVED_FACT]", section_h1))
     dim_items = dim_rep.get("measurements", []) if dim_rep else []
     dim_rows = [["Sample ID", "Measured Diameter", "Nominal Dev.", "Limit Dev.", "Conformance", "Epistemic Label"]]
@@ -396,7 +372,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
         story.append(Spacer(1, 3))
         story.append(Image(hist_buf, width=5.6*inch, height=1.9*inch))
 
-    # SECTION 6: SPC Analysis (with Control Chart)
     story.append(Paragraph("6. Statistical Process Control (SPC) Analysis [STATISTICAL_FINDING]", section_h1))
     spc_chart_data = spc_rep.get("chart_data", [])
     raw_ucl = spc_rep.get("ucl")
@@ -468,7 +443,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
         story.append(Spacer(1, 3))
         story.append(Image(spc_buf, width=5.6*inch, height=2.0*inch))
 
-    # SECTION 7: Process Anomalies
     story.append(Paragraph("7. Process Anomalies & Machine Telemetry [STATISTICAL_FINDING]", section_h1))
     proc_rows = [
         ["Parameter", "Observed Value", "Baseline Reference", "Anomaly Type", "Status"],
@@ -489,7 +463,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     ]))
     story.append(t7)
 
-    # SECTION 8: Root Cause Hypotheses
     story.append(Paragraph("8. Root Cause Hypotheses [HYPOTHESIS]", section_h1))
     stamp_table = Table([[
         Paragraph("<b>STATUS: UNCONFIRMED — REQUIRES ENGINEERING VERIFICATION</b>", stamp_style)
@@ -525,7 +498,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     ]))
     story.append(t8)
 
-    # SECTION 9: Supporting & Contradicting Evidence
     story.append(Paragraph("9. Supporting & Contradicting Evidence Breakdown [HYPOTHESIS]", section_h1))
     top_h = hyp_list[0] if hyp_list else None
     if top_h:
@@ -558,7 +530,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
         )
     story.append(Paragraph(ev_p, body_style))
 
-    # SECTION 10: Containment Actions
     story.append(Paragraph("10. Containment Actions [PROPOSED_ACTION]", section_h1))
     cont_actions = (capa_rep.get("containment_actions", []) if capa_rep else [])[:3]
     c_rows = [["Action ID", "Containment Action", "Responsible Role", "Due Date", "Status"]]
@@ -584,7 +555,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     ]))
     story.append(t10)
 
-    # SECTION 11: Corrective & Preventive Actions
     story.append(Paragraph("11. Corrective & Preventive Actions [PROPOSED_ACTION]", section_h1))
     corr_prev = (
         (capa_rep.get("corrective_actions", []) if capa_rep else [])[:2] +
@@ -614,7 +584,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     ]))
     story.append(t11)
 
-    # SECTION 12: Human Quality Approval
     story.append(Paragraph("12. Human Quality Approval [CONFIRMED_ROOT_CAUSE]", section_h1))
     has_approval = bool(approval and (approval.get("approved_by") or approval.get("decision")))
     appr_by = approval.get("approved_by") if has_approval else "PENDING — Awaiting Quality Engineer Sign-off"
@@ -639,7 +608,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     ]))
     story.append(t12)
 
-    # Immutable Audit Trail from human_decisions table
     try:
         from backend.app.database.session import SessionLocal
         from backend.app.database.models import HumanDecision
@@ -672,8 +640,6 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
     except Exception:
         pass
 
-
-    # SECTION 13: Effectiveness Monitoring
     story.append(Paragraph("13. Effectiveness Monitoring [STATISTICAL_FINDING]", section_h1))
     try:
         from backend.app.services.effectiveness import effectiveness_engine
@@ -724,19 +690,15 @@ def generate_quality_pdf_report(state_data: Dict[str, Any], output_path: Optiona
         )
         story.append(Paragraph(eff_p, body_style))
 
-    # Build document using custom canvas with running headers and footers
     doc.build(story, canvasmaker=AuditReportCanvas)
     pdf_bytes = buffer.getvalue()
     buffer.close()
     return pdf_bytes
 
-
 class PDFReportGenerator:
-    """Wrapper class providing generate_audit_report method returning io.BytesIO buffer."""
     def generate_audit_report(self, state_data: Dict[str, Any]) -> io.BytesIO:
         pdf_bytes = generate_quality_pdf_report(state_data)
         return io.BytesIO(pdf_bytes)
-
 
 pdf_report_generator = PDFReportGenerator()
 

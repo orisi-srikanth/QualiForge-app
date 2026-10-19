@@ -1,7 +1,3 @@
-"""
-Unit & Integration Tests for Phase 7: Backend REST API
-Tests all domain endpoints, auth, pareto, effectiveness, and HITL workflow decision.
-"""
 import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
@@ -19,7 +15,6 @@ def test_api_health_and_version():
     assert "QualityMind" in res_ver.json()["system"]
 
 def test_api_auth_removed_and_open():
-    """Verify that authentication is completely removed and endpoints are open without tokens."""
     unauth_client = TestClient(app)
     res = unauth_client.get("/api/dashboard/summary")
     assert res.status_code == 200
@@ -76,20 +71,17 @@ def test_api_effectiveness_endpoint():
     assert "Observed association" in data["conclusion_label"]
 
 def test_api_workflow_lifecycle_and_hitl_resume():
-    # 1. Start workflow
     res_start = client.post("/api/workflows?batch_id=BATCH-0245")
     assert res_start.status_code == 200
     state = res_start.json()
     wf_id = state["workflow_id"]
     assert state["status"] == "PENDING_HUMAN_APPROVAL"
 
-    # 2. Get trace
     res_trace = client.get(f"/api/workflows/{wf_id}/trace")
     assert res_trace.status_code == 200
     trace = res_trace.json()
     assert len(trace) >= 5
 
-    # 3. Human Quality Engineer submits decision to resume
     decision_payload = {
         "batch_id": "BATCH-0245",
         "approved_by": "Sarah Chen, Lead Quality Engineer",

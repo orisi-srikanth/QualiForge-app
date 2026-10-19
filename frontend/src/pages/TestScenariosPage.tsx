@@ -51,7 +51,7 @@ export const TestScenariosPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-[26px] font-bold text-slate-900 leading-tight">Test Scenarios</h2>
@@ -70,7 +70,6 @@ export const TestScenariosPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Test Suite Summary Banner */}
       <div className={`p-5 rounded-xl border flex items-center justify-between gap-4 ${
         allPassed ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
       }`}>
@@ -92,7 +91,6 @@ export const TestScenariosPage: React.FC = () => {
         </div>
       </div>
 
-      {/* List of 8 Detailed Scenario Cards */}
       <div className="space-y-4">
         {results.map((tc) => {
           const isPassed = tc.status === "PASS";
@@ -131,7 +129,6 @@ export const TestScenariosPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Input & States */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div className="p-3 bg-slate-50 rounded-lg space-y-1">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
@@ -148,7 +145,6 @@ export const TestScenariosPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Expected vs Actual */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div className="p-3 bg-slate-50 rounded-lg space-y-1">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
@@ -165,7 +161,6 @@ export const TestScenariosPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* ML Model Output & Evidence */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1 text-xs">
                 <div className="text-slate-700">
                   <strong>ML / Model Output:</strong> <code className="text-blue-700 font-mono text-[11px]">{tc.ml_model_output}</code>

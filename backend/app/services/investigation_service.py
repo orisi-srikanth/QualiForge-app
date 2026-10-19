@@ -1,8 +1,3 @@
-"""
-Manufacturing Process Investigation Service (Requirement 1)
-Orchestrates defect-specific investigation strategies, correlates manufacturing telemetry,
-identifies missing data sources, and synthesizes evidence-backed root cause hypotheses.
-"""
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
@@ -15,7 +10,6 @@ from backend.app.database.models import (
 )
 from backend.app.core.guardrails import EpistemicLabel
 
-# Investigation Strategy Identifiers
 STRATEGY_DIMENSIONAL_OVERSIZED = "STRATEGY_DIMENSIONAL_OVERSIZED"
 STRATEGY_DIMENSIONAL_UNDERSIZED = "STRATEGY_DIMENSIONAL_UNDERSIZED"
 STRATEGY_VISUAL_DEFECT = "STRATEGY_VISUAL_DEFECT"
@@ -24,7 +18,6 @@ STRATEGY_PROCESS_DRIFT = "STRATEGY_PROCESS_DRIFT"
 STRATEGY_MATERIAL_STRUCTURAL = "STRATEGY_MATERIAL_STRUCTURAL"
 STRATEGY_MULTIPLE_DEFECTS = "STRATEGY_MULTIPLE_DEFECTS"
 STRATEGY_CONFORMING_PROCESS = "STRATEGY_CONFORMING_PROCESS_VERIFICATION"
-
 
 def select_investigation_strategy(
     has_oversized: bool,
@@ -36,12 +29,8 @@ def select_investigation_strategy(
     nonconforming_count: int,
     defect_type: Optional[str] = None
 ) -> Dict[str, str]:
-    """
-    Dynamically select the engineering investigation strategy based on actual physical defect signals.
-    """
     defect_str = (defect_type or "").lower()
 
-    # Multiple concurrent defects check
     defects_count = sum([
         1 if (has_oversized or has_undersized) else 0,
         1 if has_visual else 0,
@@ -104,13 +93,7 @@ def select_investigation_strategy(
         "description": "All sampled parts strictly satisfy approved engineering specifications. Process parameters and statistical capability remain within normal operating windows."
     }
 
-
 def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
-    """
-    Executes end-to-end investigation for a production batch using real database records.
-    Never hardcodes batches, specification limits, or fake root causes.
-    """
-    # 1. Batch Context
     b = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
     if not b:
         raise ValueError(f"Batch '{batch_id}' not found in manufacturing database.")
@@ -118,7 +101,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
     prod = b.product
     mach = b.machine
 
-    # 2. Characteristic & Specifications
     char = None
     if prod and prod.characteristics:
         char = prod.characteristics[0]
@@ -131,7 +113,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
     char_name = char.name if char else "dimensional_specification"
     unit_str = char.unit if char else "mm"
 
-    # 3. Measurement Records
     measurements_q = db.query(Measurement).filter(Measurement.batch_id == b.id).order_by(Measurement.measured_at.asc()).all()
     total_inspected = len(measurements_q)
     nonconforming_samples = []
@@ -164,7 +145,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
     conforming_count = len(conforming_samples)
     rejection_rate = round((nonconforming_count / total_inspected * 100.0), 2) if total_inspected > 0 else 0.0
 
-    # 4. Visual Inspection Findings
     visual_findings_q = db.query(VisualFinding).join(InspectionImage).filter(InspectionImage.batch_id == b.id).all()
     has_visual_defect = any(vf.defect_detected for vf in visual_findings_q)
     visual_defects_list = [
@@ -180,7 +160,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
         for vf in visual_findings_q
     ]
 
-    # 5. Process Telemetry & Telemetry Readings
     telemetry_q = db.query(ProcessReading).filter(ProcessReading.batch_id == b.id).order_by(ProcessReading.ts.asc()).all()
     has_telemetry = len(telemetry_q) > 0
     vibration_values = [r.vibration for r in telemetry_q]
@@ -196,7 +175,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
         if is_increasing and nonconforming_count > 0:
             has_drift_signature = True
 
-    # 6. Maintenance History
     maintenance_q = db.query(MaintenanceRecord).filter(MaintenanceRecord.machine_id == b.machine_id).order_by(MaintenanceRecord.date.desc()).all()
     has_maintenance = len(maintenance_q) > 0
     maintenance_records = [
@@ -210,11 +188,9 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
         for mr in maintenance_q
     ]
 
-    # 7. Quality Incident & Human Decisions
     incident = db.query(QualityIncident).filter(QualityIncident.batch_id == b.id).first()
     incident_defect_type = incident.defect_type if incident else None
 
-    # Determine dynamic strategy
     strategy_info = select_investigation_strategy(
         has_oversized=has_oversized,
         has_undersized=has_undersized,
@@ -226,7 +202,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
         defect_type=incident_defect_type
     )
 
-    # 8. Check for Missing Process Evidence
     missing_data_sources = []
     verification_steps = []
     investigation_status = "EVIDENCE_CORRELATED"
@@ -247,7 +222,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
             missing_data_sources.append("Part surface high-resolution inspection photography")
             verification_steps.append("Capture and upload part surface images to visual inspection intake")
 
-    # 9. Synthesize Evidence-Backed Root-Cause Hypotheses
     hypotheses = []
     strat_key = strategy_info["strategy"]
 
@@ -406,7 +380,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
             "required_confirmation": "Maintain standard periodic SPC subgroup sampling."
         })
 
-    # 10. Recommended Containment & Corrective Actions
     recommended_actions = []
     if nonconforming_count > 0 or has_visual_defect:
         recommended_actions.append({
@@ -435,7 +408,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
             "urgency": "ROUTINE"
         })
 
-    # 11. Existing CAPA Linkage
     capa_records_q = db.query(CAPAAction).filter(
         CAPAAction.incident_id == (incident.id if incident else "none")
     ).all() if incident else []
@@ -453,7 +425,6 @@ def build_investigation_report(batch_id: str, db: Session) -> Dict[str, Any]:
         for c in capa_records_q
     ]
 
-    # 12. Persist investigation state into incident for reload survival
     if incident and nonconforming_count > 0:
         incident.rejection_reason = f"Strategy: {strategy_info['title']}. Status: {investigation_status}. Top Hypothesis: {hypotheses[0]['title'] if hypotheses else 'None'}"
         db.commit()

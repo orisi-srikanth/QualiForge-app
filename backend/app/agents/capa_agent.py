@@ -1,13 +1,3 @@
-"""
-Agent 7: Corrective & Preventive Action (CAPA) Agent
-Compliant with IATF 16949:2016 Clause 10.2, ISO 9001:2015 Clause 10.2, and QualiForge Safety Guardrails:
-- Formulates 3-tier action plans (Immediate Containment, Corrective Actions, Preventive Actions).
-- Dynamically ingests Agent 6 RCA hypotheses, distinguishing confirmed root causes from unconfirmed hypotheses.
-- Formulates conditional corrective actions with explicit preconditions for unconfirmed hypotheses.
-- Identifies affected populations for containment actions without autonomous batch release/rejection.
-- Ensures all proposed actions default to PENDING status, strictly requiring Quality Engineer authorization.
-- Zero autonomous machinery actuation, emergency stops, or direct PLC/CNC modification.
-"""
 import os
 import json
 import logging
@@ -23,11 +13,9 @@ from backend.app.database.models import QualityIncident, RCAHypothesis, Batch, M
 
 logger = logging.getLogger("qualiforge.agent7")
 
-# Module-level cached Groq client
 _cached_groq_client: Optional[Any] = None
 
 def get_groq_client(force_refresh: bool = False) -> Optional[Any]:
-    """Returns a reusable Groq client initialized with GROQ_API_KEY from environment."""
     global _cached_groq_client
     if _cached_groq_client is not None and not force_refresh:
         return _cached_groq_client
@@ -71,21 +59,14 @@ def get_groq_client(force_refresh: bool = False) -> Optional[Any]:
         return None
 
 def set_groq_client(client: Optional[Any]) -> None:
-    """Injects a mock or custom Groq client for unit testing."""
     global _cached_groq_client
     _cached_groq_client = client
 
 def reset_groq_client() -> None:
-    """Resets cached Groq client."""
     global _cached_groq_client
     _cached_groq_client = None
 
-
 class CorrectivePreventiveActionAgent(BaseQualityAgent):
-    """
-    Agent 7: Synthesizes evidence-backed 3-tiered CAPA plans from RCA findings.
-    Operates strictly as human decision support for Quality Engineering.
-    """
 
     def __init__(self):
         super().__init__(
@@ -103,13 +84,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
         client: Optional[Any] = None,
         model: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Drafts structured, evidence-linked CAPA recommendations using Groq (openai/gpt-oss-20b).
-        - Containment, Corrective, and Preventive proposals
-        - Actions for unconfirmed hypotheses are marked as conditional with explicit prerequisites
-        - Zero autonomous machine actuation, stops, or direct PLC/CNC edits
-        - All actions strictly default to PENDING status awaiting Quality Engineer authorization
-        """
         active_client = client or get_groq_client()
         if not active_client:
             return {
@@ -186,7 +160,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
 
                 parsed_data = json.loads(clean_json)
 
-                # Validate actions with Pydantic
                 for cat in ["containment_actions", "corrective_actions", "preventive_actions"]:
                     for item in parsed_data.get(cat, []):
                         item["status"] = ActionStatus.PENDING
@@ -242,10 +215,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
         groq_client: Optional[Any] = None,
         groq_model: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Dynamically generates structured 3-tier action proposals from RCA findings.
-        All generated actions are in PENDING status, awaiting Quality Engineer authorization.
-        """
         start = time.time()
         tool_calls = [
             "tool_ingest_rca_findings",
@@ -255,7 +224,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
             "tool_bind_iatf_audit_schema"
         ]
 
-        # 1. Normalize RCA Report Input
         rca_dict: Dict[str, Any] = {}
         if rca_report is not None:
             if hasattr(rca_report, "model_dump"):
@@ -265,7 +233,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
             elif isinstance(rca_report, dict):
                 rca_dict = rca_report
 
-        # 2. If RCA findings not passed in memory, attempt database lookup
         if not rca_dict:
             close_session = False
             session = db
@@ -316,22 +283,17 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
                     if close_session and session:
                         session.close()
 
-        # Extract contextual attributes
         defect_type = rca_dict.get("defect_type") or "Dimensional Non-Conformance"
         hypotheses = rca_dict.get("ranked_hypotheses") or []
         missing_evidence = rca_dict.get("missing_evidence") or []
         tests_required = rca_dict.get("engineering_tests_required") or []
 
-        # Target dates helper
         base_date = datetime.now(timezone.utc)
         due_d1 = (base_date + timedelta(days=2)).strftime("%Y-%m-%d")
         due_d2 = (base_date + timedelta(days=4)).strftime("%Y-%m-%d")
         due_d3 = (base_date + timedelta(days=7)).strftime("%Y-%m-%d")
         due_d4 = (base_date + timedelta(days=14)).strftime("%Y-%m-%d")
 
-        # -------------------------------------------------------------
-        # TIER 1: IMMEDIATE CONTAINMENT ACTIONS
-        # -------------------------------------------------------------
         containment_actions: List[ActionItem] = [
             ActionItem(
                 action_id="ACT-CONT-01",
@@ -387,9 +349,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
             )
         ]
 
-        # -------------------------------------------------------------
-        # TIER 2: CORRECTIVE ACTIONS (DYNAMIC & CONDITIONAL)
-        # -------------------------------------------------------------
         corrective_actions: List[ActionItem] = []
         corr_idx = 1
 
@@ -403,7 +362,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
                 h_tests = h.get("engineering_tests_required") or []
 
                 if is_confirmed:
-                    # Confirmed cause: definitive corrective proposal
                     corrective_actions.append(
                         ActionItem(
                             action_id=f"ACT-CORR-{corr_idx:02d}",
@@ -421,7 +379,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
                     )
                     corr_idx += 1
                 else:
-                    # Unconfirmed cause: CONDITIONAL corrective proposal
                     condition_clause = f"IF physical inspection confirms '{h_title}'"
                     if h_tests:
                         condition_clause += f" ({h_tests[0]})"
@@ -445,7 +402,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
                     )
                     corr_idx += 1
 
-                # If missing evidence or engineering tests exist, add investigation task
                 if h_tests or not is_confirmed:
                     test_desc = h_tests[0] if h_tests else "Physical inspection and dimension re-verification"
                     corrective_actions.append(
@@ -465,7 +421,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
                     )
                     corr_idx += 1
 
-        # Standard baseline corrective actions if none or minimal generated
         if len(corrective_actions) < 3:
             corrective_actions.append(
                 ActionItem(
@@ -515,9 +470,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
                 )
             )
 
-        # -------------------------------------------------------------
-        # TIER 3: PREVENTIVE ACTIONS
-        # -------------------------------------------------------------
         preventive_actions: List[ActionItem] = [
             ActionItem(
                 action_id="ACT-PREV-01",
@@ -557,9 +509,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
             )
         ]
 
-        # -------------------------------------------------------------
-        # Assemble CAPAReport
-        # -------------------------------------------------------------
         capa_report = CAPAReport(
             capa_id=f"CAPA-{batch_id}",
             incident_id=incident_id,
@@ -576,7 +525,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
             )
         )
 
-        # Groq LLM CAPA Drafting Integration
         active_groq = groq_client or get_groq_client()
         if active_groq:
             groq_res = self.draft_capa_with_groq(
@@ -624,7 +572,6 @@ class CorrectivePreventiveActionAgent(BaseQualityAgent):
             "capa": capa_report,
             "log": log_entry
         }
-
 
 capa_agent = CorrectivePreventiveActionAgent()
 CAPAAgent = CorrectivePreventiveActionAgent

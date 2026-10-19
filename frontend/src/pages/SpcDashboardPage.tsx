@@ -42,7 +42,7 @@ export const SpcDashboardPage: React.FC = () => {
     if (type === "insufficient") {
       values = [50.01, 50.02, 50.03];
     } else {
-      // 100 points centred around 50.00 with sigma approx 0.01
+
       values = [
         50.001, 49.994, 50.008, 49.987, 50.012, 50.005, 49.998, 50.003, 50.015, 49.989,
         50.002, 50.007, 49.991, 50.004, 49.996, 50.011, 49.985, 50.009, 50.000, 50.003,
@@ -65,7 +65,7 @@ export const SpcDashboardPage: React.FC = () => {
       nominal: 50.00
     })
       .then((capRes) => {
-        // Build mock chart data
+
         const mean = capRes.mean || 50.00;
         const s = capRes.sigma_within || capRes.sigma_overall || 0.01;
         const ucl = mean + 3.0 * s;
@@ -143,7 +143,7 @@ export const SpcDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
@@ -155,7 +155,6 @@ export const SpcDashboardPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Dataset / Scenario Selector */}
         <div className="flex flex-wrap items-center gap-2">
           {batches.length > 0 && (
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
@@ -210,7 +209,6 @@ export const SpcDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Loading State */}
       {loading && (
         <div className="p-12 bg-white border border-slate-200 rounded-xl shadow-xs text-center space-y-3">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent" />
@@ -219,7 +217,6 @@ export const SpcDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Error State */}
       {!loading && error && (
         <div className="p-6 bg-red-50 border border-red-200 rounded-xl shadow-xs flex items-start gap-4">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
@@ -238,7 +235,6 @@ export const SpcDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Empty State */}
       {!loading && !error && !report && (
         <div className="p-12 bg-white border border-slate-200 rounded-xl shadow-xs text-center space-y-2">
           <Gauge className="w-10 h-10 text-slate-300 mx-auto" />
@@ -247,10 +243,9 @@ export const SpcDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Data Loaded View */}
       {!loading && !error && report && (
         <div className="space-y-6">
-          {/* Engineering Note Banner: Spec Limits vs Control Limits */}
+
           <div className="p-3.5 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border border-blue-200 rounded-xl space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -286,7 +281,6 @@ export const SpcDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Prominent Amber Warning Banner (Concise with clear meaning) */}
           {report.warnings && report.warnings.length > 0 && (
             <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-xl shadow-xs space-y-2.5">
               <div className="flex items-center justify-between border-b border-amber-200/80 pb-2">
@@ -335,9 +329,8 @@ export const SpcDashboardPage: React.FC = () => {
             </div>
           )}
 
-          {/* Process Capability Indices Cards (Cp, Cpk, Pp, Ppk) - Hover Popups Completely Removed */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Cp Card */}
+
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-700 font-bold">
@@ -376,7 +369,6 @@ export const SpcDashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Cpk Card */}
             <div className={`p-4 rounded-xl shadow-xs space-y-2 border ${
               report.cpk === null
                 ? "bg-amber-50/30 border-amber-200"
@@ -427,7 +419,6 @@ export const SpcDashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Pp Card */}
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-700 font-bold">
@@ -466,7 +457,6 @@ export const SpcDashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Ppk Card */}
             <div className={`p-4 rounded-xl shadow-xs space-y-2 border ${
               report.ppk === null
                 ? "bg-amber-50/30 border-amber-200"
@@ -518,7 +508,6 @@ export const SpcDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Statistical Moments & Confidence Interval Summary */}
           <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
               Statistical Moments & Capability Assessment Summary
@@ -555,7 +544,6 @@ export const SpcDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Control Chart Card (I-Chart) */}
           <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -593,11 +581,9 @@ export const SpcDashboardPage: React.FC = () => {
                     contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e2e8f0", fontSize: "12px", borderRadius: "8px" }}
                   />
 
-                  {/* Engineering Specification Limits (Solid Red) */}
                   <ReferenceLine y={report.usl} label="USL (50.05 mm)" stroke="#dc2626" strokeWidth={1.5} />
                   <ReferenceLine y={report.lsl} label="LSL (49.95 mm)" stroke="#dc2626" strokeWidth={1.5} />
 
-                  {/* Statistical Control Limits (Dashed Purple) */}
                   <ReferenceLine y={report.ucl} label={`UCL (${report.ucl.toFixed(3)} mm)`} stroke="#9333ea" strokeDasharray="4 4" strokeWidth={1.5} />
                   <ReferenceLine y={report.lcl} label={`LCL (${report.lcl.toFixed(3)} mm)`} stroke="#9333ea" strokeDasharray="4 4" strokeWidth={1.5} />
                   <ReferenceLine y={report.cl} label={`CL (${report.cl.toFixed(3)} mm)`} stroke="#2563eb" strokeDasharray="2 2" strokeWidth={1} />
@@ -628,7 +614,6 @@ export const SpcDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Nelson Rules Violation Register */}
           <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

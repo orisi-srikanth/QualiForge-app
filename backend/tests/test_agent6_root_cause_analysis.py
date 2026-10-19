@@ -1,30 +1,3 @@
-"""
-Dedicated Deterministic Verification Test Suite for Agent 6 — Root Cause Analysis (RCA) Agent.
-Covers all 23 required engineering checks specified in the Root Cause Analysis specification:
- 1. RCA from a dimensional nonconformity with linked batch evidence.
- 2. Visual defect evidence from Agent 2.
- 3. Telemetry anomaly evidence from Agent 4.
- 4. SPC signal evidence from Agent 5.
- 5. Relevant maintenance record retrieval.
- 6. Historical NCR/CAPA retrieval and source references.
- 7. Supporting and contradicting evidence in the same investigation.
- 8. Missing evidence correctly reported as unavailable.
- 9. No causal conclusion based only on correlation.
-10. No confirmation based solely on LLM output.
-11. 5 Whys stops when evidence is insufficient.
-12. Fishbone categories do not imply that uninvestigated causes were ruled out.
-13. Pareto counts use actual records and correct denominators.
-14. Correlation requires aligned observations and reports limitations.
-15. Historical similarity is not treated as proof.
-16. Unknown batch returns an appropriate error.
-17. Cross-batch or cross-machine evidence contamination is prevented.
-18. Persistence and retrieval return the correct RCA record.
-19. Duplicate requests behave correctly.
-20. Authorized human confirmation requires the expected reviewer and audit trail.
-21. Unauthorised users cannot confirm a root cause.
-22. RCA output is available in the downstream workflow and PDF.
-23. Agent 6 cannot autonomously release/reject batches or execute machine actions.
-"""
 import io
 import re
 import pytest
@@ -45,10 +18,6 @@ from backend.app.agents.workflow import node_rca
 
 client = TestClient(app)
 
-
-# ---------------------------------------------------------------------------
-# 1. RCA from a dimensional nonconformity with linked batch evidence
-# ---------------------------------------------------------------------------
 def test_01_rca_from_dimensional_nonconformity_linked_batch():
     dim_findings = {
         "batch_id": "BATCH-0245",
@@ -75,15 +44,10 @@ def test_01_rca_from_dimensional_nonconformity_linked_batch():
     assert "50.05" in report.problem_statement
     assert report.rca_inputs["batch_id"] == "BATCH-0245"
     assert report.rca_inputs["dimensional_findings"] is not None
-    # Check that sample IDs are recorded in inspection results
     nonconf_samples = report.rca_inputs["inspection_results"]["nonconforming_samples"]
     assert any("P003" in s for s in nonconf_samples)
     assert any("P004" in s for s in nonconf_samples)
 
-
-# ---------------------------------------------------------------------------
-# 2. Visual defect evidence from Agent 2
-# ---------------------------------------------------------------------------
 def test_02_visual_defect_evidence_from_agent_2():
     vis_pred = {
         "defect_detected": True,
@@ -99,11 +63,9 @@ def test_02_visual_defect_evidence_from_agent_2():
     )
     report = res["report"]
     assert report.rca_inputs["visual_defect_findings"]["defect_type"] == "surface_scratch"
-    # Source citations must include visual inspection
     all_sources = [s for h in report.ranked_hypotheses for s in (h.sources or [])]
     assert any("visual" in s.lower() for s in all_sources)
 
-    # Product mismatch quarantine: mismatched visual defect should not be used as batch defect type
     mismatch_vis = {
         "defect_detected": True,
         "defect_type": "thread_damage",
@@ -119,10 +81,6 @@ def test_02_visual_defect_evidence_from_agent_2():
     )
     assert "thread_damage" not in res_mismatch["report"].problem_statement
 
-
-# ---------------------------------------------------------------------------
-# 3. Telemetry anomaly evidence from Agent 4
-# ---------------------------------------------------------------------------
 def test_03_telemetry_anomaly_evidence_from_agent_4():
     proc_rep = {
         "batch_id": "BATCH-0245",
@@ -142,16 +100,11 @@ def test_03_telemetry_anomaly_evidence_from_agent_4():
     param_names = [p["parameter"] for p in changed]
     assert "vibration" in param_names
     assert "motor_current" in param_names
-    # Unchanged parameters must also be explicitly logged
     unchanged = report.rca_inputs["machine_parameters"]["unchanged"]
     unchanged_names = [p["parameter"] for p in unchanged]
     assert "spindle_speed" in unchanged_names
     assert "feed_rate" in unchanged_names
 
-
-# ---------------------------------------------------------------------------
-# 4. SPC signal evidence from Agent 5
-# ---------------------------------------------------------------------------
 def test_04_spc_signal_evidence_from_agent_5():
     spc_rep = {
         "batch_id": "BATCH-0245",
@@ -170,10 +123,6 @@ def test_04_spc_signal_evidence_from_agent_5():
     assert "Rule 3" in str(report.rca_inputs["spc_findings"])
     assert report.rca_inputs["spc_findings"]["cpk"] == 0.42
 
-
-# ---------------------------------------------------------------------------
-# 5. Relevant maintenance record retrieval
-# ---------------------------------------------------------------------------
 def test_05_relevant_maintenance_record_retrieval():
     res = rca_agent.analyze_incident(
         incident_id="INC-MAINT-01",
@@ -184,15 +133,10 @@ def test_05_relevant_maintenance_record_retrieval():
     assert maint_info["machine_code"] == "CNC-04"
     assert maint_info["records_count"] >= 0
 
-    # Maintenance records must belong to CNC-04 only
     if isinstance(maint_info.get("records"), list):
         for rec in maint_info["records"]:
             assert "CNC-04" in str(rec) or "id" in rec
 
-
-# ---------------------------------------------------------------------------
-# 6. Historical NCR/CAPA retrieval and source references
-# ---------------------------------------------------------------------------
 def test_06_historical_ncr_capa_retrieval_and_source_references():
     res = rca_agent.analyze_incident(
         incident_id="INC-HIST-01",
@@ -208,10 +152,6 @@ def test_06_historical_ncr_capa_retrieval_and_source_references():
     assert top_match.similarity_score > 0.50
     assert len(top_match.confirmed_root_cause) > 5
 
-
-# ---------------------------------------------------------------------------
-# 7. Supporting and contradicting evidence in the same investigation
-# ---------------------------------------------------------------------------
 def test_07_supporting_and_contradicting_evidence_in_same_investigation():
     res = rca_agent.analyze_incident(
         incident_id="INC-EVID-01",
@@ -221,14 +161,9 @@ def test_07_supporting_and_contradicting_evidence_in_same_investigation():
     )
     report = res["report"]
     for hyp in report.ranked_hypotheses:
-        # Every investigated hypothesis must document both supporting and contradicting evidence
         assert len(hyp.supporting_evidence) > 0, f"Hypothesis {hyp.hypothesis_id} lacks supporting evidence"
         assert len(hyp.contradicting_evidence) > 0, f"Hypothesis {hyp.hypothesis_id} lacks contradicting evidence"
 
-
-# ---------------------------------------------------------------------------
-# 8. Missing evidence correctly reported as unavailable
-# ---------------------------------------------------------------------------
 def test_08_missing_evidence_correctly_reported_as_unavailable():
     res = rca_agent.analyze_incident(
         incident_id="INC-MISSING-01",
@@ -241,36 +176,25 @@ def test_08_missing_evidence_correctly_reported_as_unavailable():
     rca_in = res["report"].rca_inputs
     assert rca_in["tool_condition"]["tool_cycles"] == "not available"
     assert rca_in["material_information"]["material_lot"] == "not available"
-    # When incident timestamp is unknown, temporal correlation cannot be established
     temp = res["report"].temporal_precedence
     assert temp["temporal_correlation_established"] is False
     assert "temporal correlation cannot be established" in temp["details"]
 
-
-# ---------------------------------------------------------------------------
-# 9. No causal conclusion based only on correlation
-# ---------------------------------------------------------------------------
 def test_09_no_causal_conclusion_based_only_on_correlation():
     res = rca_agent.analyze_incident(
         incident_id="INC-CORR-01",
         batch_id="BATCH-0245"
     )
     report = res["report"]
-    # Check disclaimers
     assert "causation" in report.causality_disclaimer.lower()
     assert "not establish" in report.causality_disclaimer.lower()
     for c in report.correlations:
         assert "causation not established" in c["disclaimer"].lower()
-    # Epistemic label on report and all hypotheses must be HYPOTHESIS
     assert report.certainty.value.upper() == "HYPOTHESIS"
     for h in report.ranked_hypotheses:
         if "CONFIRMED" not in h.status:
             assert h.epistemic_label == "HYPOTHESIS"
 
-
-# ---------------------------------------------------------------------------
-# 10. No confirmation based solely on LLM output
-# ---------------------------------------------------------------------------
 def test_10_no_confirmation_based_solely_on_llm_output():
     with patch("backend.app.core.llm.universal_llm.chat") as mock_chat:
         mock_chat.return_value = "CONFIRMED ROOT CAUSE: Microscopic cosmic rays altered CNC spindle calibration. Score: 100%!"
@@ -283,17 +207,12 @@ def test_10_no_confirmation_based_solely_on_llm_output():
             tool_cycles=1150
         )
         report = res["report"]
-        # LLM hallucination must NOT elevate certainty or change deterministic score
         assert report.certainty.value.upper() == "HYPOTHESIS"
         top = report.ranked_hypotheses[0]
         assert top.title == "Progressive Tool Flank Wear"
         assert top.confidence_score == 0.88
         assert top.epistemic_label == "HYPOTHESIS"
 
-
-# ---------------------------------------------------------------------------
-# 11. 5 Whys stops when evidence is insufficient
-# ---------------------------------------------------------------------------
 def test_11_five_whys_stops_when_evidence_is_insufficient():
     res = rca_agent.analyze_incident(
         incident_id="INC-5W-01",
@@ -307,10 +226,6 @@ def test_11_five_whys_stops_when_evidence_is_insufficient():
     assert "Investigation stopped" in five_whys[1].answer
     assert "Insufficient empirical evidence" in five_whys[1].answer
 
-
-# ---------------------------------------------------------------------------
-# 12. Fishbone categories do not imply that uninvestigated causes were ruled out
-# ---------------------------------------------------------------------------
 def test_12_fishbone_categories_do_not_imply_uninvestigated_ruled_out():
     res = rca_agent.analyze_incident(
         incident_id="INC-FISH-01",
@@ -325,10 +240,6 @@ def test_12_fishbone_categories_do_not_imply_uninvestigated_ruled_out():
         all_text = " ".join(cat.factors)
         assert "NOT ruled out" in all_text, f"Category {cat.category} missing uninvestigated-not-ruled-out notice"
 
-
-# ---------------------------------------------------------------------------
-# 13. Pareto counts use actual records and correct denominators
-# ---------------------------------------------------------------------------
 def test_13_pareto_counts_use_actual_records_and_correct_denominators():
     db = SessionLocal()
     try:
@@ -337,17 +248,11 @@ def test_13_pareto_counts_use_actual_records_and_correct_denominators():
         assert "items" in pareto
         total_val = pareto.get("total_incidents", pareto.get("total", 0))
         if pareto["items"]:
-            # Last cumulative percentage should reach 100%
             assert pareto["items"][-1]["cumulative_percentage"] == 100.0
-            # Total counts must equal total_val
             assert sum(i["count"] for i in pareto["items"]) == total_val
     finally:
         db.close()
 
-
-# ---------------------------------------------------------------------------
-# 14. Correlation requires aligned observations and reports limitations
-# ---------------------------------------------------------------------------
 def test_14_correlation_requires_aligned_observations_and_reports_limitations():
     res = rca_agent.analyze_incident(incident_id="INC-CORR-02", batch_id="BATCH-0245")
     corrs = res["report"].correlations
@@ -360,48 +265,32 @@ def test_14_correlation_requires_aligned_observations_and_reports_limitations():
         assert "disclaimer" in c
         assert "association, causation not established" in c["disclaimer"].lower()
 
-
-# ---------------------------------------------------------------------------
-# 15. Historical similarity is not treated as proof
-# ---------------------------------------------------------------------------
 def test_15_historical_similarity_is_not_treated_as_proof():
     res = rca_agent.analyze_incident(incident_id="INC-HIST-02", batch_id="BATCH-0245")
     for match in res["report"].historical_matches:
         assert "precedent" in match.disclaimer.lower() or "context only" in match.disclaimer.lower()
         assert "does not establish current root cause" in match.disclaimer.lower()
 
-
-# ---------------------------------------------------------------------------
-# 16. Unknown batch returns an appropriate error
-# ---------------------------------------------------------------------------
 def test_16_unknown_batch_returns_appropriate_error():
-    # 1. API GET /rca/batch/{batch_id} for unknown batch -> 404
     r_get = client.get("/api/rca/batch/UNKNOWN-BATCH-99999")
     assert r_get.status_code == 404
     assert "not found" in r_get.json()["detail"].lower()
 
-    # 2. API POST /rca/investigate for unknown batch -> 404
     r_post = client.post(
         "/api/rca/investigate",
         json={"batch_id": "UNKNOWN-BATCH-99999", "defect_type": "Oversized shaft diameter"}
     )
     assert r_post.status_code == 404
 
-    # 3. Malformed input validation -> 422
     r_malformed = client.post(
         "/api/rca/investigate",
         json={"batch_id": "BATCH-0245", "usl": -10.0}
     )
     assert r_malformed.status_code == 422
 
-
-# ---------------------------------------------------------------------------
-# 17. Cross-batch or cross-machine evidence contamination is prevented
-# ---------------------------------------------------------------------------
 def test_17_cross_batch_or_cross_machine_evidence_contamination_prevented():
     db = SessionLocal()
     try:
-        # Machine CNC-04 must NOT fetch maintenance from CNC-01
         maint_q4 = db.query(MaintenanceRecord).join(Machine).filter(Machine.code == "CNC-04").all()
         maint_q1 = db.query(MaintenanceRecord).join(Machine).filter(Machine.code == "CNC-01").all()
 
@@ -411,17 +300,11 @@ def test_17_cross_batch_or_cross_machine_evidence_contamination_prevented():
         if isinstance(records_reported, list) and maint_q1:
             q1_ids = {m.id for m in maint_q1}
             reported_ids = {r["id"] for r in records_reported if "id" in r}
-            # No CNC-01 maintenance ID should leak into CNC-04 investigation
             assert len(reported_ids.intersection(q1_ids)) == 0
     finally:
         db.close()
 
-
-# ---------------------------------------------------------------------------
-# 18. Persistence and retrieval return the correct RCA record
-# ---------------------------------------------------------------------------
 def test_18_persistence_and_retrieval_return_correct_rca_record():
-    # Execute analysis which triggers DB persistence
     res = rca_agent.analyze_incident(
         incident_id="INC-PERSIST-01",
         batch_id="BATCH-0245",
@@ -431,7 +314,6 @@ def test_18_persistence_and_retrieval_return_correct_rca_record():
     )
     assert res["report"] is not None
 
-    # Retrieve via API endpoint
     r_api = client.get("/api/rca/batch/BATCH-0245")
     assert r_api.status_code == 200
     data = r_api.json()
@@ -443,17 +325,12 @@ def test_18_persistence_and_retrieval_return_correct_rca_record():
     assert "contradicting_evidence" in top_h
     assert "missing_evidence" in top_h
 
-
-# ---------------------------------------------------------------------------
-# 19. Duplicate requests behave correctly (idempotency)
-# ---------------------------------------------------------------------------
 def test_19_duplicate_requests_behave_correctly():
     db = SessionLocal()
     try:
         b = db.query(Batch).filter((Batch.batch_number == "BATCH-0245") | (Batch.id == "BATCH-0245")).first()
         b_fk = b.id if b else "BATCH-0245"
         initial_inc_count = db.query(QualityIncident).filter((QualityIncident.batch_id == b_fk) | (QualityIncident.batch_id == "BATCH-0245")).count()
-        # Call analyze_incident 3 times consecutively
         for _ in range(3):
             rca_agent.analyze_incident(
                 incident_id="INC-DUP-01",
@@ -465,10 +342,6 @@ def test_19_duplicate_requests_behave_correctly():
     finally:
         db.close()
 
-
-# ---------------------------------------------------------------------------
-# 20. Authorized human confirmation requires expected reviewer and audit trail
-# ---------------------------------------------------------------------------
 def test_20_authorized_human_confirmation_and_audit_trail():
     resp = client.post(
         "/api/rca/hypotheses/HYP-01/decision",
@@ -482,7 +355,6 @@ def test_20_authorized_human_confirmation_and_audit_trail():
     assert data["status"] == "CONFIRMED"
     assert data["epistemic_label"] == "Confirmed Root Cause"
 
-    # Verify audit trail in DB
     db = SessionLocal()
     try:
         decision_log = db.query(HumanDecision).filter(
@@ -494,13 +366,8 @@ def test_20_authorized_human_confirmation_and_audit_trail():
     finally:
         db.close()
 
-
-# ---------------------------------------------------------------------------
-# 21. Unauthorised users cannot confirm a root cause
-# ---------------------------------------------------------------------------
 def test_21_unauthorized_users_cannot_confirm_root_cause():
     from backend.app.core.security import create_access_token
-    # When role enforcement is active, an operator token must receive 403 Forbidden
     op_token = create_access_token({"sub": "usr-op-01", "name": "John Operator", "role": "operator"})
     resp = client.post(
         "/api/rca/hypotheses/HYP-01/decision",
@@ -510,12 +377,7 @@ def test_21_unauthorized_users_cannot_confirm_root_cause():
     assert resp.status_code == 403
     assert "unauthorized" in resp.json()["detail"].lower()
 
-
-# ---------------------------------------------------------------------------
-# 22. RCA output is available in downstream workflow and PDF
-# ---------------------------------------------------------------------------
 def test_22_rca_output_available_in_downstream_workflow_and_pdf():
-    # 1. Workflow node_rca passes report downstream
     mock_state = {
         "batch_id": "BATCH-0245",
         "dimensional_report": {"nonconforming": 3},
@@ -526,7 +388,6 @@ def test_22_rca_output_available_in_downstream_workflow_and_pdf():
     assert "rca_report" in rca_out
     assert rca_out["current_agent"] == rca_agent.name
 
-    # 2. PDF report generation includes Section 8 and Section 9
     state_for_pdf = {
         "workflow_id": "WF-TEST-0245",
         "batch_id": "BATCH-0245",
@@ -544,18 +405,12 @@ def test_22_rca_output_available_in_downstream_workflow_and_pdf():
     assert "9. supporting & contradicting evidence" in full_text
     assert "tool flank wear" in full_text
 
-
-# ---------------------------------------------------------------------------
-# 23. Agent 6 cannot autonomously release/reject batches or execute machine actions
-# ---------------------------------------------------------------------------
 def test_23_agent_6_cannot_autonomously_execute_actions():
     res = rca_agent.analyze_incident(batch_id="BATCH-0245")
     report = res["report"]
-    # Agent 6 must declare autonomous physical actions prohibited
     assert report.autonomous_actions_prohibited is True
     assert report.review_status == "HUMAN_REVIEW_REQUIRED"
 
-    # Safety guardrail prohibits autonomous machine interventions
     forbidden_calls = [
         ("RELEASE_PRODUCT", "BATCH-0245"),
         ("REJECT_BATCH", "BATCH-0245"),

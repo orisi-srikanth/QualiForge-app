@@ -30,7 +30,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<ProductSpec | null>(null);
 
-  // Persona / RBAC State
   const [activeRole, setActiveRole] = useState<Role>("admin");
   const [roleTokens, setRoleTokens] = useState<Record<Role, string>>({
     admin: "",
@@ -38,13 +37,11 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
     operator: "",
   });
 
-  // UI Modes
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Edit / Create Form State (9 Core Requirement Fields)
   const [formData, setFormData] = useState({
     name: "",
     part_number: "",
@@ -58,10 +55,8 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
     inspection_frequency: "100% Critical Feature",
   });
 
-  // Inline Validation Errors
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Fetch initial data
   const loadInitialData = async () => {
     try {
       setLoading(true);
@@ -85,7 +80,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
     loadInitialData();
   }, []);
 
-  // Sync formData when selectedProduct changes
   useEffect(() => {
     if (selectedProduct && !isCreating) {
       setFormData({
@@ -106,11 +100,9 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
     }
   }, [selectedProduct, isCreating]);
 
-  // Derived auto-calculated specification limits
   const calculatedLsl = Number((formData.nominal_mm - formData.tolerance_mm).toFixed(4));
   const calculatedUsl = Number((formData.nominal_mm + formData.tolerance_mm).toFixed(4));
 
-  // Client-side validation
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
     if (!formData.name.trim()) errors.name = "Product name is required.";
@@ -240,7 +232,7 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white border border-[#E3E8EF] rounded-xl shadow-xs">
         <div>
           <h2 className="text-[26px] font-bold text-slate-900 leading-tight">Product & Process Configuration</h2>
@@ -250,7 +242,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Success Notification */}
       {successMessage && (
         <div
           id="config-success-banner"
@@ -261,7 +252,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Error Notification */}
       {errorMessage && (
         <div
           id="config-error-banner"
@@ -276,7 +266,7 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Product Catalog */}
+
         <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -333,9 +323,8 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Right Column: Specification Details / Edit / Create View */}
         <div className="lg:col-span-2 p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-5">
-          {/* Header Bar */}
+
           <div className="flex items-start justify-between border-b border-slate-100 pb-4">
             <div>
               <span className="text-xs font-mono text-blue-600 font-bold">
@@ -353,7 +342,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
               </p>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex items-center gap-2">
               {!isCreating && !isEditing && (
                 <>
@@ -407,11 +395,10 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Form Mode (Create or Edit) */}
           {(isCreating || isEditing) ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Field 1: Product Name */}
+
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     1. Product Name *
@@ -429,7 +416,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                   )}
                 </div>
 
-                {/* Field 2: Part Number */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     2. Part Number *
@@ -447,7 +433,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                   )}
                 </div>
 
-                {/* Field 3: Manufacturing Process */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     3. Manufacturing Process *
@@ -465,7 +450,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                   )}
                 </div>
 
-                {/* Field 4: Machine Selection */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     4. Assigned Machine *
@@ -484,7 +468,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                   </select>
                 </div>
 
-                {/* Field 5: Inspection Characteristic */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     5. Inspection Characteristic *
@@ -502,7 +485,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                   )}
                 </div>
 
-                {/* Field 9: Inspection Frequency */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     9. Inspection Frequency *
@@ -521,7 +503,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                 </div>
               </div>
 
-              {/* Dimensional Engineering Box (Fields 6, 7) */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -531,7 +512,7 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Field 6: Nominal Dimension */}
+
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 block mb-1">
                       6. Nominal Dimension ({formData.unit}) *
@@ -549,7 +530,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                     )}
                   </div>
 
-                  {/* Field 7: Tolerance */}
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 block mb-1">
                       7. Bilateral Tolerance (±) *
@@ -573,7 +553,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                 )}
               </div>
 
-              {/* Submit Buttons */}
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   id="save-config-btn"
@@ -586,9 +565,9 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
               </div>
             </div>
           ) : (
-            /* View Mode: Displays All 9 Fields with Read-Only Calculated Limits */
+
             <div className="space-y-4">
-              {/* Product Info Summary */}
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <span className="text-[10px] text-slate-500 block uppercase font-medium">1. Product</span>
@@ -634,7 +613,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                 </div>
               </div>
 
-              {/* Critical Quality Characteristic Specification Box */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -690,7 +668,6 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                 </div>
               </div>
 
-              {/* Quality Compliance Guarantee Box */}
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <span>

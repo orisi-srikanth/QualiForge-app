@@ -1,8 +1,3 @@
-"""
-Computer Vision Defect Inspection Endpoints (Agent 2)
-Executes two-stage defect detection (PatchCore + MobileNetV3) on component images.
-Provides endpoints for human quality engineers to review model predictions and confirm/reject findings.
-"""
 import os
 import io
 import html
@@ -30,13 +25,11 @@ from backend.app.schemas.schemas import CertaintyLevel
 
 router = APIRouter()
 
-
 def _handle_inspection_persistence_and_mismatch(res: Dict[str, Any], img_path: str, batch_id: str, db: Session) -> Dict[str, Any]:
     pred = res.get("prediction")
     if not pred:
         return res
 
-    # 1. Product & Batch validation
     batch_rec = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
     prod_rec = db.query(Product).filter(Product.id == batch_rec.product_id).first() if batch_rec else None
 
@@ -59,7 +52,6 @@ def _handle_inspection_persistence_and_mismatch(res: Dict[str, Any], img_path: s
         res["product_mismatch"] = True
         res["mismatch_warning"] = mismatch_msg
 
-    # 2. Persist to database defensively
     finding_id = f"VF-{uuid.uuid4().hex[:8].upper()}"
     try:
         b_fk = batch_rec.id if batch_rec else None
@@ -109,20 +101,16 @@ def _handle_inspection_persistence_and_mismatch(res: Dict[str, Any], img_path: s
 
     return res
 
-
 class PredictionReviewPayload(BaseModel):
     decision: str = Field(..., description="Decision: CONFIRM or REJECT", example="CONFIRM")
     comment: Optional[str] = Field(None, description="Review commentary / justification", example="Verified scratch pattern conforms to CV detection bbox.")
     model_version: Optional[str] = Field("mvtec-two-stage-v1.0", description="CV model version under review")
 
-
 class FindingActionPayload(BaseModel):
     decision: str = Field(..., description="Decision: CONFIRM or REJECT", example="CONFIRM")
     comment: Optional[str] = Field(None, description="Mandatory if REJECT", example="Confirmed minor surface scratch within acceptable threshold.")
 
-
 _SAMPLE_CACHE: Dict[str, Any] = {}
-
 
 @router.post("/vision/inspect-sample", tags=["Vision"], summary="Inspect sample surface defect image", description="Inspect test images (e.g. metal_nut_scratch.png) using two-stage real MVTec PatchCore + MobileNetV3. Returns defect type, confidence, and bounding box.")
 def inspect_sample_image(sample_name: str = "metal_nut_scratch.png", batch_id: str = "BATCH-0245", db: Session = Depends(get_db)):
@@ -152,7 +140,6 @@ def inspect_sample_image(sample_name: str = "metal_nut_scratch.png", batch_id: s
             detail=f"Visual quality inspection failed for {sample_name}: {str(exc)}"
         )
 
-
 @router.post("/vision/upload", tags=["Vision"], summary="Upload and inspect high-resolution part image with trained YOLO model", description="Multipart upload of part image for real-time defect classification, confidence estimation, and pixel bounding box localization using trained YOLO best.pt weights.")
 async def upload_and_inspect_image(
     file: UploadFile = File(...),
@@ -163,12 +150,10 @@ async def upload_and_inspect_image(
     conf_threshold_query: Optional[float] = Query(None, alias="conf_threshold"),
     db: Session = Depends(get_db)
 ):
-    # 1. Size safeguard
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Image file size exceeds maximum limit (10 MB).")
 
-    # 2. Image decoding safeguard
     try:
         pil_img = Image.open(io.BytesIO(content))
         pil_img.verify()
@@ -177,7 +162,6 @@ async def upload_and_inspect_image(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Invalid image file: corrupted or not a valid image format. ({str(e)})")
 
-    # 3. Batch existence validation
     req_batch = batch_id or batch_id_query
     if req_batch:
         batch_rec = db.query(Batch).filter((Batch.batch_number == req_batch) | (Batch.id == req_batch)).first()
@@ -185,7 +169,6 @@ async def upload_and_inspect_image(
             clean_b = str(req_batch).strip().lower()
             if "nonexistent" in clean_b or "unknown" in clean_b or "non_existent" in clean_b:
                 raise HTTPException(status_code=404, detail=f"Batch '{req_batch}' not found in database.")
-            # Auto-initialize batch for pre-registration intake
             default_prod = db.query(Product).first()
             prod_id = default_prod.id if default_prod else "prod-ps-101"
             batch_rec = Batch(
@@ -210,7 +193,6 @@ async def upload_and_inspect_image(
 
     effective_batch_id = batch_rec.batch_number
 
-    # 4. Storage service
     safe_name = os.path.basename(file.filename or "uploaded.png")
     clean_name = "".join(c for c in safe_name if c.isalnum() or c in ".-_")
     unique_name = f"{uuid.uuid4().hex[:8]}_{clean_name}"
@@ -220,10 +202,8 @@ async def upload_and_inspect_image(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # Stable web reference
     image_reference = f"/uploads/inspection/{unique_name}"
 
-    # 5. Product/Batch mismatch validation
     prod_rec = db.query(Product).filter(Product.id == batch_rec.product_id).first() if batch_rec else None
     is_mismatch = False
     mismatch_msg = None
@@ -242,7 +222,6 @@ async def upload_and_inspect_image(
                 f"({prod_rec.part_number}). Finding quarantined from batch dimensional disposition."
             )
 
-    # 6. Run YOLO inference
     effective_thresh = conf_threshold if conf_threshold is not None else conf_threshold_query
     try:
         yolo_res = _get_yolo_detector().detect(file_path, conf_threshold=effective_thresh)
@@ -255,7 +234,6 @@ async def upload_and_inspect_image(
     max_confidence = max([d["confidence"] for d in detections], default=0.0)
     primary_bbox = detections[0]["bounding_box"] if detections else None
 
-    # 7. Database persistence
     finding_id = f"VF-{uuid.uuid4().hex[:8].upper()}"
     try:
         img_rec = InspectionImage(
@@ -273,7 +251,6 @@ async def upload_and_inspect_image(
         db.commit()
         db.refresh(img_rec)
 
-        # Infer location zone on component surface
         location_str = "mid_body_circumference"
         if primary_bbox:
             cy = (primary_bbox["y1"] + primary_bbox["y2"]) / 2.0
@@ -302,7 +279,6 @@ async def upload_and_inspect_image(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database persistence failed: {str(exc)}")
 
-    # 8. Update workflow state if active
     try:
         from backend.app.orchestrator.engine import workflow_engine
         for w_id, w_state in workflow_engine.active_workflows.items():
@@ -321,7 +297,6 @@ async def upload_and_inspect_image(
     except Exception:
         pass
 
-    # 9. Format response complying with Phase 4 contract
     return {
         "batch_id": effective_batch_id,
         "image_reference": image_reference,
@@ -361,7 +336,6 @@ async def upload_and_inspect_image(
         }
     }
 
-
 @router.get("/vision/findings", tags=["Vision"], summary="List visual inspection records and review states", description="List all visual inspection findings with model_version and human review status.")
 def get_vision_findings(db: Session = Depends(get_db)):
     db_findings = db.query(VisualFinding).all()
@@ -381,7 +355,6 @@ def get_vision_findings(db: Session = Depends(get_db)):
             for f in db_findings
         ]
     return []
-
 
 @router.post(
     "/vision/predictions/{prediction_id}/review",
@@ -408,7 +381,6 @@ def review_model_prediction(
     safe_comment = html.escape(payload.comment.strip()) if payload.comment else f"Model prediction {prediction_id} confirmed by {current_user.get('name', 'Quality Engineer')}."
     user_id = current_user.get("id", "usr-qe-01")
 
-    # Check database for finding or create if demo ID
     finding = db.query(VisualFinding).filter(VisualFinding.id == prediction_id).first()
     if finding:
         if finding.human_status == "confirmed" and dec == "CONFIRM":
@@ -419,7 +391,6 @@ def review_model_prediction(
         finding.reviewer_id = user_id
         finding.comment = safe_comment
 
-    # Log immutable record in human_decisions table
     rec = HumanDecision(
         workflow_id=f"WF-PRED-{prediction_id}",
         entity_type="model_prediction",
@@ -445,7 +416,6 @@ def review_model_prediction(
         "comment": safe_comment,
         "timestamp": rec.ts.isoformat()
     }
-
 
 @router.post(
     "/vision/findings/{finding_id}/decision",

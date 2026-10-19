@@ -1,13 +1,8 @@
-"""
-ONNX Runtime Defect Inspection Engine for QualityMind
-Leverages Two-Stage MVTec Inspection Engine and ONNX Runtime CPU inference (<2s).
-"""
 import os
 from typing import Dict, Any, Optional
 from backend.app.cv_model.defect_detector import vision_model
 
 class YOLOOnnxDetector:
-    """Lightweight ONNX Runtime detector conforming to inspection requirements."""
 
     def __init__(self, model_path: Optional[str] = None):
         self.vision_model = vision_model
@@ -16,7 +11,6 @@ class YOLOOnnxDetector:
         return True
 
     def detect(self, img_path: str) -> Dict[str, Any]:
-        """Runs two-stage MVTec inference and returns bounding boxes, classification, and confidence."""
         res = self.vision_model.inspect_image(img_path)
         return {
             "defect_detected": res["defect_detected"],
@@ -29,5 +23,4 @@ class YOLOOnnxDetector:
             "annotated_filename": res.get("annotated_filename")
         }
 
-# Global singleton
 yolo_detector = YOLOOnnxDetector()

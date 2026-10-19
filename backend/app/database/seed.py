@@ -1,7 +1,3 @@
-"""
-Database Seeding Script for QualityMind Platform
-Creates demo users, machines, products, tolerances, baselines, and historical knowledge base.
-"""
 import os
 import json
 from datetime import datetime, timezone
@@ -14,11 +10,9 @@ from backend.app.db.models import (
 from backend.app.core.security import hash_password, UserRole
 
 def seed_database():
-    """Initializes tables and seeds initial data if not already present."""
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        # 1. Seed Users
         if db.query(User).count() == 0:
             users = [
                 User(
@@ -45,7 +39,6 @@ def seed_database():
             ]
             db.add_all(users)
 
-        # 2. Seed Machines
         if db.query(Machine).count() == 0:
             machines = [
                 Machine(id="mach-01", code="CNC-01", type="Haas VF-2 3-Axis Mill", location="Cell A - Roughing"),
@@ -55,7 +48,6 @@ def seed_database():
             ]
             db.add_all(machines)
 
-        # 3. Seed Products
         if db.query(Product).count() == 0:
             products = [
                 Product(
@@ -89,7 +81,6 @@ def seed_database():
             db.add_all(products)
             db.commit()
 
-        # 4. Seed Inspection Characteristics
         if db.query(InspectionCharacteristic).count() == 0:
             chars = [
                 InspectionCharacteristic(
@@ -135,7 +126,6 @@ def seed_database():
             db.add_all(chars)
             db.commit()
 
-        # 4.5 Seed Production Batches from batches.csv
         if db.query(Batch).count() < 25:
             batches_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "production", "batches.csv"))
             if os.path.exists(batches_csv):
@@ -180,7 +170,6 @@ def seed_database():
                     db.add_all(batches_to_add)
                     db.commit()
 
-        # 4.6 Seed Measurements from measurements.csv
         if db.query(Measurement).count() == 0:
             meas_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "inspection", "measurements.csv"))
             if os.path.exists(meas_csv):
@@ -230,7 +219,6 @@ def seed_database():
                 db.add_all(baselines)
                 db.commit()
 
-        # Seed ProcessReadings from process_readings.csv if count < 780
         if db.query(ProcessReading).count() < 780:
             csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "process", "process_readings.csv"))
             if os.path.exists(csv_path):
@@ -267,8 +255,6 @@ def seed_database():
                     db.bulk_save_objects(readings)
                     db.commit()
 
-
-        # 6. Seed Historical Incidents for RAG
         if db.query(HistoricalIncident).count() == 0:
             incidents = [
                 HistoricalIncident(
@@ -310,7 +296,6 @@ def seed_database():
             ]
             db.add_all(incidents)
 
-        # 7. Seed Maintenance Records for CNC-04
         if db.query(MaintenanceRecord).count() == 0:
             records = [
                 MaintenanceRecord(
@@ -332,19 +317,16 @@ def seed_database():
             ]
             db.add_all(records)
 
-        # 8. Seed Quality Incidents & RCA Hypotheses
         b245 = db.query(Batch).filter_by(batch_number="BATCH-0245").first()
         b_id = b245.id if b245 else "batch-0245"
         b_map = {b.batch_number: b.id for b in db.query(Batch).all()}
 
         if db.query(QualityIncident).count() < 20:
-            # Clear previous partial incidents if needed
             db.query(RCAHypothesis).delete()
             db.query(QualityIncident).delete()
             db.commit()
 
             incident_specs = [
-                # ID, Batch Number, Defect Type, Rejection Reason, Severity, Created At, Confirmed Root Cause Title
                 ("inc-ncr-019", "BATCH-0245", "Oversized shaft diameter", "Dimensional Out of Tolerance", "HIGH", datetime(2026, 3, 14, 10, 0, tzinfo=timezone.utc), "Progressive Tool Flank Wear"),
                 ("inc-ncr-011", "BATCH-0245", "Oversized shaft diameter", "Dimensional Out of Tolerance", "HIGH", datetime(2026, 8, 22, 14, 0, tzinfo=timezone.utc), "Progressive Tool Flank Wear"),
                 ("inc-ncr-012", "BATCH-0245", "Surface scratch / score", "Surface Finish Defect", "MEDIUM", datetime(2026, 8, 24, 9, 30, tzinfo=timezone.utc), "Spindle Bearing Harmonic Vibration"),
@@ -401,7 +383,6 @@ def seed_database():
                     )
                 )
 
-            # Also seed unconfirmed hypotheses: 3 proposed, 2 rejected (to verify root cause filter excludes them)
             hypotheses_to_add.extend([
                 RCAHypothesis(
                     id="hyp-prop-01",
@@ -473,7 +454,6 @@ def seed_database():
                 with open(capa_file, "r", encoding="utf-8") as f:
                     capa_items = json.load(f)
                 
-                # Fetch a valid incident ID
                 inc_default = db.query(QualityIncident).first()
                 inc_id = inc_default.id if inc_default else "inc-ncr-011"
                 
@@ -495,7 +475,6 @@ def seed_database():
                 db.add_all(capas_to_add)
                 db.commit()
 
-        # 9. Seed Pre- and Post-Intervention Batches for Two-Proportion Effectiveness Verification
         b_pre = db.query(Batch).filter_by(batch_number="BATCH-PRE-01").first()
         if not b_pre:
             b_pre = Batch(
@@ -515,7 +494,6 @@ def seed_database():
             db.add(b_pre)
             db.commit()
 
-            # Add 1000 measurements: exactly 82 nonconforming (8.2%)
             meas_pre = []
             for i in range(1000):
                 is_defect = (i < 82)
@@ -554,7 +532,6 @@ def seed_database():
             db.add(b_post)
             db.commit()
 
-            # Add 1000 measurements: exactly 11 nonconforming (1.1%, p-bar=0.0465, z=7.540)
             meas_post = []
             for i in range(1000):
                 is_defect = (i < 11)
@@ -595,7 +572,7 @@ def seed_database():
 
             meas_recur = []
             for i in range(100):
-                is_defect = (i < 15)  # 15% defect recurrence
+                is_defect = (i < 15)
                 meas_recur.append(
                     Measurement(
                         batch_id=b_recur.id,

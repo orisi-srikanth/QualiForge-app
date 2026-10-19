@@ -1,9 +1,4 @@
--- =============================================================================
--- QualityMind Technical Discussion & Demonstration SQL Queries
--- Verified for both PostgreSQL (Render production) and SQLite (local dev)
--- =============================================================================
 
--- Query 1: All tables and total row counts across the manufacturing database.
 SELECT 'users' AS table_name, COUNT(*) AS total_rows FROM users
 UNION ALL SELECT 'machines', COUNT(*) FROM machines
 UNION ALL SELECT 'products', COUNT(*) FROM products
@@ -25,7 +20,6 @@ UNION ALL SELECT 'agent_runs', COUNT(*) FROM agent_runs
 UNION ALL SELECT 'human_decisions', COUNT(*) FROM human_decisions
 UNION ALL SELECT 'maintenance_records', COUNT(*) FROM maintenance_records;
 
--- Query 2: BATCH-0245 anchor batch with product part number, machine code, shift, and quantity.
 SELECT 
     b.batch_number,
     p.part_number,
@@ -41,7 +35,6 @@ JOIN products p ON b.product_id = p.id
 JOIN machines m ON b.machine_id = m.id
 WHERE b.batch_number = 'BATCH-0245';
 
--- Query 3: BATCH-0245 sample measurements with specification limits, conformance status, and deviations (flagging P003, P004, P005).
 SELECT 
     m.component_id AS part_serial,
     m.value AS measured_diameter_mm,
@@ -60,7 +53,6 @@ JOIN inspection_characteristics ic ON m.characteristic_id = ic.id
 WHERE b.batch_number = 'BATCH-0245'
 ORDER BY m.component_id ASC;
 
--- Query 4: Process readings for CNC-04 around BATCH-0245 displaying tool usage cycles, vibration, and cutting speeds.
 SELECT 
     pr.ts AS timestamp_utc,
     m.code AS machine_code,
@@ -80,7 +72,6 @@ WHERE b.batch_number = 'BATCH-0245'
 ORDER BY pr.ts DESC
 LIMIT 10;
 
--- Query 5: Statistical and threshold anomalies detected for BATCH-0245 across sensors.
 SELECT 
     a.id AS anomaly_id,
     b.batch_number,
@@ -96,7 +87,6 @@ JOIN machines m ON a.machine_id = m.id
 WHERE b.batch_number = 'BATCH-0245'
 ORDER BY a.score DESC;
 
--- Query 6: SPC control results with statistical control limits (UCL/LCL) and engineering specification limits (USL/LSL) in separate columns.
 SELECT 
     spc.chart_type,
     ic.nominal AS engineering_nominal,
@@ -117,7 +107,6 @@ JOIN batches b ON spc.batch_id = b.id
 JOIN inspection_characteristics ic ON spc.characteristic_id = ic.id
 WHERE b.batch_number = 'BATCH-0245';
 
--- Query 7: Quality incident and ranked RCA hypotheses with score, epistemic label, and categorized evidence.
 SELECT 
     qi.title AS incident_title,
     rh.rank AS hypothesis_rank,
@@ -131,7 +120,6 @@ FROM rca_hypotheses rh
 JOIN quality_incidents qi ON rh.incident_id = qi.id
 ORDER BY rh.rank ASC;
 
--- Query 8: Historical non-conformance incidents matched via vector RAG retrieval (highlighting NCR-019).
 SELECT 
     hi.ncr_id,
     hi.title,
@@ -145,7 +133,6 @@ FROM historical_incidents hi
 WHERE hi.ncr_id = 'NCR-019' OR hi.title LIKE '%tool wear%'
 ORDER BY hi.ncr_id ASC;
 
--- Query 9: CAPA actions with 3-tiered type, status, responsible role, approver, and approval timestamp.
 SELECT 
     ca.action_code,
     ca.type AS capa_tier,
@@ -159,7 +146,6 @@ FROM capa_actions ca
 LEFT JOIN users u ON ca.approved_by = u.id
 ORDER BY ca.action_code ASC;
 
--- Query 10: Multi-agent execution trace for workflow showing agent name, tool calls, and execution timings.
 SELECT 
     ar.workflow_id,
     ar.agent_name,
@@ -170,7 +156,6 @@ SELECT
 FROM agent_runs ar
 ORDER BY ar.started_at ASC;
 
--- Query 11: Human-in-the-Loop decision audit trail recording engineering confirmations and batch dispositions.
 SELECT 
     hd.workflow_id,
     hd.entity_type,
@@ -184,7 +169,6 @@ FROM human_decisions hd
 JOIN users u ON hd.user_id = u.id
 ORDER BY hd.ts DESC;
 
--- Query 12: CAPA statistical effectiveness checks comparing pre- and post-intervention rejection rates with p-values.
 SELECT 
     ec.capa_id,
     ec.rejection_rate_before AS pre_rejection_rate_pct,
@@ -195,7 +179,6 @@ SELECT
     ec.notes AS statistical_disclaimer
 FROM effectiveness_checks ec;
 
--- Query 13: Visual inspection defect findings with model version, defect type, and human engineer confirmation status.
 SELECT 
     vf.id AS finding_id,
     ii.component_id AS part_serial,

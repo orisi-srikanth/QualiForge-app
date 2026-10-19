@@ -1,8 +1,3 @@
-"""
-24 Relational Database Models for QualityMind Enterprise Platform
-Supports PostgreSQL and SQLite fallback.
-Enforces complete end-to-end traceability for IATF 16949 & ISO 9001 compliance.
-"""
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
@@ -17,17 +12,15 @@ def gen_uuid() -> str:
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
-# 1. Users & Authentication
 class User(Base):
     __tablename__ = "users"
     id = Column(String, primary_key=True, default=gen_uuid)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    role = Column(String, nullable=False)  # operator, quality_engineer, admin
+    role = Column(String, nullable=False)
     created_at = Column(DateTime, default=utc_now)
 
-# 2. Products & Engineering Definitions
 class Product(Base):
     __tablename__ = "products"
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -43,11 +36,10 @@ class Product(Base):
     characteristics = relationship("InspectionCharacteristic", back_populates="product", cascade="all, delete-orphan")
     batches = relationship("Batch", back_populates="product")
 
-# 3. Production Machinery
 class Machine(Base):
     __tablename__ = "machines"
     id = Column(String, primary_key=True, default=gen_uuid)
-    code = Column(String, unique=True, index=True, nullable=False)  # e.g. CNC-04
+    code = Column(String, unique=True, index=True, nullable=False)
     type = Column(String, nullable=False)
     location = Column(String, nullable=False)
     created_at = Column(DateTime, default=utc_now)
@@ -55,38 +47,36 @@ class Machine(Base):
     batches = relationship("Batch", back_populates="machine")
     maintenance_records = relationship("MaintenanceRecord", back_populates="machine")
 
-# 4. Inspection Characteristics & Engineering Tolerances
 class InspectionCharacteristic(Base):
     __tablename__ = "inspection_characteristics"
     id = Column(String, primary_key=True, default=gen_uuid)
     product_id = Column(String, ForeignKey("products.id"), nullable=False, index=True)
-    name = Column(String, nullable=False)  # e.g. shaft_diameter
+    name = Column(String, nullable=False)
     unit = Column(String, default="mm")
     nominal = Column(Float, nullable=False)
     tol_plus = Column(Float, nullable=False)
     tol_minus = Column(Float, nullable=False)
-    lsl = Column(Float, nullable=False)  # Computed deterministically
-    usl = Column(Float, nullable=False)  # Computed deterministically
+    lsl = Column(Float, nullable=False)
+    usl = Column(Float, nullable=False)
     inspection_frequency = Column(String, default="100%")
     sample_size = Column(Integer, default=5)
 
     product = relationship("Product", back_populates="characteristics")
 
-# 5. Production Batches
 class Batch(Base):
     __tablename__ = "batches"
     id = Column(String, primary_key=True, default=gen_uuid)
-    batch_number = Column(String, unique=True, index=True, nullable=False)  # e.g. BATCH-0245
+    batch_number = Column(String, unique=True, index=True, nullable=False)
     product_id = Column(String, ForeignKey("products.id"), nullable=False, index=True)
     machine_id = Column(String, ForeignKey("machines.id"), nullable=False, index=True)
-    shift = Column(String, nullable=False)  # Morning, Evening, Night
+    shift = Column(String, nullable=False)
     quantity = Column(Integer, default=500)
     material_lot = Column(String, nullable=False)
     operator_ref = Column(String, default="OP-44")
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=True)
-    status = Column(String, default="QUALITY_HOLD")  # CONFORMING, QUALITY_HOLD, APPROVED, REJECTED
-    scenario_label = Column(String, nullable=True)   # Used for evaluation test scenarios
+    status = Column(String, default="QUALITY_HOLD")
+    scenario_label = Column(String, nullable=True)
 
     product = relationship("Product", back_populates="batches")
     machine = relationship("Machine", back_populates="batches")
@@ -95,27 +85,25 @@ class Batch(Base):
     readings = relationship("ProcessReading", back_populates="batch")
     incidents = relationship("QualityIncident", back_populates="batch")
 
-# 6. Physical Dimensional Measurements
 class Measurement(Base):
     __tablename__ = "measurements"
     id = Column(String, primary_key=True, default=gen_uuid)
     batch_id = Column(String, ForeignKey("batches.id"), nullable=False, index=True)
     characteristic_id = Column(String, ForeignKey("inspection_characteristics.id"), nullable=False, index=True)
-    component_id = Column(String, nullable=False, index=True)  # e.g. P001, P002
+    component_id = Column(String, nullable=False, index=True)
     value = Column(Float, nullable=False)
     unit = Column(String, default="mm")
     measured_at = Column(DateTime, default=utc_now)
     subgroup = Column(Integer, default=1)
-    status = Column(String, default="conforming")  # conforming, nonconforming
-    deviation_from_limit = Column(Float, default=0.0)  # + beyond USL or - beyond LSL
-    source_type = Column(String, default="manual")  # csv, excel, manual
+    status = Column(String, default="conforming")
+    deviation_from_limit = Column(Float, default=0.0)
+    source_type = Column(String, default="manual")
     file_name = Column(String, nullable=True)
     uploaded_by = Column(String, nullable=True)
     upload_time = Column(DateTime, default=utc_now)
 
     batch = relationship("Batch", back_populates="measurements")
 
-# 7. Inspection Images
 class InspectionImage(Base):
     __tablename__ = "inspection_images"
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -131,25 +119,23 @@ class InspectionImage(Base):
     batch = relationship("Batch", back_populates="images")
     findings = relationship("VisualFinding", back_populates="image")
 
-# 8. Visual Quality Findings (CV Predictions)
 class VisualFinding(Base):
     __tablename__ = "visual_findings"
     id = Column(String, primary_key=True, default=gen_uuid)
     image_id = Column(String, ForeignKey("inspection_images.id"), nullable=False, index=True)
     defect_detected = Column(Boolean, default=False)
-    defect_type = Column(String, default="no_defect")  # surface_scratch, dent, crack, etc.
+    defect_type = Column(String, default="no_defect")
     confidence = Column(Float, default=0.0)
-    bbox = Column(Text, default="[]")  # JSON [x, y, w, h]
+    bbox = Column(Text, default="[]")
     location = Column(String, default="center")
     model_version = Column(String, default="cv-v1.0")
-    human_status = Column(String, default="pending")  # pending, confirmed, rejected
+    human_status = Column(String, default="pending")
     reviewer_id = Column(String, ForeignKey("users.id"), nullable=True)
     comment = Column(Text, nullable=True)
     heatmap_url = Column(String, nullable=True)
 
     image = relationship("InspectionImage", back_populates="findings")
 
-# 9. High-Frequency Process Time-Series Readings
 class ProcessReading(Base):
     __tablename__ = "process_readings"
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -167,7 +153,6 @@ class ProcessReading(Base):
 
     batch = relationship("Batch", back_populates="readings")
 
-# 10. Process Baselines
 class ProcessBaseline(Base):
     __tablename__ = "process_baselines"
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -181,7 +166,6 @@ class ProcessBaseline(Base):
     upper_threshold = Column(Float, nullable=False)
     computed_from = Column(String, default="Baseline Run Batch B001-B010")
 
-# 11. Process Anomalies
 class Anomaly(Base):
     __tablename__ = "anomalies"
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -189,18 +173,17 @@ class Anomaly(Base):
     batch_id = Column(String, ForeignKey("batches.id"), nullable=False, index=True)
     parameter = Column(String, nullable=False)
     ts = Column(DateTime, nullable=False)
-    type = Column(String, nullable=False)  # sudden_change, drift, multivariate, threshold
+    type = Column(String, nullable=False)
     score = Column(Float, nullable=False)
-    method = Column(String, nullable=False)  # z_score, cusum, ewma, isolation_forest
+    method = Column(String, nullable=False)
     details_json = Column(Text, default="{}")
 
-# 12. Statistical Process Control (SPC) Results
 class SPCResult(Base):
     __tablename__ = "spc_results"
     id = Column(String, primary_key=True, default=gen_uuid)
     batch_id = Column(String, ForeignKey("batches.id"), nullable=False, index=True)
     characteristic_id = Column(String, ForeignKey("inspection_characteristics.id"), nullable=False)
-    chart_type = Column(String, nullable=False)  # I-MR, X-bar/R, p-chart
+    chart_type = Column(String, nullable=False)
     center_line = Column(Float, nullable=False)
     ucl = Column(Float, nullable=False)
     lcl = Column(Float, nullable=False)
@@ -212,47 +195,44 @@ class SPCResult(Base):
     n = Column(Integer, nullable=False)
     warnings_json = Column(Text, default="[]")
 
-# 13. Quality Incidents (NCRs)
 class QualityIncident(Base):
     __tablename__ = "quality_incidents"
     id = Column(String, primary_key=True, default=gen_uuid)
     batch_id = Column(String, ForeignKey("batches.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     defect_type = Column(String, nullable=False)
-    severity = Column(String, default="HIGH")  # LOW, MEDIUM, HIGH, CRITICAL
-    status = Column(String, default="open")     # open, under_investigation, awaiting_approval, closed
-    rejection_reason = Column(String, nullable=True)  # Recorded nonconformance rejection reason
+    severity = Column(String, default="HIGH")
+    status = Column(String, default="open")
+    rejection_reason = Column(String, nullable=True)
     created_at = Column(DateTime, default=utc_now)
 
     batch = relationship("Batch", back_populates="incidents")
     hypotheses = relationship("RCAHypothesis", back_populates="incident")
     capas = relationship("CAPAAction", back_populates="incident")
 
-# 14. Root Cause Analysis (RCA) Hypotheses
 class RCAHypothesis(Base):
     __tablename__ = "rca_hypotheses"
     id = Column(String, primary_key=True, default=gen_uuid)
     incident_id = Column(String, ForeignKey("quality_incidents.id"), nullable=False, index=True)
     rank = Column(Integer, nullable=False)
-    category = Column(String, nullable=False)  # Man, Machine, Material, Method, Measurement, Environment
+    category = Column(String, nullable=False)
     title = Column(String, nullable=False)
-    label = Column(String, default="HYPOTHESIS")  # HYPOTHESIS, CONFIRMED_ROOT_CAUSE
+    label = Column(String, default="HYPOTHESIS")
     supporting_evidence_json = Column(Text, default="[]")
     contradicting_evidence_json = Column(Text, default="[]")
     missing_evidence_json = Column(Text, default="[]")
     evidence_score = Column(Float, default=0.0)
     confidence_text = Column(String, default="Requires engineering verification")
-    status = Column(String, default="proposed")  # proposed, confirmed, rejected
+    status = Column(String, default="proposed")
     reviewer_id = Column(String, ForeignKey("users.id"), nullable=True)
     comment = Column(Text, nullable=True)
 
     incident = relationship("QualityIncident", back_populates="hypotheses")
 
-# 15. Historical Incidents (Knowledge Base for RAG)
 class HistoricalIncident(Base):
     __tablename__ = "historical_incidents"
     id = Column(String, primary_key=True, default=gen_uuid)
-    ncr_id = Column(String, unique=True, index=True, nullable=False)  # e.g. NCR-019
+    ncr_id = Column(String, unique=True, index=True, nullable=False)
     title = Column(String, nullable=False)
     defect_type = Column(String, nullable=False)
     part_number = Column(String, nullable=False)
@@ -262,22 +242,21 @@ class HistoricalIncident(Base):
     resolution = Column(Text, nullable=False)
     date = Column(String, nullable=False)
 
-# 16. Corrective & Preventive Actions (CAPA)
 class CAPAAction(Base):
     __tablename__ = "capa_actions"
     id = Column(String, primary_key=True, default=gen_uuid)
     incident_id = Column(String, ForeignKey("quality_incidents.id"), nullable=False, index=True)
     hypothesis_id = Column(String, ForeignKey("rca_hypotheses.id"), nullable=True, index=True)
-    action_code = Column(String, unique=True, index=True, nullable=False)  # e.g. CAPA-2026-001
-    type = Column(String, nullable=False)  # containment, corrective, preventive
+    action_code = Column(String, unique=True, index=True, nullable=False)
+    type = Column(String, nullable=False)
     description = Column(Text, nullable=False)
-    suggested_role = Column(String, nullable=True)  # Suggested role by agent prior to approval
-    responsible_role = Column(String, nullable=True)  # Assigned upon engineering approval
-    due_date = Column(String, nullable=False)  # YYYY-MM-DD
-    status = Column(String, default="proposed")  # proposed, approved, in_progress, completed, verified, rejected
+    suggested_role = Column(String, nullable=True)
+    responsible_role = Column(String, nullable=True)
+    due_date = Column(String, nullable=False)
+    status = Column(String, default="proposed")
     evidence = Column(Text, default="")
     evidence_file_path = Column(String, nullable=True)
-    completion_date = Column(String, nullable=True)  # YYYY-MM-DD
+    completion_date = Column(String, nullable=True)
     effectiveness_result = Column(Text, nullable=True)
     approved_by = Column(String, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)
@@ -289,13 +268,11 @@ class CAPAAction(Base):
     approver = relationship("User", foreign_keys=[approved_by])
     effectiveness_checks = relationship("EffectivenessCheck", back_populates="capa")
 
-# 16b. Sequential Sequence Counter for CAPA Action IDs (prevents reuse even after deletion)
 class CAPASequence(Base):
     __tablename__ = "capa_sequences"
     year = Column(Integer, primary_key=True)
     last_seq = Column(Integer, nullable=False, default=0)
 
-# 17. Effectiveness Monitoring Checks
 class EffectivenessCheck(Base):
     __tablename__ = "effectiveness_checks"
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -311,7 +288,6 @@ class EffectivenessCheck(Base):
 
     capa = relationship("CAPAAction", back_populates="effectiveness_checks")
 
-# 18. Agent Runs & Trace Execution Logs
 class AgentRun(Base):
     __tablename__ = "agent_runs"
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -326,30 +302,27 @@ class AgentRun(Base):
     retrieved_evidence_json = Column(Text, default="[]")
     status = Column(String, default="COMPLETED")
 
-# 19. Human Decisions & Approval Audits
 class HumanDecision(Base):
     __tablename__ = "human_decisions"
     id = Column(String, primary_key=True, default=gen_uuid)
     workflow_id = Column(String, nullable=False, index=True)
-    entity_type = Column(String, nullable=False)  # batch, hypothesis, capa, finding
+    entity_type = Column(String, nullable=False)
     entity_id = Column(String, nullable=False, index=True)
-    decision = Column(String, nullable=False)     # approved, rejected, modified
+    decision = Column(String, nullable=False)
     comment = Column(Text, nullable=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     ts = Column(DateTime, default=utc_now)
 
-# 20. Reviewer & Critic Comments
 class ReviewerComment(Base):
     __tablename__ = "reviewer_comments"
     id = Column(String, primary_key=True, default=gen_uuid)
     workflow_id = Column(String, nullable=False, index=True)
     agent_name = Column(String, nullable=False)
-    severity = Column(String, default="WARNING")  # INFO, WARNING, BLOCKING
+    severity = Column(String, default="WARNING")
     comment = Column(Text, nullable=False)
     resolved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utc_now)
 
-# 21. PDF Reports
 class Report(Base):
     __tablename__ = "reports"
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -357,33 +330,30 @@ class Report(Base):
     file_path = Column(String, nullable=False)
     generated_at = Column(DateTime, default=utc_now)
 
-# 22. Knowledge Base Documents
 class KBDocument(Base):
     __tablename__ = "kb_documents"
     id = Column(String, primary_key=True, default=gen_uuid)
-    doc_type = Column(String, nullable=False)  # spec, inspection_procedure, sop, standard, ncr, capa, manual
+    doc_type = Column(String, nullable=False)
     title = Column(String, nullable=False)
     source_file = Column(String, nullable=False)
     chunks_count = Column(Integer, default=1)
     created_at = Column(DateTime, default=utc_now)
 
-# 23. Machine Maintenance Records
 class MaintenanceRecord(Base):
     __tablename__ = "maintenance_records"
     id = Column(String, primary_key=True, default=gen_uuid)
     machine_id = Column(String, ForeignKey("machines.id"), nullable=False, index=True)
     date = Column(String, nullable=False)
-    type = Column(String, nullable=False)  # tool_change, spindle_service, calibration, preventive
+    type = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     tool_change_flag = Column(Boolean, default=False)
 
     machine = relationship("Machine", back_populates="maintenance_records")
 
-# 24. LangGraph Checkpointed Workflow State
 class WorkflowStateModel(Base):
     __tablename__ = "workflow_state"
     workflow_id = Column(String, primary_key=True, index=True)
     state_json = Column(Text, nullable=False)
     current_node = Column(String, nullable=False)
-    status = Column(String, default="running")  # running, paused, completed, failed
+    status = Column(String, default="running")
     updated_at = Column(DateTime, default=utc_now)

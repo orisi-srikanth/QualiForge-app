@@ -1,10 +1,3 @@
-"""
-Statistical Process Control & Capability Endpoints (Agent 5)
-Calculates control limits (UCL, CL, LCL), Nelson rules, and capability indices (Cp, Cpk, Pp, Ppk).
-Strictly adheres to AIAG SPC guidelines and IATF 16949:2016 Section 8.5.1.
-Enforces sample size guardrails (n < 5 suppressed, 5 <= n < 30 preliminary with warnings)
-and assumption checks (normality, stability, variance, drift, outliers, mixed lots).
-"""
 import json
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Query, Body, status, HTTPException
@@ -35,15 +28,12 @@ def _persist_spc_result(
     warnings: list,
     characteristic_id: Optional[str] = None
 ) -> Optional[str]:
-    """Helper to persist capability and control metrics into spc_results table with deduplication."""
     try:
-        # Resolve batch
         batch = db.query(Batch).filter(
             (Batch.id == batch_identifier) | (Batch.batch_number == batch_identifier)
         ).first()
         actual_batch_id = batch.id if batch else batch_identifier
 
-        # Resolve characteristic
         char_obj = None
         if characteristic_id:
             char_obj = db.query(InspectionCharacteristic).filter(
@@ -217,10 +207,8 @@ def analyze_spc(
     subgroup_size: int = 1,
     db: Session = Depends(get_db)
 ):
-    # 1. Resolve batch
     batch = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
 
-    # 2. Extract measurements from DB
     measurements = []
     if batch:
         db_meas = db.query(Measurement).filter(
@@ -229,7 +217,6 @@ def analyze_spc(
         if db_meas:
             measurements = [float(m.value) for m in db_meas]
 
-    # 3. Fallback to intake_agent
     if not measurements:
         try:
             intake = intake_agent.process_batch_and_measurements(batch_meta={"batch_id": batch_id})
@@ -237,14 +224,12 @@ def analyze_spc(
         except Exception:
             measurements = []
 
-    # 4. Unknown batch handling
     if not batch and not measurements:
         raise HTTPException(
             status_code=404,
             detail=f"Batch '{batch_id}' not found in manufacturing system."
         )
 
-    # 5. Extract QE engineering specifications
     nominal = 50.00
     usl = 50.05
     lsl = 49.95
@@ -318,10 +303,8 @@ def analyze_spc(
     }
 )
 def get_spc_capability(batch_id: str = "BATCH-0245", db: Session = Depends(get_db)):
-    # 1. Resolve batch
     batch = db.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
 
-    # 2. Extract measurements from DB
     vals = []
     if batch:
         db_meas = db.query(Measurement).filter(
@@ -330,7 +313,6 @@ def get_spc_capability(batch_id: str = "BATCH-0245", db: Session = Depends(get_d
         if db_meas:
             vals = [float(m.value) for m in db_meas]
 
-    # 3. Fallback to intake_agent
     if not vals:
         try:
             intake = intake_agent.process_batch_and_measurements(batch_meta={"batch_id": batch_id})
@@ -338,14 +320,12 @@ def get_spc_capability(batch_id: str = "BATCH-0245", db: Session = Depends(get_d
         except Exception:
             vals = []
 
-    # 4. Unknown batch handling
     if not batch and not vals:
         raise HTTPException(
             status_code=404,
             detail=f"Batch '{batch_id}' not found in manufacturing system."
         )
 
-    # 5. Extract QE engineering specifications
     nominal = 50.00
     usl = 50.05
     lsl = 49.95
@@ -552,7 +532,6 @@ def compute_custom_capability(
         batch_ids=payload.batch_ids
     )
 
-    # Persist if batch_id provided
     if payload.batch_id and cap_res["sample_size"] >= 2:
         cl_val = cap_res.get("mean") or 0.0
         s_val = cap_res.get("sigma_within") or cap_res.get("sigma_overall") or 0.001

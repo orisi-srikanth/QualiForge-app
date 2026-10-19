@@ -1,12 +1,3 @@
-"""
-Code search utility for forbidden autonomous actions across QualityMind project.
-Keywords: release, approve_batch, reject_batch, status = rejected, cnc, plc, machine_param,
-stop, shutdown, setpoint, write_register, opcua, modbus, serial.
-Classifies every hit into:
-- READ_ONLY (data ingestion, reading logs, query parameters)
-- DISPLAY_TEXT (UI labels, mock scenarios, documentation, string literals)
-- REAL_WRITE (database persistence, API mutation, hardware communication)
-"""
 import os
 import re
 from pathlib import Path
@@ -33,27 +24,21 @@ ROOT_DIRS = ["backend/app", "backend/app/agents", "backend/app/agents/prompts", 
 def classify_hit(file_path: str, line_num: int, line_content: str, keyword: str) -> str:
     line_lower = line_content.lower()
     
-    # Check for hardware write attempts
     if any(k in line_lower for k in ["write_register", "opcua.write", "modbus.write", "serial.write"]):
         return "REAL_WRITE (HARDWARE) [CRITICAL]"
     
-    # Check for safety guardrail assertions
     if "assert_no_" in line_lower or "guardrail" in line_lower:
         return "GUARDRAIL_INTERCEPT (Blocks real write)"
         
-    # Check for tests or mocks
     if "test" in file_path.lower() or "mock" in line_lower:
         return "TEST_OR_MOCK"
         
-    # Check for UI display text
     if file_path.endswith((".tsx", ".jsx", ".html", ".css")) or "label" in line_lower or "title" in line_lower or "badge" in line_lower or "placeholder" in line_lower or "text" in line_lower:
         return "DISPLAY_TEXT (UI)"
         
-    # Check for markdown prompts or docs
     if file_path.endswith(".md"):
         return "DOCUMENTATION_OR_PROMPT"
         
-    # Check for DB models / schemas / queries
     if any(k in line_lower for k in [".filter", "get(", "select", "read", "query"]):
         return "READ_ONLY (Query / Schema)"
         

@@ -1,7 +1,3 @@
-"""
-Quality Inspection & RCA Multi-Agent System
-Exposes all 8 domain agents and the central workflow orchestrator.
-"""
 def __getattr__(name: str):
     if name in ("intake_agent", "data_intake_agent", "ProductionDataIntakeAgent", "DataIntakeAgent"):
         from backend.app.agents.intake_agent import intake_agent, data_intake_agent, ProductionDataIntakeAgent, DataIntakeAgent

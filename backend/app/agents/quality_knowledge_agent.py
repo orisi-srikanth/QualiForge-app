@@ -1,9 +1,3 @@
-"""
-Quality Knowledge Agent & Enterprise RAG Pipeline for QualityMind
-Implements end-to-end document ingestion, record-aware chunking (preserving complete CSV rows),
-metadata extraction, persistent ChromaDB vector storage, semantic retrieval, and source-grounded answer generation.
-Fully functional in offline mode (LLM_PROVIDER="none") and with supported LLM providers.
-"""
 import os
 import re
 import csv
@@ -26,7 +20,6 @@ from backend.app.services.document_loader import (
 )
 
 class QualityKnowledgeAgent:
-    """Enterprise RAG agent managing manufacturing quality standards, SOPs, and historical incident records."""
 
     def __init__(
         self,
@@ -34,7 +27,6 @@ class QualityKnowledgeAgent:
         collection_name: Optional[str] = None,
         docs_directory: Optional[str] = None
     ):
-        # Base directories
         self.persist_directory = os.path.abspath(
             persist_directory or getattr(settings, "KNOWLEDGE_DB_PATH", os.path.join(settings.DATA_DIR, "knowledge_db"))
         )
@@ -104,12 +96,10 @@ class QualityKnowledgeAgent:
         self._embedding_function = val
 
     def get_status(self) -> Dict[str, Any]:
-        """Returns operational information about the ChromaDB knowledge collection and LLM state."""
         doc_count = self.collection.count()
         llm_mode = getattr(settings, "LLM_PROVIDER", "none").lower()
         llm_enabled = universal_llm.is_enabled() if hasattr(universal_llm, "is_enabled") else (llm_mode != "none")
 
-        # Discover available source files across data directories
         discovered_files = self._discover_source_files()
 
         warnings = []
@@ -133,7 +123,6 @@ class QualityKnowledgeAgent:
         }
 
     def _discover_source_files(self, custom_paths: Optional[List[str]] = None) -> List[str]:
-        """Discovers candidates from configured data directories and files."""
         if custom_paths:
             resolved = []
             for p in custom_paths:
@@ -146,7 +135,6 @@ class QualityKnowledgeAgent:
                             resolved.append(os.path.join(root, f))
             return sorted(list(set(resolved)))
 
-        # Default directories to search
         search_dirs = [
             self.docs_directory,
             os.path.join(settings.DATA_DIR, "knowledge_docs"),
@@ -172,7 +160,6 @@ class QualityKnowledgeAgent:
                         if ext.lower() in valid_exts:
                             found.append(os.path.abspath(full_p))
 
-        # Deduplicate by basename to avoid duplicate ingestion of mirrored files
         unique_by_name = {}
         for f in found:
             bname = os.path.basename(f)
@@ -185,10 +172,6 @@ class QualityKnowledgeAgent:
         source_paths: Optional[List[str]] = None,
         force_reindex: bool = False
     ) -> Dict[str, Any]:
-        """
-        Extracts, chunks, validates, and stores documents in persistent ChromaDB.
-        Preserves entire CSV rows as single cohesive records.
-        """
         files = self._discover_source_files(source_paths)
         if force_reindex:
             try:
@@ -215,7 +198,6 @@ class QualityKnowledgeAgent:
             "errors": []
         }
 
-        # Fetch existing IDs and content hashes to ensure idempotency
         existing_data = self.collection.get(include=["metadatas"])
         existing_hashes = {}
         if existing_data and existing_data["ids"]:
@@ -240,7 +222,6 @@ class QualityKnowledgeAgent:
                     summary["per_file_status"][fname] = {"status": "SKIPPED_EMPTY", "chunks": 0}
                     continue
 
-                # Purge orphan chunks for this file
                 try:
                     existing_file_records = self.collection.get(where={"file_name": fname})
                     if existing_file_records and existing_file_records["ids"]:
@@ -262,14 +243,12 @@ class QualityKnowledgeAgent:
                     text = rec["text"]
                     chash = hashlib.sha256(text.encode("utf-8")).hexdigest()
                     
-                    # Check idempotency
                     if not force_reindex and cid in existing_hashes and existing_hashes[cid] == chash:
-                        continue  # Already up to date
+                        continue
 
                     meta = rec["metadata"]
                     meta["content_hash"] = chash
                     meta["ingestion_timestamp"] = now_iso
-                    # Ensure ChromaDB-compatible types (str, int, float, bool)
                     sanitized_meta = {k: v for k, v in meta.items() if isinstance(v, (str, int, float, bool))}
 
                     ids_to_upsert.append(cid)
@@ -303,7 +282,6 @@ class QualityKnowledgeAgent:
                 summary["errors"].append(err_msg)
                 summary["per_file_status"][fname] = {"status": "ERROR", "error": str(e)}
 
-        # Synchronize SQL tables (kb_documents, historical_incidents)
         self._sync_sql_tables()
 
         self.last_ingestion_info = {
@@ -314,13 +292,11 @@ class QualityKnowledgeAgent:
         return summary
 
     def _sync_sql_tables(self):
-        """Synchronizes SQL tables (kb_documents, historical_incidents) to match vector store contents exactly."""
         try:
             from backend.app.database.session import SessionLocal
             from backend.app.database.models import KBDocument, HistoricalIncident
             db = SessionLocal()
             try:
-                # 1. Sync HistoricalIncident with historical NCRs
                 ncr_path = os.path.join(settings.DATA_DIR, "historical_ncrs.json")
                 if not os.path.exists(ncr_path):
                     ncr_path = os.path.join(settings.BASE_DIR, "backend", "data", "historical_ncrs.json")
@@ -354,7 +330,6 @@ class QualityKnowledgeAgent:
                             existing.resolution = n.get("resolution", existing.resolution)
                     db.commit()
 
-                # 2. Sync KBDocument with indexed vector store chunks
                 col_data = self.collection.get(include=["metadatas"])
                 file_stats = {}
                 for m in (col_data.get("metadatas") or []):
@@ -382,11 +357,9 @@ class QualityKnowledgeAgent:
             pass
 
     def _extract_records_from_file(self, fpath: str, ext: str) -> Tuple[List[Dict[str, Any]], List[str]]:
-        """Parses source file and extracts records with source metadata."""
         return extract_records_from_file(fpath, ext)
 
     def _infer_category(self, fname: str, row_dict: Optional[dict] = None) -> str:
-        """Determines semantic category based on filename or contents."""
         return infer_document_category(fname, row_dict)
 
     def query(
@@ -395,10 +368,6 @@ class QualityKnowledgeAgent:
         top_k: int = 5,
         filters: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Performs hybrid semantic retrieval with metadata filtering, accurate distance reporting,
-        and deterministic or grounded LLM answer generation.
-        """
         q_clean = query_text.strip() if query_text else ""
         if not q_clean:
             raise ValueError("Query string cannot be empty or whitespace.")
@@ -419,7 +388,6 @@ class QualityKnowledgeAgent:
                 "warnings": ["Vector database contains 0 indexed documents."]
             }
 
-        # Build ChromaDB where filter
         where_filter = {}
         if filters:
             valid_keys = {
@@ -430,7 +398,6 @@ class QualityKnowledgeAgent:
                 if k in valid_keys and v is not None and str(v).strip():
                     where_filter[k] = str(v).strip()
 
-        # Chroma query with candidate pool for hybrid ranking
         candidate_k = max(top_k * 4, 25)
         query_params = {
             "query_texts": [q_clean],
@@ -446,7 +413,6 @@ class QualityKnowledgeAgent:
         try:
             res = self.collection.query(**query_params)
         except Exception as e:
-            # Fallback without where filter if filter was invalid or returned empty
             warnings.append(f"Query filter exception: {str(e)}. Falling back to unfiltered search.")
             query_params.pop("where", None)
             res = self.collection.query(**query_params)
@@ -492,12 +458,8 @@ class QualityKnowledgeAgent:
                     "token_overlap": token_overlap
                 })
 
-        # Rank candidates by hybrid similarity
         candidates.sort(key=lambda x: x["hybrid_sim"], reverse=True)
 
-        # Check out-of-domain similarity floor (Check 5)
-        # In manufacturing quality RAG, genuine matches have either high cosine similarity (>0.70)
-        # or relevant domain terminology overlap (>=0.20). Out-of-domain queries lack both.
         SIMILARITY_FLOOR = 0.65
         llm_mode = getattr(settings, "LLM_PROVIDER", "none").lower()
         llm_active = universal_llm.is_enabled() if hasattr(universal_llm, "is_enabled") else (llm_mode != "none")
@@ -555,7 +517,6 @@ class QualityKnowledgeAgent:
                 )
             })
 
-        # Generate Grounded Answer based on LLM configuration mode
         llm_mode = getattr(settings, "LLM_PROVIDER", "none").lower()
         llm_active = universal_llm.is_enabled() if hasattr(universal_llm, "is_enabled") else (llm_mode != "none")
 
@@ -573,7 +534,6 @@ class QualityKnowledgeAgent:
             }
 
         if not llm_active or llm_mode in ["none", ""]:
-            # Mode 1: Deterministic retrieval only (Zero LLM calls)
             deterministic_answer = self._generate_deterministic_summary(q_clean, matches)
             return {
                 "query": q_clean,
@@ -587,7 +547,6 @@ class QualityKnowledgeAgent:
                 "warnings": warnings
             }
         else:
-            # Mode 2: Grounded LLM generation via Universal LLM Client
             llm_answer = self._generate_grounded_llm_answer(q_clean, matches, sources)
             return {
                 "query": q_clean,
@@ -602,7 +561,6 @@ class QualityKnowledgeAgent:
             }
 
     def _generate_deterministic_summary(self, query: str, matches: List[Dict[str, Any]]) -> str:
-        """Produces a deterministic, hallucination-free evidence summary linking to citations."""
         lines = [
             f"[Deterministic Evidence Summary] Retrieved {len(matches)} matching quality record(s) for query: '{query}'",
             "--------------------------------------------------------------------------------"
@@ -611,7 +569,6 @@ class QualityKnowledgeAgent:
             rec_str = f"Record: {m['record_id']} | " if m.get("record_id") else ""
             lines.append(f"• [Rank {m['rank']}] Source: {m['source_file']} ({rec_str}Similarity: {m['similarity_score']})")
             
-            # Extract first 2-3 lines of content for summary
             snippet_lines = [l.strip() for l in m["text"].split("\n") if l.strip()]
             for s in snippet_lines[1:4]:
                 lines.append(f"    - {s}")
@@ -621,7 +578,6 @@ class QualityKnowledgeAgent:
         return "\n".join(lines)
 
     def _generate_grounded_llm_answer(self, query: str, matches: List[Dict[str, Any]], sources: List[str]) -> str:
-        """Instructs the configured LLM to answer strictly from retrieved context with citations."""
         context_blocks = []
         for m in matches:
             citation = f"[{m['source_file']} | Record: {m.get('record_id', 'N/A')}]"
@@ -655,8 +611,6 @@ class QualityKnowledgeAgent:
         except Exception as e:
             pass
 
-        # Fallback to deterministic summary if LLM call fails
         return self._generate_deterministic_summary(query, matches)
 
-# Global singleton instance
 quality_knowledge_agent = QualityKnowledgeAgent()

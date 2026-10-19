@@ -1,18 +1,3 @@
-"""
-QualityMind Anomaly Detection Evaluation & Metrics Benchmarking Harness
-Evaluates three anomaly detection approaches across 780 labelled time-series readings:
-1. Univariate Robust Z-Score Only
-2. Multivariate Isolation Forest Only
-3. QualityMind Hybrid Multi-Layer Ensemble (Production)
-
-Computes Precision, Recall, F1, False Alarm Rate (per 1,000 normal readings),
-and Detection Delay (median & worst-case samples) per anomaly type and overall.
-Outputs:
-- models/anomaly_metrics.json
-- models/anomaly_predictions.csv
-- docs/anomaly_predictions_eval.csv
-- Synchronizes docs/anomaly_methodology.md
-"""
 import os
 import json
 import numpy as np
@@ -32,8 +17,6 @@ def run_evaluation():
     df["scenario_label"] = df["batch_id"].map(sc_map)
     df["batch_idx"] = df.groupby("batch_id").cumcount()
 
-    # Ground truth labeling across 780 readings:
-    # 0 = normal, 1 = anomaly
     def get_ground_truth(row):
         sc = row["scenario_label"]
         idx = row["batch_idx"]
@@ -57,9 +40,6 @@ def run_evaluation():
 
     features = ["spindle_speed", "feed_rate", "coolant_temp", "vibration", "motor_current"]
 
-    # -------------------------------------------------------------------------
-    # MODEL 1: Univariate Robust Z-Score Only
-    # -------------------------------------------------------------------------
     med_vib = float(normal_df["vibration"].median())
     mad_vib = float(np.median(np.abs(normal_df["vibration"] - med_vib)))
     med_cool = float(normal_df["coolant_temp"].median())
@@ -77,9 +57,6 @@ def run_evaluation():
         pred_z.append(is_anom)
     df["pred_z"] = pred_z
 
-    # -------------------------------------------------------------------------
-    # MODEL 2: Multivariate Isolation Forest Only
-    # -------------------------------------------------------------------------
     scaler = StandardScaler()
     X_train = scaler.fit_transform(normal_df[features].values)
     iso = IsolationForest(contamination=0.015, random_state=42)
@@ -89,9 +66,6 @@ def run_evaluation():
     pred_iso = [1 if p == -1 else 0 for p in iso.predict(X_all)]
     df["pred_iso"] = pred_iso
 
-    # -------------------------------------------------------------------------
-    # MODEL 3: QualityMind Hybrid Multi-Layer Ensemble (Production)
-    # -------------------------------------------------------------------------
     pred_hybrid = []
     for idx, r in df.iterrows():
         is_thresh = (r["vibration"] >= 3.5 or r["tool_usage_cycles"] >= 1000 or r["coolant_temp"] >= 30.0)
@@ -104,9 +78,6 @@ def run_evaluation():
         pred_hybrid.append(is_anom)
     df["pred_hybrid"] = pred_hybrid
 
-    # -------------------------------------------------------------------------
-    # METRICS EVALUATION
-    # -------------------------------------------------------------------------
     models = {
         "univariate_zscore": df["pred_z"].values,
         "isolation_forest": df["pred_iso"].values,
@@ -185,13 +156,11 @@ def run_evaluation():
             "per_anomaly_type": by_type
         }
 
-    # Save to models/anomaly_metrics.json
     models_dir = os.path.join(base_dir, "models")
     os.makedirs(models_dir, exist_ok=True)
     with open(os.path.join(models_dir, "anomaly_metrics.json"), "w", encoding="utf-8") as f:
         json.dump(metrics_output, f, indent=2)
 
-    # Save predictions
     save_cols = ["batch_id", "ts", "spindle_speed", "feed_rate", "coolant_temp", "vibration", "tool_usage_cycles", "motor_current", "scenario_label", "y_true", "anomaly_type", "pred_z", "pred_iso", "pred_hybrid"]
     df[save_cols].to_csv(os.path.join(models_dir, "anomaly_predictions.csv"), index=False)
     docs_dir = os.path.join(base_dir, "docs")

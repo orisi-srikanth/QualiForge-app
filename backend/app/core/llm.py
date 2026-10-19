@@ -1,9 +1,3 @@
-"""
-Universal OpenAI-Compatible LLM Client for QualityMind
-Provides per-agent model routing, reasoning controls, adversarial critic architecture,
-and hosted embeddings for low-memory environments (Render <512 MB RAM).
-Seamlessly falls back to deterministic rule-based outputs when offline or LLM_PROVIDER="none".
-"""
 import os
 import json
 import logging
@@ -28,7 +22,6 @@ class AgentLLMConfig(BaseModel):
     force_json: bool = False
 
 class UniversalLLMClient:
-    """Universal client managing OpenAI-compatible endpoints across Groq, OpenRouter, and Gemini."""
 
     def __init__(self):
         self.provider = settings.LLM_PROVIDER.lower()
@@ -37,15 +30,12 @@ class UniversalLLMClient:
         return self.provider not in ("none", "")
 
     def get_config(self, agent_id: str) -> AgentLLMConfig:
-        """Resolves endpoint, model, fallback, and reasoning parameters per agent."""
         agent_id_clean = agent_id.lower().replace(" ", "_")
 
-        # 1. Agent 6: RCA (Kilo Gateway + NVIDIA Nemotron-3 Ultra 550B)
         if "agent_6" in agent_id_clean or "rca" in agent_id_clean:
             model = getattr(settings, "KILO_MODEL", None) or settings.AGENT6_MODEL or "nvidia/nemotron-3-ultra-550b-a55b:free"
             fallback_model = settings.AGENT6_FALLBACK_MODEL or "nvidia/nemotron-3-ultra-550b-a55b:free"
             
-            # Primary base_url and key: Kilo Gateway prioritized
             base_url = (
                 getattr(settings, "KILO_BASE_URL", None)
                 or settings.AGENT6_BASE_URL
@@ -74,7 +64,6 @@ class UniversalLLMClient:
                 force_json=True
             )
 
-        # 2. Agent 8: Critic (Adversarial Groq family at medium reasoning_effort)
         elif "agent_8" in agent_id_clean or "critic" in agent_id_clean:
             model = settings.AGENT8_MODEL or "openai/gpt-oss-120b"
             fallback_model = settings.AGENT8_FALLBACK_MODEL or "llama-3.3-70b-versatile"
@@ -98,7 +87,6 @@ class UniversalLLMClient:
                 force_json=False
             )
 
-        # 3. Agent 1: Data Intake (Fast, non-reasoning, forced JSON)
         elif "agent_1" in agent_id_clean or "intake" in agent_id_clean:
             model = settings.AGENT1_MODEL or "openai/gpt-oss-20b"
             fallback_model = settings.AGENT1_FALLBACK_MODEL or "openai/gpt-oss-20b"
@@ -120,7 +108,6 @@ class UniversalLLMClient:
                 force_json=True
             )
 
-        # 4. Agent 7: CAPA (Fast, non-reasoning, forced JSON)
         elif "agent_7" in agent_id_clean or "capa" in agent_id_clean:
             model = settings.AGENT7_MODEL or "gemini-3.5-flash-lite"
             fallback_model = settings.AGENT7_FALLBACK_MODEL or "gpt-oss-20b"
@@ -142,7 +129,6 @@ class UniversalLLMClient:
                 force_json=True
             )
 
-        # 5. Report Narrative Generation
         elif "report" in agent_id_clean:
             model = settings.REPORT_MODEL or "gemini-3.5-flash-lite"
             fallback_model = settings.REPORT_FALLBACK_MODEL or "gpt-oss-20b"
@@ -164,7 +150,6 @@ class UniversalLLMClient:
                 force_json=False
             )
 
-        # Default Generic Agent
         base_url = settings.GEMINI_BASE_URL or settings.GROQ_BASE_URL or settings.OPENROUTER_BASE_URL
         api_key = settings.GEMINI_API_KEY or settings.GROQ_API_KEY or settings.OPENROUTER_API_KEY or settings.OPENAI_API_KEY
         return AgentLLMConfig(
@@ -185,11 +170,6 @@ class UniversalLLMClient:
         temperature: float = 0.2,
         force_json: Optional[bool] = None
     ) -> Optional[str]:
-        """
-        Executes chat completion using OpenAI-compatible client.
-        Automatically attempts primary model, then fallback model.
-        Returns None on failure or if LLM_PROVIDER="none", triggering deterministic fallbacks.
-        """
         if not self.is_enabled():
             logger.info(f"[{agent_id}] LLM disabled (LLM_PROVIDER={self.provider}). Using deterministic rule-based engine.")
             return None
@@ -201,7 +181,6 @@ class UniversalLLMClient:
 
         should_json = cfg.force_json if force_json is None else force_json
 
-        # Attempt 1: Primary Model
         try:
             client = openai.OpenAI(base_url=cfg.base_url, api_key=cfg.api_key, timeout=30.0)
             kwargs: Dict[str, Any] = {
@@ -227,7 +206,6 @@ class UniversalLLMClient:
         except Exception as e:
             logger.warning(f"[{agent_id}] Primary model {cfg.model} failed: {e}. Trying fallback: {cfg.fallback_model}")
 
-        # Attempt 2: Fallback Model
         try:
             fallback_client = openai.OpenAI(
                 base_url=cfg.fallback_base_url,
@@ -254,10 +232,6 @@ class UniversalLLMClient:
         return None
 
     def embed_text(self, text: str) -> Optional[List[float]]:
-        """
-        Generates text embedding via hosted API (Gemini or OpenAI) over HTTP.
-        Consumes 0 MB local RAM, ensuring compliance with Render's 512 MB free tier.
-        """
         api_key = settings.EMBEDDING_API_KEY or settings.GEMINI_API_KEY or settings.OPENAI_API_KEY
         if not api_key:
             return None

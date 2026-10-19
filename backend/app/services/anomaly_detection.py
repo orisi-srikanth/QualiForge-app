@@ -1,15 +1,3 @@
-"""
-Hybrid Multi-Parameter Process Anomaly Detection Engine
-Monitors 8 manufacturing parameters using 5 complementary techniques:
-1. Operational Threshold Checks (machine limits from manuals / ISO 10816-3 / Kennametal specs)
-2. Robust Z-Score / Step Change (sudden changes > 3 sigma)
-3. EWMA / CUSUM Trend (gradual process drift toward specification limits)
-4. Scikit-Learn Isolation Forest (multivariate anomalous combinations)
-5. Statistical Baselines (mean, std, percentiles, robust median/MAD)
-
-Handles data quality issues (missing readings, duplicate timestamps, out-of-order data, unit conversion)
-without crashing, producing structured warnings and explicit 'Parameters Changed vs Unchanged' contrast tables.
-"""
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import numpy as np
@@ -50,8 +38,6 @@ except Exception:
 
 from backend.app.core.guardrails import EpistemicLabel
 
-# Standard nominal operational thresholds from machine specifications and manuals
-# (Okuma LB3000 Lathe Manual, ISO 10816-3 Class 1, Kennametal CNMG432 Tool Spec)
 OPERATIONAL_THRESHOLDS = {
     "vibration": {
         "name": "Machine Vibration",
@@ -126,7 +112,6 @@ OPERATIONAL_THRESHOLDS = {
 }
 
 class CusumResult(tuple):
-    """3-tuple (c_plus, c_minus, flagged) supporting both tuple and dict access."""
     def __new__(cls, c_plus, c_minus, flagged, alarm_index=None):
         instance = super().__new__(cls, (c_plus, c_minus, flagged))
         instance._alarm_index = alarm_index
@@ -153,9 +138,7 @@ class CusumResult(tuple):
             raise KeyError(item)
         return super().__getitem__(item)
 
-
 class EwmaResult(tuple):
-    """4-tuple (z, ucl, lcl, flagged) supporting both tuple and dict access."""
     def __new__(cls, z, ucl, lcl, flagged, alarm_index=None):
         instance = super().__new__(cls, (z, ucl, lcl, flagged))
         instance._alarm_index = alarm_index
@@ -184,9 +167,7 @@ class EwmaResult(tuple):
             raise KeyError(item)
         return super().__getitem__(item)
 
-
 class HybridAnomalyDetector:
-    """Enterprise multi-parameter process anomaly detection engine."""
 
     def __init__(self):
         self._scaler: Optional[StandardScaler] = None
@@ -194,7 +175,6 @@ class HybridAnomalyDetector:
         self._features = ["spindle_speed", "feed_rate", "coolant_temp", "vibration", "motor_current"]
 
     def train_multivariate_model(self, df: pd.DataFrame, features: Optional[List[str]] = None) -> None:
-        """Trains Isolation Forest on baseline DataFrame."""
         feats = features or self._features
         avail = [f for f in feats if f in df.columns]
         if not avail:
@@ -207,7 +187,6 @@ class HybridAnomalyDetector:
         self._features = avail
 
     def detect_multivariate_anomalies(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
-        """Evaluates DataFrame against trained Isolation Forest."""
         feats = self._features
         avail = [f for f in feats if f in df.columns]
         if not avail:
@@ -233,12 +212,10 @@ class HybridAnomalyDetector:
 
     @classmethod
     def detect_drift_and_trends(cls, df: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
-        """Alias for calculate_trend_statistics."""
         return cls.calculate_trend_statistics(df)
 
     @staticmethod
     def _check_operational_thresholds(reading: Dict[str, Any]) -> Tuple[str, List[str]]:
-        """Checks a single telemetry reading against configured OPERATIONAL_THRESHOLDS."""
         alarms = []
         has_critical = False
         has_warn = False
@@ -253,7 +230,6 @@ class HybridAnomalyDetector:
             except (ValueError, TypeError):
                 continue
 
-            # Critical checks
             if "critical" in limits and val >= limits["critical"]:
                 has_critical = True
                 alarms.append(f"{limits['name']} critical: {val} {limits.get('unit', '')} >= {limits['critical']}")
@@ -263,7 +239,6 @@ class HybridAnomalyDetector:
             elif "critical_low" in limits and val <= limits["critical_low"]:
                 has_critical = True
                 alarms.append(f"{limits['name']} critical low: {val} <= {limits['critical_low']}")
-            # Warning checks
             elif "warn" in limits and val >= limits["warn"]:
                 has_warn = True
                 alarms.append(f"{limits['name']} warning: {val} >= {limits['warn']}")
@@ -278,17 +253,12 @@ class HybridAnomalyDetector:
         return status, alarms
 
     def detect_anomalies(self, df: pd.DataFrame, batch_id: str = "BATCH-TEST", machine: str = "CNC-04") -> List[Dict[str, Any]]:
-        """Convenience method running the hybrid detector on a DataFrame and returning anomalies."""
         records = df.to_dict(orient="records")
         res = self.analyze_telemetry_series(batch_id=batch_id, machine_code=machine, telemetry_records=records)
         return res.get("anomalies", [])
 
     @staticmethod
     def compute_robust_z_score(val: float, median: float, mad: float) -> float:
-        """
-        Computes robust z-score: 0.6745 * (val - median) / MAD.
-        Resistant to extreme outlier masking.
-        """
         if mad < 1e-6:
             return 0.0 if abs(val - median) < 1e-6 else 5.0
         return float(0.6745 * (val - median) / mad)
@@ -301,12 +271,6 @@ class HybridAnomalyDetector:
         h: Optional[float] = None,
         sigma: Optional[float] = None
     ) -> CusumResult:
-        """
-        Tabular CUSUM (Cumulative Sum) quality control detector.
-        k: allowance / slack parameter (default: 0.5 * sigma)
-        h: decision interval threshold (default: 4.0 * sigma)
-        Returns: CusumResult (c_plus, c_minus, flagged)
-        """
         vals = np.asarray(series, dtype=float)
         std_val = sigma if (sigma is not None and sigma > 1e-6) else max(float(np.std(vals)), 0.05)
         k_val = k if k is not None else 0.5 * std_val
@@ -336,12 +300,6 @@ class HybridAnomalyDetector:
         L: float = 3.0,
         sigma: Optional[float] = None
     ) -> EwmaResult:
-        """
-        Exponentially Weighted Moving Average (EWMA) control chart.
-        lambda_: smoothing parameter in [0.05, 0.25] (default: 0.2)
-        L: control limit width multiplier (default: 3.0)
-        Returns: EwmaResult (z_series, ucl_series, lcl_series, is_flagged)
-        """
         vals = np.asarray(series, dtype=float)
         std_val = sigma if (sigma is not None and sigma > 1e-6) else max(float(np.std(vals)), 0.05)
 
@@ -369,15 +327,6 @@ class HybridAnomalyDetector:
     def validate_and_clean_telemetry(
         records: List[Dict[str, Any]]
     ) -> Tuple[List[Dict[str, Any]], List[str]]:
-        """
-        Validates raw telemetry records for data quality defects:
-        - Out-of-order timestamps: sorts chronologically
-        - Duplicate timestamps: deduplicates keeping latest
-        - Missing readings: imputes missing numeric fields from baseline or forward fill
-        - Unit normalization: converts recognized foreign units (e.g. in/s to mm/s, F to C)
-        Returns: (cleaned_records, warnings_list)
-        Never crashes on bad data.
-        """
         warnings: List[str] = []
         if not records:
             return [], warnings
@@ -403,23 +352,17 @@ class HybridAnomalyDetector:
             except (ValueError, TypeError):
                 return default_val
 
-        # 1. Parse and standardize records
         for idx, r in enumerate(records):
             item = dict(r)
 
-            # Check timestamp
             ts_str = str(item.get("timestamp") or item.get("ts") or f"2026-10-10 00:00:{idx:02d}")
             item["timestamp"] = ts_str
 
-            # Duplicate timestamp check
             if ts_str in seen_timestamps:
                 warnings.append(f"Duplicate timestamp detected at '{ts_str}' (record #{idx+1}); deduplicated keeping latest.")
-                # Update previous record in list
                 cleaned = [x for x in cleaned if x["timestamp"] != ts_str]
             seen_timestamps.add(ts_str)
 
-            # Unit normalizations if alternate units supplied
-            # Vibration: in/s -> mm/s
             if "vibration_in_s" in item:
                 try:
                     item["vibration"] = round(float(item["vibration_in_s"]) * 25.4, 2)
@@ -435,7 +378,6 @@ class HybridAnomalyDetector:
                 item["vibration"] = 2.1
                 warnings.append(f"Missing vibration reading at '{ts_str}'; imputed baseline 2.1 mm/s.")
 
-            # Temperature: °F -> °C
             if "coolant_temp_f" in item:
                 try:
                     item["coolant_temp"] = round((float(item["coolant_temp_f"]) - 32.0) * 5.0 / 9.0, 1)
@@ -451,27 +393,21 @@ class HybridAnomalyDetector:
                 item["coolant_temp"] = 24.0
                 warnings.append(f"Missing coolant temperature reading at '{ts_str}'; imputed baseline 24.0 °C.")
 
-            # Tool cycles
             val_cycles = item.get("tool_usage_cycles") if item.get("tool_usage_cycles") is not None else (item.get("tool_cycles") if item.get("tool_cycles") is not None else item.get("tool_wear_cycles"))
             item["tool_usage_cycles"] = _clean_int(val_cycles, 600)
 
-            # Spindle speed
             val_speed = item.get("spindle_speed", item.get("spindle_speed_rpm"))
             item["spindle_speed"] = _clean_val(val_speed, 1200.0)
 
-            # Feed rate
             val_feed = item.get("feed_rate", item.get("feed_rate_mmrev"))
             item["feed_rate"] = _clean_val(val_feed, 0.20)
 
-            # Motor current
             val_motor = item.get("motor_current", item.get("motor_current_a", 14.5))
             item["motor_current"] = _clean_val(val_motor, 14.5)
 
-            # Cycle time
             val_cyc = item.get("cycle_time", item.get("cycle_time_s", 45.0))
             item["cycle_time"] = _clean_val(val_cyc, 45.0)
 
-            # Pressure: psi -> bar
             if "pressure_psi" in item:
                 try:
                     item["pressure"] = round(float(item["pressure_psi"]) / 14.5038, 2)
@@ -486,7 +422,6 @@ class HybridAnomalyDetector:
             else:
                 item["pressure"] = 5.5
 
-            # Check for unsupported units
             for k in list(item.keys()):
                 if any(tag in k.lower() for tag in ["_unit", "unit_", "units", "unsupported"]):
                     u_val = str(item[k]).lower().strip()
@@ -496,7 +431,6 @@ class HybridAnomalyDetector:
 
             cleaned.append(item)
 
-        # 2. Chronological Ordering Check
         timestamps_raw = [r["timestamp"] for r in cleaned]
         is_sorted = all(timestamps_raw[i] <= timestamps_raw[i+1] for i in range(len(timestamps_raw)-1))
         if not is_sorted:
@@ -507,10 +441,6 @@ class HybridAnomalyDetector:
 
     @staticmethod
     def calculate_trend_statistics(df: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
-        """
-        Computes OLS linear regression slope and p-value for process parameters.
-        Returns parameter trend metadata: slope, intercept, r_value, p_value, direction.
-        """
         trends: Dict[str, Dict[str, Any]] = {}
         if len(df) < 3:
             return trends
@@ -571,11 +501,6 @@ class HybridAnomalyDetector:
         baselines: Optional[Dict[str, Dict[str, float]]] = None,
         thresholds: Optional[Dict[str, Dict[str, float]]] = None
     ) -> Dict[str, Any]:
-        """
-        Runs comprehensive hybrid anomaly detection across 8 telemetry parameters.
-        Monitors 5 core parameters: vibration, coolant_temp, spindle_speed, feed_rate, tool_usage_cycles,
-        plus 3 extra parameters: motor_current, cycle_time, pressure.
-        """
         if not telemetry_records:
             return {
                 "batch_id": batch_id,
@@ -596,7 +521,6 @@ class HybridAnomalyDetector:
         anomalies: List[Dict[str, Any]] = []
         flags: List[str] = []
 
-        # Standard certified baselines for precision shaft cell
         default_base = {
             "vibration": {"mean": 2.1, "std": 0.052, "p01": 1.97, "p99": 2.21, "median": 2.10, "mad": 0.03},
             "tool_usage_cycles": {"mean": 600.0, "std": 86.6, "p01": 600.0, "p99": 890.0, "median": 600.0, "mad": 75.0},
@@ -609,7 +533,6 @@ class HybridAnomalyDetector:
         }
         active_baselines = baselines or default_base
 
-        # Resolve active operational thresholds from persisted machine configuration
         active_thresholds = {k: dict(v) for k, v in OPERATIONAL_THRESHOLDS.items()}
         if thresholds:
             for p, t_cfg in thresholds.items():
@@ -627,7 +550,6 @@ class HybridAnomalyDetector:
                         active_thresholds[p]["warn_low"] = float(t_cfg["lower"])
                         active_thresholds[p]["critical_low"] = float(t_cfg["lower"])
 
-        # 1. Operational Threshold Checks on latest points
         latest_record = df.iloc[-1]
         vibration_val = float(latest_record.get("vibration", 2.1))
         tool_cycles_val = int(latest_record.get("tool_usage_cycles", 600))
@@ -673,7 +595,6 @@ class HybridAnomalyDetector:
             vibration_status = "ELEVATED_WARNING"
             flags.append(f"Vibration elevated: {vibration_val:.2f} mm/s (warn limit: {warn_vib_thresh} mm/s)")
 
-
         tool_status = "NORMAL"
         crit_tool_thresh = active_thresholds["tool_usage_cycles"]["critical"]
         warn_tool_thresh = active_thresholds["tool_usage_cycles"]["warn"]
@@ -706,7 +627,6 @@ class HybridAnomalyDetector:
         elif tool_cycles_val >= warn_tool_thresh:
             tool_status = "WARNING_NEAR_LIFE"
 
-        # Coolant temperature check: flagged only if outside documented threshold
         coolant_status = "NORMAL"
         crit_temp_thresh = active_thresholds["coolant_temp"]["critical"]
         warn_temp_thresh = active_thresholds["coolant_temp"]["warn"]
@@ -733,8 +653,6 @@ class HybridAnomalyDetector:
         elif coolant_temp_val >= warn_temp_thresh:
             coolant_status = "WARNING_ELEVATED"
 
-        # 1b. Additional Configured Operational Threshold Checks
-        # Spindle Speed: critical limits
         crit_low_speed = active_thresholds["spindle_speed"]["critical_low"]
         crit_high_speed = active_thresholds["spindle_speed"]["critical_high"]
         if spindle_speed_val <= crit_low_speed or spindle_speed_val >= crit_high_speed:
@@ -758,7 +676,6 @@ class HybridAnomalyDetector:
                 "label": EpistemicLabel.STATISTICAL_FINDING.value
             })
 
-        # Hydraulic Clamping Pressure: critical limits
         crit_low_press = active_thresholds["pressure"]["critical_low"]
         crit_high_press = active_thresholds["pressure"]["critical_high"]
         if pressure_val <= crit_low_press or pressure_val >= crit_high_press:
@@ -782,7 +699,6 @@ class HybridAnomalyDetector:
                 "label": EpistemicLabel.STATISTICAL_FINDING.value
             })
 
-        # Motor Current: critical limit
         crit_curr_thresh = active_thresholds["motor_current"]["critical"]
         if motor_current_val >= crit_curr_thresh:
             anomalies.append({
@@ -805,7 +721,6 @@ class HybridAnomalyDetector:
                 "label": EpistemicLabel.STATISTICAL_FINDING.value
             })
 
-        # 2. TC-04 Sudden Step Change Detection & TC-05 Drift Detection
         drift_detected = False
         if len(df) >= 6 and "vibration" in df.columns:
             vib_series = df["vibration"].values
@@ -832,7 +747,6 @@ class HybridAnomalyDetector:
                     "label": EpistemicLabel.STATISTICAL_FINDING.value
                 })
 
-        # CUSUM / EWMA / Trend Drift Detection
         if len(df) >= 10:
             for p in ["vibration", "coolant_temp", "motor_current"]:
                 if p in df.columns:
@@ -840,7 +754,6 @@ class HybridAnomalyDetector:
                     p_mean = active_baselines.get(p, {}).get("mean", float(np.mean(series)))
                     p_std = max(active_baselines.get(p, {}).get("std", 0.05), 0.01)
 
-                    # Check for continuous upward drift across consecutive points
                     has_consecutive = False
                     for start_idx in range(len(series) - 5):
                         window = series[start_idx : start_idx + 6]
@@ -849,12 +762,9 @@ class HybridAnomalyDetector:
                             has_consecutive = True
                             break
 
-                    # CUSUM / EWMA alarm check
                     cusum_res = cls.compute_cusum(series, target=p_mean, sigma=p_std)
                     ewma_res = cls.compute_ewma(series, target=p_mean, sigma=p_std)
 
-                    # For coolant_temp, only flag if temperature reached elevated levels (>= warn 28.0 C or >= 26.0 C)
-                    # to prevent normal thermal fluctuations in 24 C range from being falsely flagged
                     val_elevated = (series[-1] >= (p_mean + 2.0 * p_std))
 
                     if p == "coolant_temp":
@@ -887,7 +797,6 @@ class HybridAnomalyDetector:
                                 "label": EpistemicLabel.STATISTICAL_FINDING.value
                             })
 
-        # 3. Multivariate Isolation Forest Outlier Analysis
         features = ["spindle_speed", "feed_rate", "coolant_temp", "vibration", "motor_current"]
         available_features = [f for f in features if f in df.columns]
         if len(df) >= 10 and len(available_features) >= 4:
@@ -900,9 +809,6 @@ class HybridAnomalyDetector:
                 preds = iso_forest.predict(X_scaled)
                 scores = -iso_forest.decision_function(X_scaled)
 
-                # Flag multivariate anomaly if joint distribution is anomalous:
-                # E.g. unusual combination (high feed + low speed + high motor current)
-                # or concurrent anchor critical state
                 is_multi_anomaly = (preds[-1] == -1 and (
                     (abs(feed_rate_val - 0.20) > 0.015 and motor_current_val > 16.0) or
                     (vibration_status == "ABNORMAL_CRITICAL" or tool_status == "CRITICAL_EXCEEDED")
@@ -930,8 +836,6 @@ class HybridAnomalyDetector:
             except Exception:
                 pass
 
-        # 4. Explicit 'Parameters Changed vs Unchanged' Contrast Table
-        # Essential for root cause exclusion (proves spindle speed and feed rate did NOT cause failure)
         vib_pct = round(((vibration_val - 2.1) / 2.1) * 100)
         tool_pct = round(((tool_cycles_val - 600) / 600) * 100)
         temp_pct = round(((coolant_temp_val - 24.0) / 24.0) * 100)
@@ -1019,10 +923,8 @@ class HybridAnomalyDetector:
             }
         ]
 
-        # 5. Compute Trend Statistics
         trends = cls.calculate_trend_statistics(df)
 
-        # Enforce human review status and epistemic labeling on every anomaly
         for a in anomalies:
             if "review_status" not in a:
                 a["review_status"] = "HUMAN_REVIEW_REQUIRED"

@@ -1,6 +1,3 @@
-"""
-PyTest Test Suite for Mandatory Scenarios TC-01 to TC-08
-"""
 import pytest
 from backend.app.scenarios.test_scenarios import run_test_scenario, run_all_scenarios
 

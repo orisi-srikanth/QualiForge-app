@@ -104,7 +104,6 @@ def update_ncrs():
         df.to_csv(ncr_csv_path, index=False)
         print(f"Updated {ncr_json_path} and {ncr_csv_path}: Total {len(existing_ncrs)} records.")
 
-    # Write Markdown documents in backend/data/kb/
     for ncr in NEW_SHAFT_NCRS:
         md_path = BACKEND_KB_DIR / f"{ncr['id']}.md"
         content = f"""# Nonconformance Report: {ncr['id']}

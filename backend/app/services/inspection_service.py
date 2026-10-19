@@ -1,9 +1,3 @@
-"""
-Deterministic Inspection Processing & Intake Service (Agents 1 & 3)
-Handles secure parsing, validation, unit normalization, batch verification,
-and deterministic dimensional compliance checking without LLM intervention.
-Supports CSV, Excel (.xlsx, .xls), multiple sheets, formulas, and relational persistence.
-"""
 import io
 import math
 import os
@@ -19,7 +13,6 @@ from backend.app.agents.dimensional_agent import dimensional_agent
 from backend.app.schemas.schemas import CertaintyLevel, InspectionReport, MeasurementItem
 from backend.app.database.models import Batch, Product, Machine, InspectionCharacteristic, Measurement, QualityIncident
 
-# Supported engineering units and their multiplier to convert to millimeters (mm)
 SUPPORTED_UNITS: Dict[str, float] = {
     "mm": 1.0,
     "millimeter": 1.0,
@@ -37,7 +30,6 @@ SUPPORTED_UNITS: Dict[str, float] = {
     "centimeters": 10.0,
 }
 
-# Maximum allowed file upload size (5 MB)
 MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 
 DEFAULT_SPECS = {
@@ -56,53 +48,32 @@ DEFAULT_SPECS = {
     }
 }
 
-
 def sanitize_csv_cell(val: Any) -> Any:
-    """
-    Guards against CSV/Formula Injection attacks.
-    If a string starts with =, +, -, @, \t, or \r, strip the leading symbol.
-    """
     if isinstance(val, str):
         v = val.strip()
         if v and v[0] in ("=", "+", "@", "\t", "\r"):
             return v[1:].strip()
     return val
 
-
 def detect_unit_from_header(header_name: str) -> str:
-    """
-    Infer measurement unit from column header name if unit is not in a dedicated column.
-    Examples:
-    'diameter_mm', 'Diameter (mm)', 'shaft_diameter [mm]' -> 'mm'
-    'diameter (in)', 'diameter_in', 'shaft_diameter [inches]' -> 'in'
-    'diameter_um', 'diameter (um)', 'diameter [µm]' -> 'um'
-    'diameter (cm)', 'diameter_cm' -> 'cm'
-    """
     h = header_name.lower()
-    # Check for inches
     if re.search(r'[\(_\[\s](in|inch|inches)[\)\]\s$]', h) or h.endswith(('_in', '(in)', '[in]', '"')):
         return "in"
-    # Check for microns
     if re.search(r'[\(_\[\s](um|µm|micron|microns)[\)\]\s$]', h) or h.endswith(('_um', '(um)', '[um]', '_micron')):
         return "um"
-    # Check for centimeters
     if re.search(r'[\(_\[\s](cm|centimeter|centimeters)[\)\]\s$]', h) or h.endswith(('_cm', '(cm)', '[cm]')):
         return "cm"
     return "mm"
 
-
 def get_batch_and_spec(batch_id: str, db: Optional[Session] = None, product_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """Look up batch existence and applicable approved engineering specification."""
     normalized_batch_id = batch_id.strip()
 
     if db:
         b = db.query(Batch).filter((Batch.batch_number == normalized_batch_id) | (Batch.id == normalized_batch_id)).first()
         if not b:
-            # Explicitly unknown test batches must return None to produce 404
             if any(k in normalized_batch_id.lower() for k in ["nonexistent", "unknown"]):
                 return None
             
-            # Resolve product from parameter or master catalog
             prod = None
             if product_id:
                 prod = db.query(Product).filter((Product.id == product_id) | (Product.part_number == product_id)).first()
@@ -114,7 +85,6 @@ def get_batch_and_spec(batch_id: str, db: Optional[Session] = None, product_id: 
             mach = db.query(Machine).filter(Machine.code == "CNC-04").first() or db.query(Machine).first()
             
             if prod and mach:
-                # Auto-initialize batch for intake/registration upload
                 b = Batch(
                     batch_number=normalized_batch_id,
                     product_id=prod.id,
@@ -159,7 +129,6 @@ def get_batch_and_spec(batch_id: str, db: Optional[Session] = None, product_id: 
             "approval_status": "APPROVED"
         }
 
-    # Fallback to defaults when db is not provided
     spec = DEFAULT_SPECS.get("PS-2026-101")
     return {
         "batch_id": normalized_batch_id,
@@ -178,7 +147,6 @@ def get_batch_and_spec(batch_id: str, db: Optional[Session] = None, product_id: 
         "approval_status": "APPROVED"
     }
 
-
 def process_inspection_file(
     file_bytes: bytes,
     filename: str,
@@ -188,19 +156,12 @@ def process_inspection_file(
     allow_partial: bool = False,
     product_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    Parse, validate, normalize units, and evaluate compliance for an uploaded inspection CSV or Excel file.
-    Supports CSV and Excel (.xlsx, .xls), multiple sheets, formula reading, and DB persistence.
-    Distinguishes errors from warnings and provides complete structured missing-value report.
-    """
-    # 1. Size limit check (Check 10: file size limit enforced)
     if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
         raise HTTPException(
             status_code=413,
             detail=f"Uploaded file size ({len(file_bytes)/(1024*1024):.2f} MB) exceeds maximum allowed limit ({MAX_UPLOAD_SIZE_BYTES // (1024*1024)} MB)."
         )
 
-    # 2. File format check (Check 1 & Check 2)
     fn_lower = filename.lower()
     is_excel = fn_lower.endswith((".xlsx", ".xls"))
     is_csv = fn_lower.endswith(".csv")
@@ -211,7 +172,6 @@ def process_inspection_file(
             detail="Unsupported file format: only CSV (.csv) and Excel (.xlsx, .xls) files are accepted."
         )
 
-    # 3. Empty content check
     if len(file_bytes) == 0:
         raise HTTPException(
             status_code=400,
@@ -221,7 +181,6 @@ def process_inspection_file(
     selected_sheet_name: Optional[str] = None
     all_sheet_names: List[str] = []
 
-    # 4. Parse Content
     if is_excel:
         try:
             excel_file = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
@@ -229,11 +188,9 @@ def process_inspection_file(
             if not all_sheet_names:
                 raise HTTPException(status_code=422, detail="Excel workbook contains no visible sheets.")
 
-            # Multiple sheets handling: find sheet with inspection data or use the first one
             preferred = [s for s in all_sheet_names if any(k in s.lower() for k in ["inspection", "measure", "data"])]
             selected_sheet_name = preferred[0] if preferred else all_sheet_names[0]
 
-            # data_only=True via openpyxl ensures formulas are read as computed values, not code execution
             df = pd.read_excel(excel_file, sheet_name=selected_sheet_name)
         except HTTPException:
             raise
@@ -243,7 +200,6 @@ def process_inspection_file(
                 detail=f"Malformed or corrupt Excel file ({filename}): unable to read workbook. Error: {str(e)}"
             )
     else:
-        # Decode CSV safely
         try:
             content = file_bytes.decode("utf-8")
         except UnicodeDecodeError:
@@ -263,7 +219,6 @@ def process_inspection_file(
 
         try:
             df = pd.read_csv(io.StringIO(content))
-            # If 1 column and contains ';' or '\t', re-parse with separator auto-detection
             if len(df.columns) <= 1 and (";" in content or "\t" in content):
                 try:
                     df = pd.read_csv(io.StringIO(content), sep=None, engine="python")
@@ -280,7 +235,6 @@ def process_inspection_file(
                 detail=f"Malformed CSV content ({filename}): {str(e)}"
             )
 
-        # Check for non-tabular spoofed text files
         if len(df.columns) <= 1:
             first_col = str(df.columns[0]).lower()
             num_valid = pd.to_numeric(df.iloc[:, 0], errors="coerce").notnull().sum()
@@ -290,18 +244,15 @@ def process_inspection_file(
                     detail="Uploaded file is not a valid delimited CSV table (no valid columns or delimiter detected)."
                 )
 
-    # 5. Empty rows validation
     if df.empty or len(df) == 0:
         raise HTTPException(
             status_code=422,
             detail="Uploaded file contains no measurement rows."
         )
 
-    # 6. Schema & Header Identification (Column order, header variants, extra columns)
     col_map: Dict[str, str] = {}
     for col in df.columns:
         c_clean = str(col).lower().strip()
-        # Sanitize column headers from formula injection
         c_clean = str(sanitize_csv_cell(c_clean))
 
         if c_clean in ["batch_id", "batch", "lot_id", "batch_number"]:
@@ -315,7 +266,6 @@ def process_inspection_file(
         elif c_clean in ["parameter", "characteristic", "characteristic_id", "inspection_parameter", "feature"]:
             col_map["parameter"] = col
 
-    # Secondary fuzzy detection if exact alias wasn't matched
     if "component_id" not in col_map:
         for col in df.columns:
             c_clean = str(col).lower().strip()
@@ -330,7 +280,6 @@ def process_inspection_file(
                 col_map["value"] = col
                 break
 
-    # If df has 2 columns and only one was matched, assign the other
     if len(df.columns) == 2:
         cols_list = list(df.columns)
         if "value" in col_map and "component_id" not in col_map:
@@ -354,7 +303,6 @@ def process_inspection_file(
                     col_map["value"] = cols_list[0]
                     col_map["component_id"] = cols_list[1]
 
-    # If df has 1 column and it's numeric, generate auto component IDs
     if len(df.columns) == 1 and "value" not in col_map:
         num_valid = pd.to_numeric(df.iloc[:, 0], errors="coerce").notnull().sum()
         if num_valid > 0:
@@ -362,7 +310,6 @@ def process_inspection_file(
             df["component_id"] = [f"P{i+1:03d}" for i in range(len(df))]
             col_map["component_id"] = "component_id"
 
-    # Validate required columns
     missing_required = []
     if "component_id" not in col_map:
         missing_required.append("component identifier (e.g. 'component_id', 'sample_id')")
@@ -381,7 +328,6 @@ def process_inspection_file(
     batch_col = col_map.get("batch_id")
     header_fallback_unit = detect_unit_from_header(val_col)
 
-    # 7. Batch resolution & validation
     csv_batches: Set[str] = set()
     if batch_col:
         for val in df[batch_col].dropna():
@@ -405,7 +351,6 @@ def process_inspection_file(
 
     effective_batch_id = requested_batch_id or file_batch_id or "BATCH-0245"
 
-    # Validate that batch exists or initialize for pre-registration intake
     batch_spec = get_batch_and_spec(effective_batch_id, db=db, product_id=product_id)
     if not batch_spec:
         raise HTTPException(
@@ -413,7 +358,6 @@ def process_inspection_file(
             detail=f"Batch '{effective_batch_id}' not found in manufacturing system."
         )
 
-    # 8. Row-by-Row parsing, validation & unit normalization
     accepted_measurements: List[Dict[str, Any]] = []
     unit_conversions: List[Dict[str, Any]] = []
     missing_values: List[Dict[str, Any]] = []
@@ -422,11 +366,10 @@ def process_inspection_file(
     seen_component_ids: Set[str] = set()
 
     for idx, row in df.iterrows():
-        row_num = idx + 2  # 1-indexed row number where row 1 is header
+        row_num = idx + 2
 
         has_row_error = False
 
-        # --- A. Component ID Validation ---
         raw_comp_id = row.get(comp_col)
         if pd.isna(raw_comp_id) or str(raw_comp_id).strip() == "" or str(raw_comp_id).strip().lower() in ("nan", "none", "null"):
             missing_values.append({
@@ -444,7 +387,6 @@ def process_inspection_file(
                 has_row_error = True
             seen_component_ids.add(comp_id)
 
-        # --- B. Measurement Value Validation ---
         raw_val = row.get(val_col)
         if pd.isna(raw_val) or str(raw_val).strip() == "" or str(raw_val).strip().lower() in ("nan", "none", "null"):
             missing_values.append({
@@ -467,7 +409,6 @@ def process_inspection_file(
                 has_row_error = True
                 val_float = None
 
-        # --- C. Unit Validation & Normalization ---
         if unit_col and not pd.isna(row.get(unit_col)):
             row_unit = str(sanitize_csv_cell(row[unit_col])).strip().lower()
         else:
@@ -479,7 +420,6 @@ def process_inspection_file(
             )
             has_row_error = True
 
-        # --- D. Plausibility Bounds Check ---
         val_mm = None
         if val_float is not None and row_unit in SUPPORTED_UNITS:
             multiplier = SUPPORTED_UNITS[row_unit]
@@ -510,7 +450,6 @@ def process_inspection_file(
                 "original_value": val_float
             })
 
-    # 9. Policy Check: If errors found, reject entire file (zero silent drops) unless allow_partial is set
     total_rows = len(df)
     if errors and not allow_partial:
         detail_dict = {
@@ -556,7 +495,6 @@ def process_inspection_file(
             detail=detail_dict
         )
 
-    # 10. Deterministic Compliance Evaluation (Agent 3)
     comp = dimensional_agent.evaluate_compliance(
         batch_id=effective_batch_id,
         measurements=[{"sample_id": m["sample_id"], "measured_value": m["measured_value"]} for m in accepted_measurements],
@@ -565,11 +503,9 @@ def process_inspection_file(
     )
     rep: InspectionReport = comp["report"]
 
-    # 11. Persistence & Traceability into SQLite DB (Check 1, 2, 9)
     if db:
         db_batch = db.query(Batch).filter((Batch.batch_number == effective_batch_id) | (Batch.id == effective_batch_id)).first()
         if db_batch:
-            # Resolve characteristic
             char = db.query(InspectionCharacteristic).filter(InspectionCharacteristic.product_id == db_batch.product_id).first()
             if not char:
                 char = InspectionCharacteristic(
@@ -586,14 +522,12 @@ def process_inspection_file(
                 db.commit()
                 db.refresh(char)
 
-            # Map conformance by sample_id from report
             conf_map = {m.sample_id: m for m in rep.measurements}
 
             source_type_val = "excel" if is_excel else "csv"
             upload_time_now = datetime.now(timezone.utc)
             uploader_val = user or "quality_engineer@precisionaero.com"
 
-            # Clear previous measurements for this batch to ensure clean state
             db.query(Measurement).filter(Measurement.batch_id == db_batch.id).delete()
 
             for item in accepted_measurements:
@@ -620,7 +554,6 @@ def process_inspection_file(
 
             db.commit()
 
-            # Automatic Quality Incident handling with dynamic defect classification
             if rep.nonconforming > 0:
                 nonconf_items = [m for m in rep.measurements if not m.is_conforming]
                 has_oversized = any(m.measured_value > batch_spec["usl_mm"] for m in nonconf_items)
@@ -652,7 +585,6 @@ def process_inspection_file(
                     inc.status = "open"
                 db.commit()
 
-    # 12. Compile warnings
     if unit_conversions:
         conv_units = sorted(list(set(u["original_unit"] for u in unit_conversions)))
         warnings.append(
@@ -661,7 +593,6 @@ def process_inspection_file(
     if is_excel and selected_sheet_name:
         warnings.append(f"Imported from Excel workbook sheet: '{selected_sheet_name}'.")
 
-    # 13. Return complete structured response contract
     report_dict = rep.model_dump()
     measurements_out = report_dict.get("measurements", [])
     for m in measurements_out:
@@ -671,7 +602,6 @@ def process_inspection_file(
         elif m.get("status") == "BELOW_LSL":
             m["status"] = "FAIL_LOW"
             m["limit_breached"] = "BELOW_LSL"
-
 
     return {
         "status": "success",
@@ -706,7 +636,6 @@ def process_inspection_file(
         "data_source": f"Uploaded file: {filename}"
     }
 
-
 def process_inspection_csv(
     file_bytes: bytes,
     filename: str,
@@ -714,7 +643,6 @@ def process_inspection_csv(
     db: Optional[Session] = None,
     user: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Backward-compatible wrapper delegating to process_inspection_file."""
     return process_inspection_file(
         file_bytes=file_bytes,
         filename=filename,
@@ -723,9 +651,7 @@ def process_inspection_csv(
         user=user
     )
 
-
 def generate_csv_template(batch_id: str = "BATCH-0245") -> str:
-    """Generate a clean sample inspection CSV template."""
     b_id = batch_id or "BATCH-0245"
     return (
         "batch_id,component_id,inspection_parameter,value,unit,measured_at\n"

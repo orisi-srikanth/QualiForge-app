@@ -1,8 +1,3 @@
-"""
-Manufacturing Process Investigation Endpoints (Requirement 1)
-Serves defect-specific root-cause investigations, process parameter correlation,
-and missing-evidence diagnostics for the Manufacturing Process Investigation UI.
-"""
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -14,11 +9,9 @@ from backend.app.services.investigation_service import build_investigation_repor
 
 router = APIRouter()
 
-
 class RunInvestigationPayload(BaseModel):
     batch_id: str = Field(..., description="Target batch number or ID", json_schema_extra={"example": "BATCH-0245"})
     force_refresh: bool = Field(False, description="Whether to recompute investigation from live records")
-
 
 @router.get(
     "/investigation/{batch_id}",
@@ -40,7 +33,6 @@ def get_process_investigation(
         import logging
         logging.getLogger("uvicorn.error").error(f"Error generating investigation for {clean_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate process investigation: {str(e)}")
-
 
 @router.post(
     "/investigation/run",
