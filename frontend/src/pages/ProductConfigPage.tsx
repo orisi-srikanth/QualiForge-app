@@ -24,9 +24,16 @@ interface Props {
   onNavigate?: (page: string, machineId?: string) => void;
 }
 
+const defaultFallbackMachines = [
+  { code: "CNC-01", name: "Haas VF-2 3-Axis Mill", cell: "Cell-A" },
+  { code: "CNC-02", name: "Mori Seiki NLX-2500 CNC Lathe", cell: "Cell-A" },
+  { code: "CNC-03", name: "Mazak Quick Turn 250MSY", cell: "Cell-B" },
+  { code: "CNC-04", name: "Okuma LB3000-EX II CNC Lathe", cell: "Cell-B" },
+];
+
 export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
   const [products, setProducts] = useState<ProductSpec[]>([]);
-  const [machines, setMachines] = useState<any[]>([]);
+  const [machines, setMachines] = useState<any[]>(defaultFallbackMachines);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<ProductSpec | null>(null);
 
@@ -39,13 +46,14 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
     part_number: "",
-    manufacturing_process: "",
+    manufacturing_process: "CNC Turning & Grinding",
     machine_id: "CNC-04",
     material: "Carbon Steel AISI 1045",
     inspection_parameter: "shaft_diameter",
@@ -61,13 +69,21 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
     try {
       setLoading(true);
       const [prods, machs] = await Promise.all([
-        api.getProducts(),
-        api.getMachines(),
+        api.getProducts().catch((err) => {
+          console.warn("Failed to load products from API:", err);
+          return [] as ProductSpec[];
+        }),
+        api.getMachines().catch((err) => {
+          console.warn("Failed to load machines from API:", err);
+          return defaultFallbackMachines;
+        }),
       ]);
       setProducts(prods);
-      setMachines(machs);
+      setMachines(machs && machs.length > 0 ? machs : defaultFallbackMachines);
       if (prods.length > 0) {
         setSelectedProduct(prods[0]);
+      } else {
+        setSelectedProduct(null);
       }
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to load product specifications");
@@ -83,16 +99,16 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
   useEffect(() => {
     if (selectedProduct && !isCreating) {
       setFormData({
-        name: selectedProduct.name,
-        part_number: selectedProduct.part_number,
-        manufacturing_process: selectedProduct.manufacturing_process,
-        machine_id: selectedProduct.machine_id,
+        name: selectedProduct.name || "",
+        part_number: selectedProduct.part_number || "",
+        manufacturing_process: selectedProduct.manufacturing_process || "CNC Turning & Grinding",
+        machine_id: selectedProduct.machine_id || "CNC-04",
         material: selectedProduct.material || "Carbon Steel AISI 1045",
-        inspection_parameter: selectedProduct.inspection_parameter,
-        nominal_mm: selectedProduct.nominal_mm,
-        tolerance_mm: selectedProduct.tolerance_mm,
+        inspection_parameter: selectedProduct.inspection_parameter || "shaft_diameter",
+        nominal_mm: selectedProduct.nominal_mm ?? 50.0,
+        tolerance_mm: selectedProduct.tolerance_mm ?? 0.05,
         unit: selectedProduct.unit || "mm",
-        inspection_frequency: selectedProduct.inspection_frequency,
+        inspection_frequency: selectedProduct.inspection_frequency || "100% Critical Feature",
       });
       setIsEditing(false);
       setFormErrors({});
@@ -120,67 +136,81 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
   };
 
   const handleSaveEdit = async () => {
-    if (!validateForm() || !selectedProduct) return;
+    if (isSubmitting) return;
+    if (!validateForm() || !selectedProduct) {
+      setErrorMessage("Please complete all required fields and correct form errors before saving.");
+      return;
+    }
     try {
+      setIsSubmitting(true);
       setErrorMessage(null);
       const token = roleTokens[activeRole];
       const updated = await api.updateProduct(
         selectedProduct.product_id,
         {
-          name: formData.name,
-          part_number: formData.part_number,
-          process: formData.manufacturing_process,
-          material: formData.material,
+          name: formData.name.trim(),
+          part_number: formData.part_number.trim(),
+          process: formData.manufacturing_process.trim(),
+          material: formData.material.trim(),
           machine_id: formData.machine_id,
-          inspection_parameter: formData.inspection_parameter,
+          inspection_parameter: formData.inspection_parameter.trim(),
           nominal: Number(formData.nominal_mm),
           tol_plus: Number(formData.tolerance_mm),
           tol_minus: Number(formData.tolerance_mm),
           unit: formData.unit,
-          inspection_frequency: formData.inspection_frequency,
+          inspection_frequency: formData.inspection_frequency.trim(),
         },
         token
       );
       setSuccessMessage(`Product '${updated.part_number}' updated successfully.`);
       setIsEditing(false);
-      const refreshed = await api.getProducts();
+      const refreshed = await api.getProducts().catch(() => [updated]);
       setProducts(refreshed);
       setSelectedProduct(updated);
       setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to update product");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateProduct = async () => {
-    if (!validateForm()) return;
+    if (isSubmitting) return;
+    if (!validateForm()) {
+      setErrorMessage("Please complete all required fields and correct form errors before registering.");
+      return;
+    }
     try {
+      setIsSubmitting(true);
       setErrorMessage(null);
       const token = roleTokens[activeRole];
       const created = await api.createProduct(
         {
-          name: formData.name,
-          part_number: formData.part_number,
-          process: formData.manufacturing_process,
-          material: formData.material,
-          machine_id: formData.machine_id,
-          inspection_parameter: formData.inspection_parameter,
+          name: formData.name.trim(),
+          part_number: formData.part_number.trim(),
+          process: formData.manufacturing_process.trim(),
+          material: formData.material.trim(),
+          machine_id: formData.machine_id || machines[0]?.code || "CNC-04",
+          inspection_parameter: formData.inspection_parameter.trim(),
           nominal: Number(formData.nominal_mm),
           tol_plus: Number(formData.tolerance_mm),
           tol_minus: Number(formData.tolerance_mm),
           unit: formData.unit,
-          inspection_frequency: formData.inspection_frequency,
+          inspection_frequency: formData.inspection_frequency.trim(),
         },
         token
       );
-      setSuccessMessage(`Product '${created.part_number}' created successfully.`);
+      setSuccessMessage(`Product '${created.part_number}' registered successfully.`);
       setIsCreating(false);
-      const refreshed = await api.getProducts();
+      const refreshed = await api.getProducts().catch(() => [created]);
       setProducts(refreshed);
       setSelectedProduct(created);
       setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to create product");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -196,7 +226,7 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
       const token = roleTokens[activeRole];
       await api.deleteProduct(selectedProduct.product_id, token);
       setSuccessMessage(`Product '${selectedProduct.part_number}' deleted.`);
-      const refreshed = await api.getProducts();
+      const refreshed = await api.getProducts().catch(() => []);
       setProducts(refreshed);
       setSelectedProduct(refreshed.length > 0 ? refreshed[0] : null);
       setTimeout(() => setSuccessMessage(null), 4000);
@@ -224,8 +254,13 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
     });
   };
 
-  if (loading || (!selectedProduct && products.length > 0)) {
-    return <div className="p-8 text-center text-slate-500">Loading Product Specifications...</div>;
+  if (loading && products.length === 0) {
+    return (
+      <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
+        <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+        <span className="text-sm font-medium">Loading Product Specifications...</span>
+      </div>
+    );
   }
 
   const isOperator = false;
@@ -556,13 +591,37 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   id="save-config-btn"
+                  disabled={isSubmitting}
                   onClick={isCreating ? handleCreateProduct : handleSaveEdit}
-                  className="flex items-center gap-1 text-xs font-bold px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                  className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg transition-all ${
+                    isSubmitting
+                      ? "bg-blue-400 cursor-not-allowed text-white"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                  }`}
                 >
-                  <Check className="w-4 h-4" />
-                  {isCreating ? "Confirm & Register Product" : "Save Specification"}
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{isCreating ? "Registering Product..." : "Saving..."}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>{isCreating ? "Confirm & Register Product" : "Save Specification"}</span>
+                    </>
+                  )}
                 </button>
               </div>
+            </div>
+          ) : !selectedProduct ? (
+            <div className="p-8 text-center bg-white border border-slate-200 rounded-xl space-y-3">
+              <p className="text-slate-500 text-sm">No product specification selected.</p>
+              <button
+                onClick={startCreate}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" /> Register New Product
+              </button>
             </div>
           ) : (
 
@@ -572,21 +631,21 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <span className="text-[10px] text-slate-500 block uppercase font-medium">1. Product</span>
                   <span id="view-product-name" className="text-xs font-bold text-slate-900 mt-0.5 block">
-                    {selectedProduct?.name}
+                    {selectedProduct.name}
                   </span>
                 </div>
 
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <span className="text-[10px] text-slate-500 block uppercase font-medium">2. Part Number</span>
                   <span id="view-part-number" className="text-xs font-mono font-bold text-slate-900 mt-0.5 block">
-                    {selectedProduct?.part_number}
+                    {selectedProduct.part_number}
                   </span>
                 </div>
 
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <span className="text-[10px] text-slate-500 block uppercase font-medium">3. Process</span>
                   <span id="view-process" className="text-xs font-semibold text-slate-800 mt-0.5 block truncate">
-                    {selectedProduct?.manufacturing_process}
+                    {selectedProduct.manufacturing_process}
                   </span>
                 </div>
 
@@ -596,18 +655,18 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                     <button
                       id="view-machine"
                       type="button"
-                      onClick={() => onNavigate("machine-config", selectedProduct?.machine_id)}
+                      onClick={() => onNavigate("machine-config", selectedProduct.machine_id)}
                       className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline mt-0.5 flex items-center gap-1 cursor-pointer group text-left"
                       title="Click to view and configure machine baselines & process thresholds"
                     >
-                      <span>{selectedProduct?.machine_id}</span>
+                      <span>{selectedProduct.machine_id}</span>
                       <span className="text-[10px] bg-blue-100 group-hover:bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded font-normal transition-colors">
                         Configure &rarr;
                       </span>
                     </button>
                   ) : (
                     <span id="view-machine" className="text-xs font-bold text-blue-700 mt-0.5 block">
-                      {selectedProduct?.machine_id}
+                      {selectedProduct.machine_id}
                     </span>
                   )}
                 </div>
@@ -618,7 +677,7 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                   <div className="flex items-center gap-2">
                     <Ruler className="w-4 h-4 text-blue-600" />
                     <span id="view-characteristic" className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      5. Characteristic: {selectedProduct?.inspection_parameter}
+                      5. Characteristic: {selectedProduct.inspection_parameter}
                     </span>
                   </div>
                   <CertaintyBadge level="Observed Fact" />
@@ -628,28 +687,28 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                   <div className="p-3 bg-white border border-slate-200 rounded-lg">
                     <span className="text-[10px] text-slate-500 block uppercase font-medium">6. Nominal Dimension</span>
                     <span id="view-nominal" className="text-lg font-bold text-slate-900 font-mono">
-                      {selectedProduct?.nominal_mm.toFixed(2)} {selectedProduct?.unit}
+                      {selectedProduct.nominal_mm != null ? selectedProduct.nominal_mm.toFixed(2) : "50.00"} {selectedProduct.unit || "mm"}
                     </span>
                   </div>
 
                   <div className="p-3 bg-white border border-slate-200 rounded-lg">
                     <span className="text-[10px] text-slate-500 block uppercase font-medium">7. Bilateral Tolerance</span>
                     <span id="view-tolerance" className="text-lg font-bold text-blue-700 font-mono">
-                      ±{selectedProduct?.tolerance_mm.toFixed(2)} {selectedProduct?.unit}
+                      ±{selectedProduct.tolerance_mm != null ? selectedProduct.tolerance_mm.toFixed(2) : "0.05"} {selectedProduct.unit || "mm"}
                     </span>
                   </div>
 
                   <div className="p-3 bg-white border border-rose-200 rounded-lg bg-rose-50/30">
                     <span className="text-[10px] text-rose-600 block uppercase font-bold">8. Upper Limit (USL)</span>
                     <span id="view-usl" className="text-lg font-bold text-rose-700 font-mono">
-                      {selectedProduct?.usl.toFixed(2)} {selectedProduct?.unit}
+                      {selectedProduct.usl != null ? selectedProduct.usl.toFixed(2) : "50.05"} {selectedProduct.unit || "mm"}
                     </span>
                   </div>
 
                   <div className="p-3 bg-white border border-rose-200 rounded-lg bg-rose-50/30">
                     <span className="text-[10px] text-rose-600 block uppercase font-bold">8. Lower Limit (LSL)</span>
                     <span id="view-lsl" className="text-lg font-bold text-rose-700 font-mono">
-                      {selectedProduct?.lsl.toFixed(2)} {selectedProduct?.unit}
+                      {selectedProduct.lsl != null ? selectedProduct.lsl.toFixed(2) : "49.95"} {selectedProduct.unit || "mm"}
                     </span>
                   </div>
                 </div>
@@ -657,12 +716,12 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
                 <div className="p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-1 text-slate-600">
                   <div className="flex justify-between">
                     <span className="font-medium text-slate-700">9. Inspection Frequency:</span>
-                    <span id="view-frequency" className="font-semibold">{selectedProduct?.inspection_frequency}</span>
+                    <span id="view-frequency" className="font-semibold">{selectedProduct.inspection_frequency}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium text-slate-700">Deterministic Conformance Band:</span>
                     <span className="font-mono text-emerald-700 font-bold">
-                      {selectedProduct?.lsl.toFixed(2)} mm &le; Shaft Diameter &le; {selectedProduct?.usl.toFixed(2)} mm
+                      {selectedProduct.lsl != null ? selectedProduct.lsl.toFixed(2) : "49.95"} mm &le; Shaft Diameter &le; {selectedProduct.usl != null ? selectedProduct.usl.toFixed(2) : "50.05"} mm
                     </span>
                   </div>
                 </div>
@@ -671,8 +730,8 @@ export const ProductConfigPage: React.FC<Props> = ({ onNavigate }) => {
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Deterministic Calculation Guarantee:</strong> Engineering specification limits LSL ({selectedProduct?.lsl.toFixed(2)} mm)
-                  and USL ({selectedProduct?.usl.toFixed(2)} mm) are calculated strictly on the backend. Any component exceeding USL or dropping below LSL
+                  <strong>Deterministic Calculation Guarantee:</strong> Engineering specification limits LSL ({selectedProduct.lsl != null ? selectedProduct.lsl.toFixed(2) : "49.95"} mm)
+                  and USL ({selectedProduct.usl != null ? selectedProduct.usl.toFixed(2) : "50.05"} mm) are calculated strictly on the backend. Any component exceeding USL or dropping below LSL
                   is flagged nonconforming during dimensional inspection.
                 </span>
               </div>

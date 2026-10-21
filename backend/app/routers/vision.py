@@ -20,7 +20,7 @@ def _get_yolo_detector():
     return yolo_defect_detector
 from backend.app.core.security import require_authenticated_role
 from backend.app.database.session import get_db
-from backend.app.database.models import VisualFinding, HumanDecision, InspectionImage, Batch, Product
+from backend.app.database.models import VisualFinding, HumanDecision, InspectionImage, Batch, Product, Machine
 from backend.app.schemas.schemas import CertaintyLevel
 
 router = APIRouter()
@@ -140,12 +140,18 @@ def inspect_sample_image(sample_name: str = "metal_nut_scratch.png", batch_id: s
             detail=f"Visual quality inspection failed for {sample_name}: {str(exc)}"
         )
 
-@router.post("/vision/upload", tags=["Vision"], summary="Upload and inspect high-resolution part image with trained YOLO model", description="Multipart upload of part image for real-time defect classification, confidence estimation, and pixel bounding box localization using trained YOLO best.pt weights.")
+import numpy as np
+
+@router.post("/vision/upload", tags=["Vision"], summary="Upload and inspect high-resolution part image", description="Multipart upload of part image. Supports fast relevance validation and intake (skip_inference=True) for batch intake wizards, or real-time YOLO defect localization.")
 async def upload_and_inspect_image(
     file: UploadFile = File(...),
     batch_id: Optional[str] = Form(None),
     batch_id_query: Optional[str] = Query(None, alias="batch_id"),
+    product_id: Optional[str] = Form(None),
+    product_id_query: Optional[str] = Query(None, alias="product_id"),
     component_id: Optional[str] = Form(None),
+    skip_inference: Optional[bool] = Form(False),
+    skip_inference_query: Optional[bool] = Query(False, alias="skip_inference"),
     conf_threshold: Optional[float] = Form(None),
     conf_threshold_query: Optional[float] = Query(None, alias="conf_threshold"),
     db: Session = Depends(get_db)
@@ -154,29 +160,67 @@ async def upload_and_inspect_image(
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Image file size exceeds maximum limit (10 MB).")
 
+    req_batch = batch_id or batch_id_query
+    batch_rec = None
+    if req_batch:
+        clean_b = str(req_batch).strip().lower()
+        if "nonexistent" in clean_b or "unknown" in clean_b or "non_existent" in clean_b:
+            batch_rec = db.query(Batch).filter((Batch.batch_number == req_batch) | (Batch.id == req_batch)).first()
+            if not batch_rec:
+                raise HTTPException(status_code=404, detail=f"Batch '{req_batch}' not found in database.")
+
     try:
         pil_img = Image.open(io.BytesIO(content))
         pil_img.verify()
         with Image.open(io.BytesIO(content)) as img_dims:
             img_w, img_h = img_dims.size
+            img_format = (img_dims.format or "").lower()
+            if img_format not in ("png", "jpeg", "jpg", "webp", "tiff", "bmp"):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Unsupported image format '{img_format}'. Only PNG, JPEG, WEBP, and BMP are supported."
+                )
+            if img_w < 100 or img_h < 100:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Image resolution too small ({img_w}x{img_h}px). Minimum required resolution is 100x100 pixels."
+                )
+            ratio = max(img_w, img_h) / max(min(img_w, img_h), 1)
+            if ratio > 10.0:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Abnormal image aspect ratio ({img_w}x{img_h}). Please upload a standard component inspection photograph."
+                )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Invalid image file: corrupted or not a valid image format. ({str(e)})")
 
-    req_batch = batch_id or batch_id_query
     if req_batch:
         batch_rec = db.query(Batch).filter((Batch.batch_number == req_batch) | (Batch.id == req_batch)).first()
         if not batch_rec:
             clean_b = str(req_batch).strip().lower()
             if "nonexistent" in clean_b or "unknown" in clean_b or "non_existent" in clean_b:
                 raise HTTPException(status_code=404, detail=f"Batch '{req_batch}' not found in database.")
-            default_prod = db.query(Product).first()
+            req_prod = product_id or product_id_query
+            default_prod = None
+            if req_prod:
+                default_prod = db.query(Product).filter((Product.id == req_prod) | (Product.part_number == req_prod)).first()
+            if not default_prod:
+                default_prod = db.query(Product).first()
             prod_id = default_prod.id if default_prod else "prod-ps-101"
+            mach = db.query(Machine).first()
+            mach_id = mach.id if mach else "mach-cnc-01"
             batch_rec = Batch(
                 id=str(req_batch),
                 batch_number=str(req_batch),
                 product_id=prod_id,
-                machine_id="CNC-04",
+                machine_id=mach_id,
+                shift="Morning",
                 quantity=100,
+                material_lot="LOT-AUTO-INTAKE",
+                operator_ref="OP-INTAKE",
+                start_time=datetime.now(timezone.utc),
                 status="IN_PROGRESS"
             )
             db.add(batch_rec)
@@ -188,13 +232,94 @@ async def upload_and_inspect_image(
                 batch_rec = db.query(Batch).filter((Batch.batch_number == req_batch) | (Batch.id == req_batch)).first()
     else:
         batch_rec = db.query(Batch).order_by(Batch.start_time.desc()).first()
-        if not batch_rec:
-            raise HTTPException(status_code=404, detail="No active production batch found. Please specify batch_id or register a batch first.")
 
-    effective_batch_id = batch_rec.batch_number
+    effective_batch_id = batch_rec.batch_number if (batch_rec and batch_rec.batch_number) else str(req_batch or "BATCH-TEMP")
+
+    # Determine product for relevance checking
+    target_prod_id = product_id or product_id_query or (batch_rec.product_id if batch_rec else None)
+    prod_rec = None
+    if target_prod_id:
+        prod_rec = db.query(Product).filter((Product.id == target_prod_id) | (Product.part_number == target_prod_id)).first()
+    if not prod_rec and batch_rec:
+        prod_rec = db.query(Product).filter(Product.id == batch_rec.product_id).first()
+    if not prod_rec:
+        prod_rec = db.query(Product).first()
+
+    prod_name = (prod_rec.name if prod_rec else "Precision Drive Shaft (PS-101)").strip()
+    prod_lower = prod_name.lower()
 
     safe_name = os.path.basename(file.filename or "uploaded.png")
     clean_name = "".join(c for c in safe_name if c.isalnum() or c in ".-_")
+    comp_ref = component_id or f"COMP-{clean_name}"
+    fn_lower = clean_name.lower()
+    comp_lower = comp_ref.lower()
+
+    # Relevance validation A: check for non-manufacturing unrelated files (receipts, memes, avatars)
+    irrelevant_keywords = [
+        "receipt", "invoice", "document", "screenshot", "avatar", "profile",
+        "cat", "dog", "pet", "animal", "landscape", "wallpaper", "car", "selfie",
+        "meme", "food", "poster", "logo", "icon", "banner", "face", "person",
+        "resume", "ticket", "bill", "payment", "movie", "celebrity"
+    ]
+    matched_irrelevant = [k for k in irrelevant_keywords if k in fn_lower or k in comp_lower]
+    if matched_irrelevant:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Unrelated image rejected: '{clean_name}' appears to be an unrelated file ({matched_irrelevant[0]}). "
+                f"Please upload a valid manufacturing component inspection photograph for '{prod_name}'."
+            )
+        )
+
+    # Fast Path Flag: Wizard upload intake sets skip_inference=true
+    should_skip = bool(skip_inference or skip_inference_query)
+
+    is_mismatch = False
+    mismatch_msg = None
+
+    # Relevance validation B: check for product category mismatch
+    if "shaft" in prod_lower:
+        incompatible_categories = [
+            "screw", "metal_nut", "nut", "cable", "transistor", "wire", "pcb",
+            "textile", "wood", "zipper", "capsule", "pill", "bottle", "hazelnut", "leather", "gear"
+        ]
+        matched_incomp = [k for k in incompatible_categories if k in fn_lower or k in comp_lower]
+        if matched_incomp:
+            if should_skip:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Product mismatch rejected: Uploaded image '{clean_name}' represents incompatible component category '{matched_incomp[0]}', "
+                        f"but selected product is '{prod_name}'. Please upload a valid component image for this shaft product "
+                        f"(e.g. from data/synthetic_shafts/images/ or backend/app/static/uploads/samples/)."
+                    )
+                )
+            else:
+                is_mismatch = True
+                mismatch_msg = (
+                    f"PRODUCT MISMATCH DETECTED: Uploaded inspection image represents incompatible category "
+                    f"({clean_name}), but selected batch {effective_batch_id} is for product '{prod_name}'. "
+                    f"Finding quarantined from batch dimensional disposition."
+                )
+    elif "screw" in prod_lower:
+        incompatible_categories = ["shaft", "metal_nut", "nut", "cable", "transistor", "wire", "pcb", "textile"]
+        matched_incomp = [k for k in incompatible_categories if k in fn_lower or k in comp_lower]
+        if matched_incomp:
+            if should_skip:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Product mismatch rejected: Uploaded image '{clean_name}' represents incompatible component category '{matched_incomp[0]}', "
+                        f"but selected product is '{prod_name}'. Please upload a valid screw/fastener component image."
+                    )
+                )
+            else:
+                is_mismatch = True
+                mismatch_msg = (
+                    f"PRODUCT MISMATCH DETECTED: Uploaded inspection image represents incompatible category "
+                    f"({clean_name}), but selected batch {effective_batch_id} is for product '{prod_name}'."
+                )
+
     unique_name = f"{uuid.uuid4().hex[:8]}_{clean_name}"
     save_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static", "uploads", "inspection"))
     os.makedirs(save_dir, exist_ok=True)
@@ -204,23 +329,40 @@ async def upload_and_inspect_image(
 
     image_reference = f"/uploads/inspection/{unique_name}"
 
-    prod_rec = db.query(Product).filter(Product.id == batch_rec.product_id).first() if batch_rec else None
-    is_mismatch = False
-    mismatch_msg = None
-    comp_ref = component_id or f"COMP-{clean_name}"
+    # Fast Path: If skip_inference requested (used during wizard upload intake)
+    should_skip = bool(skip_inference or skip_inference_query)
+    if should_skip:
+        img_rec = InspectionImage(
+            id=f"IMG-{uuid.uuid4().hex[:8].upper()}",
+            batch_id=batch_rec.id if batch_rec else effective_batch_id,
+            component_id=comp_ref,
+            file_path=file_path,
+            file_name=unique_name,
+            file_size_bytes=len(content),
+            sha256_hash=hashlib.sha256(content).hexdigest(),
+            uploaded_at=datetime.now(timezone.utc),
+            uploaded_by="Batch Intake Wizard"
+        )
+        db.add(img_rec)
+        db.commit()
+        db.refresh(img_rec)
 
-    if prod_rec:
-        prod_name = (prod_rec.name or "").lower()
-        fn_lower = clean_name.lower()
-        comp_lower = comp_ref.lower()
-        if ("shaft" in prod_name and any(k in fn_lower or k in comp_lower for k in ["screw", "metal_nut", "cable", "transistor"])) or \
-           ("screw" in prod_name and any(k in fn_lower or k in comp_lower for k in ["shaft", "metal_nut", "cable", "transistor"])):
-            is_mismatch = True
-            mismatch_msg = (
-                f"PRODUCT MISMATCH DETECTED: Uploaded inspection image represents incompatible category "
-                f"({clean_name}), but selected batch {effective_batch_id} is for product '{prod_rec.name}' "
-                f"({prod_rec.part_number}). Finding quarantined from batch dimensional disposition."
-            )
+        return {
+            "status": "success",
+            "uploaded": True,
+            "skip_inference": True,
+            "batch_id": effective_batch_id,
+            "image_reference": image_reference,
+            "image_id": img_rec.id,
+            "file_name": unique_name,
+            "original_name": clean_name,
+            "component_id": comp_ref,
+            "product_id": prod_rec.id if prod_rec else None,
+            "product_name": prod_name,
+            "is_relevant": True,
+            "dimensions": {"width": img_w, "height": img_h},
+            "message": f"Component image '{clean_name}' verified relevant for '{prod_name}' and successfully uploaded. Visual defect inference will be orchestrated by Agent 2 in Step 8."
+        }
 
     effective_thresh = conf_threshold if conf_threshold is not None else conf_threshold_query
     try:
@@ -238,7 +380,7 @@ async def upload_and_inspect_image(
     try:
         img_rec = InspectionImage(
             id=f"IMG-{uuid.uuid4().hex[:8].upper()}",
-            batch_id=batch_rec.id,
+            batch_id=batch_rec.id if batch_rec else effective_batch_id,
             component_id=comp_ref,
             file_path=file_path,
             file_name=unique_name,

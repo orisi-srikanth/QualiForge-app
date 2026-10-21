@@ -4,7 +4,7 @@ import { ProductSpec } from "../types";
 import {
   CheckCircle2, ArrowRight, ArrowLeft, Upload, FileSpreadsheet,
   Camera, Activity, Layers, AlertCircle, Loader2, Sparkles,
-  FileCheck, ShieldCheck, Factory, Cpu, Clock
+  FileCheck, ShieldCheck, Factory, Cpu, Clock, Lock, AlertTriangle, Image as ImageIcon, X
 } from "lucide-react";
 
 interface Props {
@@ -49,7 +49,8 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUploadStatus, setImageUploadStatus] = useState<string | null>(null);
-  const [imagePrediction, setImagePrediction] = useState<any | null>(null);
+  const [imageUploadData, setImageUploadData] = useState<any | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
@@ -78,6 +79,62 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
   }, []);
 
   const selectedProduct = products.find((p) => p.product_id === selectedProductId);
+
+  // Verification and Gating Prerequisites
+  const isStep1Complete = Boolean(batchNumber && batchNumber.trim().length > 0);
+  const isStep2Complete = Boolean(selectedProductId && selectedMachineId);
+  const isStep3Complete = Boolean(shift && Number(quantity) > 0 && materialLot && materialLot.trim().length > 0);
+  const isStep4Complete = Boolean(measurementUploadStatus === "success" && measurementFile);
+  const isStep5Complete = Boolean(telemetryUploadStatus === "success" && telemetryFile);
+  const isStep6Complete = Boolean(imageUploadStatus === "success" && imageFile);
+
+  const prerequisites = [
+    {
+      step: 1,
+      title: "Batch Identification",
+      isComplete: isStep1Complete,
+      summary: batchNumber || "Not specified",
+      requiredAction: "Specify batch number"
+    },
+    {
+      step: 2,
+      title: "Product & Machine Cell",
+      isComplete: isStep2Complete,
+      summary: `${selectedProduct?.name || selectedProductId || "None"} (${selectedMachineId || "No Machine"})`,
+      requiredAction: "Select product and machine"
+    },
+    {
+      step: 3,
+      title: "Shift, Quantity & Heat Lot",
+      isComplete: isStep3Complete,
+      summary: `${shift} Shift • ${quantity} units • Lot ${materialLot || "None"}`,
+      requiredAction: "Configure quantity and heat lot"
+    },
+    {
+      step: 4,
+      title: "CMM Measurement Intake",
+      isComplete: isStep4Complete,
+      summary: measurementFile ? measurementFile.name : "No file uploaded",
+      requiredAction: "Upload CMM inspection CSV/Excel"
+    },
+    {
+      step: 5,
+      title: "Machine Telemetry Stream",
+      isComplete: isStep5Complete,
+      summary: telemetryFile ? telemetryFile.name : "No file uploaded",
+      requiredAction: "Upload machine sensor logs CSV"
+    },
+    {
+      step: 6,
+      title: "Component Surface Image",
+      isComplete: isStep6Complete,
+      summary: imageFile ? imageFile.name : "No image uploaded",
+      requiredAction: "Upload verified component photo"
+    }
+  ];
+
+  const allPrerequisitesComplete = prerequisites.every((p) => p.isComplete);
+  const completedCount = prerequisites.filter((p) => p.isComplete).length;
 
   const handleMeasurementUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,25 +172,77 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImageFile(file);
-    setImageUploadStatus("uploading");
+
     setImageError(null);
+
+    // Fast client pre-check: verify image file extension and MIME type
+    if (!file.type.startsWith("image/") && !/\.(png|jpe?g|webp|bmp)$/i.test(file.name)) {
+      setImageUploadStatus("error");
+      setImageFile(null);
+      setImagePreviewUrl(null);
+      setImageError(`Invalid file format: "${file.name}" is not a recognized image. Please select a PNG, JPEG, WEBP, or BMP file.`);
+      e.target.value = "";
+      return;
+    }
+
+    const fnLower = file.name.toLowerCase();
+    const irrelevantKeywords = [
+      "receipt", "invoice", "document", "screenshot", "avatar", "profile",
+      "cat", "dog", "pet", "animal", "landscape", "wallpaper", "car", "selfie",
+      "meme", "food", "poster", "logo", "icon", "banner", "face", "person",
+      "resume", "ticket", "bill", "payment"
+    ];
+    const matchedIrrelevant = irrelevantKeywords.find((k) => fnLower.includes(k));
+    if (matchedIrrelevant) {
+      setImageUploadStatus("error");
+      setImageFile(null);
+      setImagePreviewUrl(null);
+      setImageError(`Unrelated file rejected: "${file.name}" appears to be an unrelated file (${matchedIrrelevant}). Please upload a valid component inspection photograph.`);
+      e.target.value = "";
+      return;
+    }
+
+    const prodName = (selectedProduct?.name || selectedProduct?.part_number || "Shaft").toLowerCase();
+    if (prodName.includes("shaft")) {
+      const incompatible = ["screw", "metal_nut", "nut", "cable", "transistor", "wire", "pcb", "textile", "wood", "zipper", "capsule", "pill", "bottle", "hazelnut", "leather", "gear"];
+      const matchedIncomp = incompatible.find((k) => fnLower.includes(k));
+      if (matchedIncomp) {
+        setImageUploadStatus("error");
+        setImageFile(null);
+        setImagePreviewUrl(null);
+        setImageError(`Product mismatch rejected: "${file.name}" represents an incompatible component category (${matchedIncomp}), but selected product is "${selectedProduct?.name || "Precision Drive Shaft"}". Please upload a valid machined shaft component image.`);
+        e.target.value = "";
+        return;
+      }
+    }
+
+    setImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setImageUploadStatus("uploading");
+
     try {
-      const res = await api.uploadAndInspectImage(file, batchNumber);
-      setImagePrediction(res);
+      // Ingest image rapidly with skip_inference=true. YOLO inference will run during Step 8 Agent Orchestration.
+      const res = await api.uploadBatchImage(file, batchNumber, selectedProductId);
+      setImageUploadData(res);
       setImageUploadStatus("success");
     } catch (err: any) {
       setImageUploadStatus("error");
-      const msg = err?.detail?.message || err?.detail || err?.message || "Failed to inspect component image.";
+      setImageFile(null);
+      setImagePreviewUrl(null);
+      const msg = err?.detail?.message || err?.detail || err?.message || "Failed to validate component image.";
       setImageError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      e.target.value = "";
     }
   };
 
   const handleSubmitBatch = async () => {
+    if (!allPrerequisitesComplete) {
+      setSubmitError("Cannot orchestrate agents: please complete all required steps and upload valid measurement, telemetry, and component image files.");
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
-
       const batchPayload = {
         batch_number: batchNumber,
         product_id: selectedProductId,
@@ -148,7 +257,6 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
       try {
         await api.createBatch(batchPayload);
       } catch (createErr: any) {
-
         console.warn("Batch record already registered or initialized:", createErr);
       }
 
@@ -172,16 +280,17 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
         </div>
         <div className="grid grid-cols-8 gap-1.5">
           {STEPS.map((s) => (
-            <div
+            <button
               key={s.id}
-              className={`h-2 rounded-full transition-all ${
+              onClick={() => setCurrentStep(s.id)}
+              className={`h-2.5 rounded-full transition-all cursor-pointer ${
                 s.id === currentStep
-                  ? "bg-blue-600"
+                  ? "bg-blue-600 ring-2 ring-blue-300 ring-offset-1"
                   : s.id < currentStep
-                  ? "bg-emerald-500"
-                  : "bg-slate-200"
+                  ? "bg-emerald-500 hover:bg-emerald-600"
+                  : "bg-slate-200 hover:bg-slate-300"
               }`}
-              title={`${s.id}. ${s.title}`}
+              title={`Step ${s.id}: ${s.title} (${s.desc})`}
             />
           ))}
         </div>
@@ -431,51 +540,135 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
 
             {currentStep === 6 && (
               <div className="space-y-4">
-                <h3 className="text-base font-bold text-slate-900">Step 6: High-Resolution Component Photography</h3>
-                <p className="text-xs text-slate-600">
-                  Submit part surface images for real-time computer vision defect classification and localization.
-                </p>
-
-                <div className="p-6 border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl bg-slate-50/50 text-center space-y-3 transition-colors">
-                  <Camera className="w-10 h-10 text-purple-600 mx-auto" />
+                <div className="flex items-center justify-between">
                   <div>
-                    <label className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs inline-block">
-                      <span>Choose Part Image (.png, .jpg)</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                    </label>
+                    <h3 className="text-base font-bold text-slate-900">Step 6: High-Resolution Component Photography Intake</h3>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Ingest component surface photographs for the selected product ({selectedProduct?.name || selectedProductId || "Shaft"}).
+                      Images are verified for product relevance and saved; deep learning defect classification executes during agent orchestration in Step 8.
+                    </p>
                   </div>
+                </div>
+
+                <div className="p-6 border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl bg-slate-50/50 text-center space-y-4 transition-colors">
+                  {!imageFile && imageUploadStatus !== "uploading" && (
+                    <>
+                      <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto text-purple-600">
+                        <Camera className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-slate-800">
+                          Upload Component Image for {selectedProduct?.name || "Selected Product"}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          Accepts PNG, JPEG, WEBP, BMP (Minimum 100x100 resolution)
+                        </div>
+                      </div>
+                      <div>
+                        <label className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs inline-flex items-center gap-1.5 transition-colors">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Choose Component Image</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                      <div className="p-2.5 bg-blue-50/70 border border-blue-200/60 rounded-lg text-left text-[11px] text-blue-900 flex items-start gap-2">
+                        <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Relevance Check Active:</strong> Only valid manufactured component photos matching <em>{selectedProduct?.name || "Precision Shaft"}</em> are accepted.
+                          Unrelated documents, screenshots, avatars, or mismatched part categories will be rejected.
+                          <div className="mt-1 text-slate-600 font-mono text-[10px]">
+                            Sample photos: <code>data/synthetic_shafts/images/</code> or <code>backend/app/static/uploads/samples/</code>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {imageUploadStatus === "uploading" && (
-                    <div className="text-xs text-blue-600 flex items-center justify-center gap-1 font-semibold">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Running computer vision inference...
+                    <div className="py-6 space-y-2 text-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                      <div className="text-xs text-blue-700 font-semibold">
+                        Validating component relevance and ingesting image...
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Fast intake active &bull; Heavy computer vision inference deferred to Step 8 multi-agent orchestration
+                      </div>
                     </div>
                   )}
 
-                  {imageUploadStatus === "success" && (
-                    <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs space-y-1 text-left">
-                      <div className="font-bold text-purple-900 flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-purple-600" />
-                        Visual Model Inference:
+                  {imageUploadStatus === "success" && imageFile && (
+                    <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl text-left space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                          <div>
+                            <div className="text-xs font-bold text-emerald-950">Component Image Verified & Ingested</div>
+                            <div className="text-[11px] text-emerald-700">Matched to product category: <strong>{selectedProduct?.name || "Precision Drive Shaft"}</strong></div>
+                          </div>
+                        </div>
+                        <label className="cursor-pointer px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-300 rounded-lg shadow-2xs hover:bg-slate-50 transition-colors">
+                          Replace Image
+                          <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                        </label>
                       </div>
-                      <div className="text-slate-700">
-                        Predicted Defect: <strong className="font-mono text-purple-900">{imagePrediction?.predicted_class || "Surface Scratch"}</strong>
+
+                      <div className="flex items-center gap-4 pt-1">
+                        {imagePreviewUrl && (
+                          <img
+                            src={imagePreviewUrl}
+                            alt="Component Preview"
+                            className="w-20 h-20 object-cover rounded-lg border border-emerald-300 shadow-2xs"
+                          />
+                        )}
+                        <div className="text-xs space-y-1 text-slate-700">
+                          <div><span className="text-slate-500">File Name:</span> <strong className="font-mono">{imageFile.name}</strong></div>
+                          <div><span className="text-slate-500">File Size:</span> <strong className="font-mono">{(imageFile.size / 1024).toFixed(1)} KB</strong></div>
+                          <div>
+                            <span className="text-slate-500">Relevance:</span>{" "}
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              ✓ Relevant Component Photo
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-slate-700">
-                        Confidence: <strong className="font-mono">{Math.round((imagePrediction?.confidence || 0.94) * 100)}%</strong>
-                        <span className="ml-2 text-[10px] text-purple-600 font-bold bg-purple-100 px-1 py-0.5 rounded">[MODEL PREDICTION]</span>
+
+                      <div className="text-[11px] text-emerald-800 bg-emerald-100/60 p-2 rounded-lg border border-emerald-200">
+                        ⚡ <strong>Fast Intake Complete:</strong> Image stored and linked to batch <code className="font-mono">{batchNumber}</code>. Multi-scale YOLO defect classification and bounding-box localization will run seamlessly during Step 8 Agent Orchestration.
                       </div>
                     </div>
                   )}
 
                   {imageUploadStatus === "error" && (
-                    <div className="text-xs text-rose-700 flex items-center justify-center gap-1 font-semibold bg-rose-50 py-1.5 px-3 rounded-lg border border-rose-200">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{imageError || "Failed to inspect component image."}</span>
+                    <div className="p-4 bg-rose-50 border border-rose-300 rounded-xl text-left space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <div className="text-xs font-bold text-rose-950">Unrelated / Incompatible Image Rejected</div>
+                          <div className="text-xs text-rose-800 leading-relaxed">{imageError}</div>
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 bg-white border border-rose-200 rounded-lg text-[11px] text-slate-700 space-y-1">
+                        <div className="font-semibold text-slate-900">How to resolve:</div>
+                        <ul className="list-disc list-inside text-slate-600 space-y-0.5">
+                          <li>Upload an authentic surface inspection photograph of the selected product (<strong>{selectedProduct?.name || "Precision Shaft"}</strong>).</li>
+                          <li>Ensure the file is not a document, invoice, screenshot, personal photo, or mismatched part (such as screws, nuts, or cables).</li>
+                          <li>You can find validated sample images in <code className="bg-slate-100 px-1 py-0.5 rounded text-[10px]">data/synthetic_shafts/images/</code> or <code className="bg-slate-100 px-1 py-0.5 rounded text-[10px]">backend/app/static/uploads/samples/</code>.</li>
+                        </ul>
+                      </div>
+
+                      <div className="pt-1">
+                        <label className="cursor-pointer px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs inline-flex items-center gap-1.5 transition-colors">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Choose Valid Component Image</span>
+                          <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                        </label>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -489,8 +682,8 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
                   Review verified batch parameters and data inputs before triggering multi-agent quality orchestration.
                 </p>
 
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
-                  <div className="grid grid-cols-2 gap-2 pb-2 border-b border-slate-200">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4 text-xs">
+                  <div className="grid grid-cols-2 gap-2 pb-3 border-b border-slate-200">
                     <div><span className="text-slate-500">Batch Number:</span> <strong className="font-mono text-slate-900">{batchNumber}</strong></div>
                     <div><span className="text-slate-500">Product:</span> <strong className="text-slate-900">{selectedProduct?.name || selectedProduct?.part_number || selectedProductId}</strong></div>
                     <div><span className="text-slate-500">Machining Cell:</span> <strong className="font-mono text-slate-900">{selectedMachineId}</strong></div>
@@ -499,26 +692,81 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
                     <div><span className="text-slate-500">Operator ID:</span> <strong className="font-mono text-slate-900">{operatorRef}</strong></div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Inspection Measurements:</span>
-                      <span className={`font-semibold ${measurementFile ? "text-emerald-600" : "text-amber-600"}`}>
-                        {measurementFile ? measurementFile.name : "Will use existing batch measurements"}
-                      </span>
+                  <div className="space-y-2">
+                    <div className="font-semibold text-slate-800">Required Intake Files & Data Streams:</div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200">
+                      <div className="flex items-center gap-2">
+                        {isStep4Complete ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        )}
+                        <span className="text-slate-700">CMM Inspection Measurements:</span>
+                      </div>
+                      {isStep4Complete ? (
+                        <span className="font-mono font-semibold text-emerald-700 text-[11px]">{measurementFile?.name}</span>
+                      ) : (
+                        <button
+                          onClick={() => setCurrentStep(4)}
+                          className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold rounded text-[11px] cursor-pointer"
+                        >
+                          Upload in Step 4 &rarr;
+                        </button>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Machine Telemetry:</span>
-                      <span className={`font-semibold ${telemetryFile ? "text-emerald-600" : "text-amber-600"}`}>
-                        {telemetryFile ? telemetryFile.name : "Cell CNC-04 live stream"}
-                      </span>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200">
+                      <div className="flex items-center gap-2">
+                        {isStep5Complete ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        )}
+                        <span className="text-slate-700">CNC Machine Telemetry Log:</span>
+                      </div>
+                      {isStep5Complete ? (
+                        <span className="font-mono font-semibold text-emerald-700 text-[11px]">{telemetryFile?.name}</span>
+                      ) : (
+                        <button
+                          onClick={() => setCurrentStep(5)}
+                          className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold rounded text-[11px] cursor-pointer"
+                        >
+                          Upload in Step 5 &rarr;
+                        </button>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Part Photography:</span>
-                      <span className={`font-semibold ${imageFile ? "text-emerald-600" : "text-amber-600"}`}>
-                        {imageFile ? imageFile.name : "Default component imaging"}
-                      </span>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200">
+                      <div className="flex items-center gap-2">
+                        {isStep6Complete ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        )}
+                        <span className="text-slate-700">Relevant Component Photography:</span>
+                      </div>
+                      {isStep6Complete ? (
+                        <span className="font-mono font-semibold text-emerald-700 text-[11px]">{imageFile?.name}</span>
+                      ) : (
+                        <button
+                          onClick={() => setCurrentStep(6)}
+                          className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold rounded text-[11px] cursor-pointer"
+                        >
+                          Upload in Step 6 &rarr;
+                        </button>
+                      )}
                     </div>
                   </div>
+
+                  {!allPrerequisitesComplete && (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-[11px] flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        <strong>Orchestration Gating Active:</strong> Step 8 requires all 6 intake requirements to be completed before the 8-agent pipeline can be triggered.
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -560,15 +808,30 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-4">
-                    <Sparkles className="w-8 h-8 text-blue-600 mx-auto" />
+                ) : allPrerequisitesComplete ? (
+                  <div className="p-6 bg-gradient-to-b from-blue-50/60 to-white border border-blue-200 rounded-xl text-center space-y-4 shadow-xs">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600">
+                      <Sparkles className="w-6 h-6" />
+                    </div>
                     <div>
                       <div className="text-sm font-bold text-slate-900">Ready to Orchestrate 8 Quality Agents</div>
-                      <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                        Clicking submit will ingest batch records, evaluate tolerances against USL/LSL, compute I-MR charts,
-                        and compile RCA hypotheses for engineering sign-off.
+                      <p className="text-xs text-slate-600 mt-1 max-w-md mx-auto">
+                        All 6 intake requirements and verification files are validated. Clicking submit will register batch
+                        <strong className="font-mono text-slate-900"> {batchNumber}</strong> and execute the multi-agent pipeline:
+                        Intake &bull; Vision &bull; Spec &bull; Telemetry &bull; SPC &bull; RCA &bull; CAPA &bull; Human Review.
                       </p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 max-w-lg mx-auto text-left text-[11px] p-3 bg-white border border-blue-100 rounded-lg shadow-2xs">
+                      <div className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> CMM Measurements
+                      </div>
+                      <div className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Machine Telemetry
+                      </div>
+                      <div className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Component Image
+                      </div>
                     </div>
 
                     <button
@@ -582,9 +845,58 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-4 h-4" /> Submit Batch & Run Quality Analysis
+                          <Sparkles className="w-4 h-4" /> Submit Batch & Orchestrate 8 Quality Agents
                         </>
                       )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-6 bg-amber-50/50 border border-amber-300/80 rounded-xl text-center space-y-4">
+                    <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto text-amber-700">
+                      <Lock className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-amber-950">Prerequisites Incomplete — Orchestration Locked</div>
+                      <p className="text-xs text-amber-800 mt-1 max-w-md mx-auto">
+                        The 8 quality agents cannot be orchestrated until all required batch metadata, CMM measurement files,
+                        telemetry logs, and relevant component photographs are completed and validated.
+                      </p>
+                    </div>
+
+                    <div className="max-w-xl mx-auto space-y-2 text-left text-xs bg-white p-4 rounded-xl border border-amber-200 shadow-2xs">
+                      <div className="font-semibold text-slate-800 pb-1 border-b border-slate-100 flex items-center justify-between">
+                        <span>Intake Requirements Checklist:</span>
+                        <span className="text-[11px] text-amber-700 font-bold font-mono">{completedCount}/6 Completed</span>
+                      </div>
+                      {prerequisites.map((p) => (
+                        <div key={p.step} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-b-0">
+                          <div className="flex items-center gap-2">
+                            {p.isComplete ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                            )}
+                            <span className="font-medium text-slate-700">Step {p.step}: {p.title}</span>
+                          </div>
+                          {p.isComplete ? (
+                            <span className="text-[11px] font-mono text-emerald-700 font-semibold truncate max-w-[180px]">{p.summary}</span>
+                          ) : (
+                            <button
+                              onClick={() => setCurrentStep(p.step)}
+                              className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-bold cursor-pointer transition-colors"
+                            >
+                              Go to Step {p.step} &rarr;
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      disabled={true}
+                      className="px-6 py-3 bg-slate-200 text-slate-400 border border-slate-300 rounded-xl text-xs font-bold cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
+                    >
+                      <Lock className="w-4 h-4 text-slate-400" /> Complete All Requirements to Enable Orchestration ({completedCount}/6 Ready)
                     </button>
                   </div>
                 )}

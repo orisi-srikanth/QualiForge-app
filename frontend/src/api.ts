@@ -4,21 +4,57 @@ import {
   WorkflowState, TestScenarioResult, AgentStepLog
 } from "./types";
 
-const rawApiUrl = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
-const API_BASE = rawApiUrl
-  ? (rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`)
-  : "/api";
+function getApiBase(): string {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0") {
+      return "/api";
+    }
+  }
+  const rawApiUrl = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
+  return rawApiUrl
+    ? (rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`)
+    : "/api";
+}
+
+export const API_BASE = getApiBase();
+
+export async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 15000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: options.signal || controller.signal,
+    });
+    return res;
+  } catch (err: any) {
+    if (err.name === "AbortError" || err.message?.includes("aborted")) {
+      throw new Error(
+        `Backend request timed out after ${Math.round(timeoutMs / 1000)}s. Please verify your backend server is running and accessible.`
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function parseJsonSafe(res: Response): Promise<any> {
   const text = await res.text();
   try {
-    return JSON.parse(text);
+    return text ? JSON.parse(text) : {};
   } catch {
     if (res.status === 502 || res.status === 503 || res.status === 504) {
-      throw new Error(`Backend service is warming up or temporarily unreachable (HTTP ${res.status}). Render free-tier instances sleep after inactivity and take ~40s to spin up. Please retry.`);
+      throw new Error(`Backend service is temporarily unreachable (HTTP ${res.status}). If using Render free-tier, instances sleep after inactivity and take ~45s to spin up. If running locally, please ensure backend is started on port 8000.`);
     }
     if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
-      throw new Error(`API returned HTML (HTTP ${res.status}) instead of JSON. Backend may be cold starting or proxying.`);
+      throw new Error(`API returned HTML (HTTP ${res.status}) instead of JSON. Backend may be offline, starting up, or proxy error.`);
     }
     throw new Error(`API returned non-JSON response (HTTP ${res.status}): ${text.slice(0, 100)}`);
   }
@@ -39,12 +75,12 @@ export const api = {
   },
 
   login: async (username?: string, password?: string) => {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await fetchWithTimeout(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) {
       throw new Error(data.detail || "Authentication failed");
     }
@@ -60,8 +96,8 @@ export const api = {
     const token = localStorage.getItem("qualiforge_token");
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    const res = await fetch(`${API_BASE}/auth/me`, { headers });
-    return res.json();
+    const res = await fetchWithTimeout(`${API_BASE}/auth/me`, { headers });
+    return parseJsonSafe(res);
   },
 
   logout: () => {
@@ -75,23 +111,31 @@ export const api = {
     if (startDate) params.set("start_date", startDate);
     if (endDate) params.set("end_date", endDate);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${API_BASE}/dashboard/summary${qs}`);
-    return res.json();
+    const res = await fetchWithTimeout(`${API_BASE}/dashboard/summary${qs}`);
+    return parseJsonSafe(res);
   },
 
   getProducts: async (): Promise<ProductSpec[]> => {
-    const res = await fetch(`${API_BASE}/products`);
-    return res.json();
+    const res = await fetchWithTimeout(`${API_BASE}/products`);
+    const data = await parseJsonSafe(res);
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to load product specifications");
+    }
+    return Array.isArray(data) ? data : [];
   },
 
   getMachines: async (): Promise<any[]> => {
-    const res = await fetch(`${API_BASE}/machines`);
-    return res.json();
+    const res = await fetchWithTimeout(`${API_BASE}/machines`);
+    const data = await parseJsonSafe(res);
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to load machine cells");
+    }
+    return Array.isArray(data) ? data : [];
   },
 
   getMachine: async (machineId: string): Promise<any> => {
-    const res = await fetch(`${API_BASE}/machines/${encodeURIComponent(machineId)}`);
-    const data = await res.json();
+    const res = await fetchWithTimeout(`${API_BASE}/machines/${encodeURIComponent(machineId)}`);
+    const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.detail || "Failed to load machine details");
     return data;
   },
@@ -101,12 +145,12 @@ export const api = {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
     headers["x-enforce-role"] = "true";
-    const res = await fetch(`${API_BASE}/machines`, {
+    const res = await fetchWithTimeout(`${API_BASE}/machines`, {
       method: "POST",
       headers,
       body: JSON.stringify(machineData),
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.detail || "Failed to register machine");
     return data;
   },
@@ -116,19 +160,19 @@ export const api = {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
     headers["x-enforce-role"] = "true";
-    const res = await fetch(`${API_BASE}/machines/${encodeURIComponent(machineId)}`, {
+    const res = await fetchWithTimeout(`${API_BASE}/machines/${encodeURIComponent(machineId)}`, {
       method: "PUT",
       headers,
       body: JSON.stringify(machineData),
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.detail || "Failed to update machine");
     return data;
   },
 
   getMachineBaselines: async (machineId: string): Promise<any> => {
-    const res = await fetch(`${API_BASE}/process/baselines?machine=${encodeURIComponent(machineId)}`);
-    const data = await res.json();
+    const res = await fetchWithTimeout(`${API_BASE}/process/baselines?machine=${encodeURIComponent(machineId)}`);
+    const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.detail || "Failed to load machine baselines");
     return data;
   },
@@ -138,23 +182,26 @@ export const api = {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
     headers["x-enforce-role"] = "true";
-    const res = await fetch(`${API_BASE}/process/baselines`, {
+    const res = await fetchWithTimeout(`${API_BASE}/process/baselines`, {
       method: "PUT",
       headers,
       body: JSON.stringify({ machine_id: machineId, baselines }),
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.detail || "Failed to save machine baselines");
     return data;
   },
 
   createProduct: async (productData: any, _token?: string): Promise<ProductSpec> => {
-    const res = await fetch(`${API_BASE}/products`, {
+    const token = _token || localStorage.getItem("qualiforge_token");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetchWithTimeout(`${API_BASE}/products`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(productData),
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) {
       const errMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
       throw new Error(errMsg || "Failed to create product");
@@ -163,12 +210,15 @@ export const api = {
   },
 
   updateProduct: async (productId: string, productData: any, _token?: string): Promise<ProductSpec> => {
-    const res = await fetch(`${API_BASE}/products/${encodeURIComponent(productId)}`, {
+    const token = _token || localStorage.getItem("qualiforge_token");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetchWithTimeout(`${API_BASE}/products/${encodeURIComponent(productId)}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(productData),
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) {
       const errMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
       throw new Error(errMsg || "Failed to update product");
@@ -177,10 +227,14 @@ export const api = {
   },
 
   deleteProduct: async (productId: string, _token?: string): Promise<any> => {
-    const res = await fetch(`${API_BASE}/products/${encodeURIComponent(productId)}`, {
+    const token = _token || localStorage.getItem("qualiforge_token");
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetchWithTimeout(`${API_BASE}/products/${encodeURIComponent(productId)}`, {
       method: "DELETE",
+      headers,
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) {
       const errMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
       throw new Error(errMsg || "Failed to delete product");
@@ -383,6 +437,32 @@ export const api = {
       method: "POST",
     });
     return res.json();
+  },
+
+  uploadBatchImage: async (file: File, batchId: string = "", productId: string = "", componentId: string = "") => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (batchId) {
+      formData.append("batch_id", batchId);
+    }
+    if (productId) {
+      formData.append("product_id", productId);
+    }
+    if (componentId) {
+      formData.append("component_id", componentId);
+    }
+    formData.append("skip_inference", "true");
+
+    const res = await fetch(`${API_BASE}/vision/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) {
+      const errMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+      throw new Error(errMsg || "Failed to validate and upload component image");
+    }
+    return data;
   },
 
   uploadAndInspectImage: async (file: File, batchId: string = "", componentId: string = "") => {

@@ -212,7 +212,11 @@ class QualityWorkflowOrchestrator:
                         ]
 
                 if image_path is None:
-                    db_img = db_enrich.query(InspectionImage).filter(InspectionImage.batch_id == b_rec.id).order_by(InspectionImage.uploaded_at.desc()).first()
+                    db_img = db_enrich.query(InspectionImage).filter(
+                        (InspectionImage.batch_id == b_rec.id) |
+                        (InspectionImage.batch_id == b_rec.batch_number) |
+                        (InspectionImage.batch_id == batch_id)
+                    ).order_by(InspectionImage.uploaded_at.desc()).first()
                     if db_img and db_img.file_path and os.path.exists(db_img.file_path):
                         image_path = db_img.file_path
             db_enrich.close()
