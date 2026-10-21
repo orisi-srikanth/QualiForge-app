@@ -814,6 +814,12 @@ class QualityWorkflowOrchestrator:
             try:
                 b_rec = db_rpt.query(Batch).filter((Batch.batch_number == batch_id) | (Batch.id == batch_id)).first()
                 b_fk = b_rec.id if b_rec else batch_id
+                if b_rec:
+                    disp = (payload.disposition or "").upper()
+                    if any(term in disp for term in ["RELEASE", "ACCEPT", "CONFORM"]):
+                        b_rec.status = "CONFORMING"
+                    else:
+                        b_rec.status = "COMPLETED"
                 existing_rpt = db_rpt.query(Report).filter(Report.batch_id == b_fk).first()
                 if existing_rpt:
                     existing_rpt.file_path = rpt_path
