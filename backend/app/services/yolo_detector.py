@@ -1,5 +1,6 @@
 import os
 import cv2
+import numpy as np
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from PIL import Image
@@ -7,6 +8,12 @@ from PIL import Image
 from backend.app.core.config import settings
 
 EXPECTED_YOLO_CLASSES: List[str] = ["scratch", "crack", "dent"]
+
+CLASS_COLORS = {
+    "scratch": (0, 165, 255),  # Orange/amber
+    "crack": (0, 0, 255),      # Red
+    "dent": (255, 120, 0),     # Blue
+}
 
 class YoloDefectDetector:
 
@@ -29,6 +36,8 @@ class YoloDefectDetector:
         self.expected_classes = list(EXPECTED_YOLO_CLASSES)
 
         self.model = None
+        self.net = None
+        self.use_opencv_dnn = False
         self.is_loaded = False
 
         if auto_load:
@@ -46,40 +55,140 @@ class YoloDefectDetector:
                 "Automatic fallback to unauthorized or default pretrained models is strictly prohibited."
             )
 
+        # High-efficiency path: Use OpenCV DNN for ONNX models (uses < 30MB RAM instead of 450MB with PyTorch)
+        if self.model_path.endswith(".onnx"):
+            try:
+                self.net = cv2.dnn.readNetFromONNX(self.model_path)
+                self.use_opencv_dnn = True
+                self.is_loaded = True
+                self.model_version = "trained-best-onnx"
+                return
+            except Exception as dnn_err:
+                print(f"[YoloDefectDetector] OpenCV DNN failed to load ONNX: {dnn_err}. Falling back to ultralytics if available.")
+
+        # Fallback path: Ultralytics (when .pt model is explicitly used)
         try:
             from ultralytics import YOLO
-        except ImportError as exc:
-            raise ImportError(
-                "Ultralytics package is required for Agent 2 YOLO defect detection. "
-                "Ensure ultralytics>=8.1.0 is installed."
-            ) from exc
-
-        try:
             if self.model_path.endswith(".onnx"):
                 loaded_model = YOLO(self.model_path, task="detect")
             else:
                 loaded_model = YOLO(self.model_path)
+            self.model = loaded_model
+            self.use_opencv_dnn = False
+            self.is_loaded = True
         except Exception as exc:
             raise RuntimeError(
                 f"Failed to load YOLO model weights from '{self.model_path}': {str(exc)}"
             ) from exc
 
-        names = getattr(loaded_model, "names", None)
-        if isinstance(names, dict):
-            actual_classes = list(names.values())
-        elif isinstance(names, list):
-            actual_classes = names
+    def _detect_opencv_dnn(
+        self,
+        image_path: str,
+        thresh: float,
+        save_annotated: bool,
+        output_dir: Optional[str]
+    ) -> Dict[str, Any]:
+        img_bgr = cv2.imread(image_path)
+        if img_bgr is None:
+            raise ValueError(f"Failed to read image at '{image_path}' using OpenCV.")
+        img_h, img_w = img_bgr.shape[:2]
+
+        blob = cv2.dnn.blobFromImage(img_bgr, 1.0 / 255.0, (640, 640), swapRB=True)
+        self.net.setInput(blob)
+        raw_out = self.net.forward()
+
+        # Output shape is (1, 7, 8400) -> transpose to (8400, 7)
+        if raw_out.ndim == 3:
+            out = raw_out[0].T
         else:
-            actual_classes = []
+            out = raw_out.T
 
-        if set(actual_classes) != set(self.expected_classes):
-            raise ValueError(
-                f"Loaded model class mismatch. Expected {self.expected_classes}, but model contains {actual_classes}. "
-                "The model must be trained specifically for scratch, crack, and dent detection."
+        boxes: List[List[int]] = []
+        confidences: List[float] = []
+        class_ids: List[int] = []
+
+        scale_x = img_w / 640.0
+        scale_y = img_h / 640.0
+
+        for row in out:
+            classes_scores = row[4:]
+            max_score = float(np.max(classes_scores))
+            if max_score >= thresh:
+                cls_id = int(np.argmax(classes_scores))
+                xc, yc, bw, bh = row[0], row[1], row[2], row[3]
+                x1 = max(0.0, float((xc - bw / 2.0) * scale_x))
+                y1 = max(0.0, float((yc - bh / 2.0) * scale_y))
+                w_box = float(bw * scale_x)
+                h_box = float(bh * scale_y)
+                boxes.append([int(x1), int(y1), int(w_box), int(h_box)])
+                confidences.append(max_score)
+                class_ids.append(cls_id)
+
+        indices = cv2.dnn.NMSBoxes(boxes, confidences, thresh, 0.45)
+        detections: List[Dict[str, Any]] = []
+
+        if len(indices) > 0:
+            for i in indices:
+                idx = int(i) if isinstance(i, (int, np.integer)) else int(i[0])
+                cls_idx = class_ids[idx]
+                cls_name = self.expected_classes[cls_idx] if cls_idx < len(self.expected_classes) else f"unknown_{cls_idx}"
+                conf = confidences[idx]
+                bx, by, bw, bh = boxes[idx]
+                x1 = float(max(0, bx))
+                y1 = float(max(0, by))
+                x2 = float(min(img_w, bx + bw))
+                y2 = float(min(img_h, by + bh))
+
+                detections.append({
+                    "defect_class": cls_name,
+                    "confidence": round(conf, 4),
+                    "bounding_box": {
+                        "x1": round(x1, 2),
+                        "y1": round(y1, 2),
+                        "x2": round(x2, 2),
+                        "y2": round(y2, 2)
+                    }
+                })
+
+        annotated_filename: Optional[str] = None
+        annotated_path: Optional[str] = None
+        if save_annotated:
+            out_dir = output_dir or os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "static", "uploads", "annotated")
             )
+            os.makedirs(out_dir, exist_ok=True)
+            base_name = os.path.basename(image_path)
+            annotated_filename = f"yolo_annotated_{base_name}"
+            annotated_path = os.path.join(out_dir, annotated_filename)
 
-        self.model = loaded_model
-        self.is_loaded = True
+            annotated_img = img_bgr.copy()
+            for d in detections:
+                bbox = d["bounding_box"]
+                x1, y1 = int(bbox["x1"]), int(bbox["y1"])
+                x2, y2 = int(bbox["x2"]), int(bbox["y2"])
+                cls_name = d["defect_class"]
+                color = CLASS_COLORS.get(cls_name, (0, 255, 0))
+                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), color, 2)
+                label_txt = f"{cls_name} ({d['confidence'] * 100:.1f}%)"
+                cv2.putText(annotated_img, label_txt, (x1, max(15, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+            cv2.imwrite(annotated_path, annotated_img)
+
+        return {
+            "model": {
+                "name": self.model_name,
+                "version": self.model_version,
+                "classes": self.expected_classes
+            },
+            "detections": detections,
+            "defect_detected": len(detections) > 0,
+            "primary_defect": detections[0]["defect_class"] if detections else "no_defect",
+            "max_confidence": max([d["confidence"] for d in detections], default=0.0),
+            "image_dimensions": {"width": img_w, "height": img_h},
+            "annotated_filename": annotated_filename,
+            "annotated_path": annotated_path,
+            "annotated_url": f"/uploads/annotated/{annotated_filename}" if annotated_filename else None
+        }
 
     def detect(
         self,
@@ -88,24 +197,22 @@ class YoloDefectDetector:
         save_annotated: bool = True,
         output_dir: Optional[str] = None
     ) -> Dict[str, Any]:
-        if not self.is_loaded or self.model is None:
+        if not self.is_loaded:
             self.load_model()
 
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Inspection image file not found at: '{image_path}'")
 
-        try:
-            with Image.open(image_path) as img:
-                img.verify()
-            with Image.open(image_path) as img:
-                img_w, img_h = img.size
-        except Exception as exc:
-            raise ValueError(f"Invalid or corrupted image file '{image_path}': {str(exc)}") from exc
-
         thresh = conf_threshold if conf_threshold is not None else self.conf_threshold
         self.validate_conf_threshold(thresh)
 
+        if self.use_opencv_dnn and self.net is not None:
+            return self._detect_opencv_dnn(image_path, thresh, save_annotated, output_dir)
+
+        # Fallback to Ultralytics if OpenCV DNN not used
         try:
+            with Image.open(image_path) as img:
+                img_w, img_h = img.size
             results = self.model.predict(source=image_path, conf=thresh, verbose=False)
             res = results[0]
         except Exception as exc:

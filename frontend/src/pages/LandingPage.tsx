@@ -63,154 +63,8 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
     });
   }, []);
 
-  useEffect(() => {
-    if (prefersReducedMotion) return;
+  // Clean static baseline for landing view without continuous timer loops
 
-    let sampleCounter = 111;
-    const interval = setInterval(() => {
-
-      const microDelta = (Math.sin(sampleCounter * 0.75) * 0.014) + ((Math.random() - 0.5) * 0.008);
-      const nextDiameter = parseFloat((50.000 + microDelta).toFixed(3));
-      const nextVib = parseFloat((2.10 + (Math.sin(sampleCounter * 0.4) * 0.18) + ((Math.random() - 0.5) * 0.08)).toFixed(2));
-      const sLabel = String(sampleCounter);
-
-      setTelemetryData((prev) => {
-        const nextList = [...prev.slice(1), { sample: sLabel, diameter: nextDiameter, vibration: nextVib }];
-        return nextList;
-      });
-
-      setLiveDiameter(nextDiameter);
-      setLiveVibration(nextVib);
-      setLiveSampleCount((c) => c + 1);
-      sampleCounter += 1;
-    }, 1800);
-
-    return () => clearInterval(interval);
-  }, [prefersReducedMotion]);
-
-  const [activeStage, setActiveStage] = useState(0);
-  const [isFlowPlaying, setIsFlowPlaying] = useState(true);
-
-  const workflowStages = [
-    {
-      stage: "01",
-      name: "Production Data",
-      category: "SHOP FLOOR INGESTION",
-      agent: "Agent 1: Metadata Registrar",
-      desc: "Batch specifications, material lots, machine registration, and operator shift parameters.",
-      input: "Material Heat Certs, Machine ID, Shift Roster",
-      output: "Registered Batch Dossier & Specification Baseline",
-      preview: { label: "Batch Context", value: "Lot Dossier • Machine ID • Material Heat Certificate" }
-    },
-    {
-      stage: "02",
-      name: "Data Intake",
-      category: "AUTOMATED NORMALIZATION",
-      agent: "Agent 2: Intake Validation Service",
-      desc: "Automated ingestion, unit normalization (microns/inches to mm), and schema validation.",
-      input: "Raw CMM Caliper CSV & Telemetry Streams",
-      output: "100% Normalized Dimensional Float Array",
-      preview: { label: "Normalization", value: "50000 µm → 50.000 mm • Schema Verified 100%" }
-    },
-    {
-      stage: "03",
-      name: "Visual, Dimensional & Process Analysis",
-      category: "AI MULTI-MODAL INFERENCE",
-      agent: "Agent 3: YOLOv8 Computer Vision & Telemetry Engine",
-      desc: "Parallel evaluation: YOLOv8 defect detection, boundary-safe tolerance verification, and telemetry anomaly detection.",
-      input: "High-res Camera Frames + Vibration Spectrograms",
-      output: "Defect Bounding Boxes + Deviation Deltas",
-      preview: { label: "Vision Inference", value: "Surface Scratch (94.0% Conf) • [50, 120, 210, 180]" }
-    },
-    {
-      stage: "04",
-      name: "Statistical Process Control",
-      category: "SPC MATHEMATICS",
-      agent: "Agent 4: Deterministic Capability Engine",
-      desc: "I-MR control charting, Nelson rule trips, and sample-verified Cp/Cpk capability evaluation.",
-      input: "Subgroup Measurements Array (k=5)",
-      output: "UCL, LCL, Centerline, Cp (1.42), Cpk (1.38)",
-      preview: { label: "Capability Indices", value: "Cp = 1.42 • Cpk = 1.38 • Nelson Rule 1-8: PASS" }
-    },
-    {
-      stage: "05",
-      name: "Incident Detection Gate",
-      category: "AUTONOMOUS CONTAINMENT",
-      agent: "Agent 5: Non-conformance Gatekeeper",
-      desc: "Automated non-conformance detection triggers quality hold if specifications or control limits are breached.",
-      input: "Tolerance & Rule Violations Delta",
-      output: "NCR Incident Record & Quarantine Trigger",
-      preview: { label: "NCR Generation", value: "NCR-2026-088 Triggered • Cell Quarantine Activated" }
-    },
-    {
-      stage: "06",
-      name: "Root Cause Analysis",
-      category: "CAUSAL SYNTHESIS",
-      agent: "Agent 6: 6M Ishikawa & 5-Whys Synthesizer",
-      desc: "6M Ishikawa failure mode analysis and 5-Whys causal chains synthesized with physical sensor evidence.",
-      input: "Machine Spindle Telemetry + Tool Cycle Counts",
-      output: "Ranked Causal Hypotheses with Physical Proof",
-      preview: { label: "Causal Chains", value: "Tool Flank Wear (88% Prob) & Spindle Harmonics (62%)" }
-    },
-    {
-      stage: "07",
-      name: "Historical Evidence Retrieval",
-      category: "VECTOR MEMORY RETRIEVAL",
-      agent: "Agent 7: Knowledge Base Retriever",
-      desc: "In-process vector search retrieves matched non-conformance reports (NCRs) and approved standard operating procedures.",
-      input: "Embedding of Incident Anomaly Signatures",
-      output: "Matched Historical Incidents (NCR-019 Cosine 0.91)",
-      preview: { label: "Vector Search", value: "NCR-019 (Cosine Similarity 0.912) • SOP-84 Matched" }
-    },
-    {
-      stage: "08",
-      name: "CAPA Recommendations",
-      category: "ACTION FORMULATION",
-      agent: "Agent 8: 3-Tier CAPA Generator",
-      desc: "Formulation of 3-tier containment, corrective action, and preventive action proposals.",
-      input: "Synthesized Causal Chain + Past Proven Remedies",
-      output: "3-Tier Action Plan: Containment / Correction / Prevention",
-      preview: { label: "Action Plan", value: "Hold 500 pcs • Replace Tool Insert • 850-Cycle Lockout" }
-    },
-    {
-      stage: "09",
-      name: "Human Engineering Approval",
-      category: "HITL GOVERNANCE GATE",
-      agent: "Quality Engineer: Authorized Person Disposition",
-      desc: "HITL Gate: Quality Engineer reviews hypotheses, verifies sensor evidence, and signs off final disposition.",
-      input: "Full Agentic Evidence Dossier",
-      output: "Cryptographic E-Signature & Release Disposition",
-      preview: { label: "HITL Sign-Off", value: "Signed: Lead Quality Engineer • Status: Disposition Final" }
-    },
-    {
-      stage: "10",
-      name: "Effectiveness Monitoring",
-      category: "STATISTICAL VERIFICATION",
-      agent: "Agent 9: Two-Proportion Z-Test Engine",
-      desc: "Two-proportion z-test statistical verification compares pre- and post-CAPA defect rates.",
-      input: "Pre-CAPA vs Post-CAPA Defect Proportions",
-      output: "Z-Score, p-value (<0.05), Rejection Rate Drop (8.2% → 1.1%)",
-      preview: { label: "Z-Test Result", value: "Defect Drop: 8.2% → 1.1% (p = 0.0004 < 0.05 PASS)" }
-    },
-    {
-      stage: "11",
-      name: "Quality Audit Report",
-      category: "COMPLIANCE DOSSIER",
-      agent: "Agent 10: IATF / ISO ReportLab Compiler",
-      desc: "Compilation of official 13-section ISO 9001 / IATF 16949 audit dossier PDF.",
-      input: "All 11 Upstream Agent Immutable Checkpoints",
-      output: "Official PDF Audit Dossier with Running Headers & Disclaimers",
-      preview: { label: "Audit Dossier", value: "IATF 16949 / ISO 9001 Audit Dossier • 13 Standard Sections Ready" }
-    },
-  ];
-
-  useEffect(() => {
-    if (!isFlowPlaying) return;
-    const interval = setInterval(() => {
-      setActiveStage((prev) => (prev + 1) % workflowStages.length);
-    }, 3200);
-    return () => clearInterval(interval);
-  }, [isFlowPlaying, workflowStages.length]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-500 selection:text-white">
@@ -558,186 +412,108 @@ export const LandingPage: React.FC<Props> = ({ onNavigateToLogin, onExplore }) =
 
       <section id="workflow" className="py-20 bg-slate-900 text-white border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950 text-blue-400 border border-blue-800 text-xs font-mono uppercase tracking-widest mb-3">
+              <Zap className="w-3.5 h-3.5 text-blue-400" /> Multi-Agent Quality Architecture
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              8-Agent Autonomous Quality Pipeline
+            </h2>
+            <p className="mt-3 text-base text-slate-300">
+              Deterministic specification verification, computer vision defect detection, statistical process control,
+              and Bayesian causal diagnosis orchestrated with Human-in-the-Loop governance.
+            </p>
+          </div>
 
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-10 border-b border-slate-800">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950 text-blue-400 border border-blue-800 text-xs font-mono uppercase tracking-widest mb-3">
-                <Zap className="w-3.5 h-3.5 text-blue-400" /> Workflow Architecture
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:border-blue-500 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="w-7 h-7 rounded-md font-mono text-xs font-bold bg-blue-600 text-white flex items-center justify-center">01</span>
+                <span className="text-[10px] font-mono text-blue-400 uppercase tracking-wider font-semibold">Intake</span>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                11-Stage Multi-Agent Quality Pipeline
-              </h2>
-              <p className="mt-3 text-base text-slate-300 max-w-2xl">
-                How production data flows deterministically from factory floor ingestion to human sign-off.
+              <h4 className="text-base font-bold text-white">Data Intake Agent</h4>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                Automated schema validation, unit standardization (inches to mm), and operator notes extraction.
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsFlowPlaying(!isFlowPlaying)}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 border transition-all cursor-pointer ${
-                  isFlowPlaying
-                    ? "bg-blue-600/90 text-white border-blue-500 shadow-sm"
-                    : "bg-slate-800 text-slate-300 border-slate-700 hover:text-white"
-                }`}
-              >
-                {isFlowPlaying ? (
-                  <>
-                    <Pause className="w-3.5 h-3.5" />
-                    <span>Auto-Playing Flow</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3.5 h-3.5" />
-                    <span>Resume Auto-Flow</span>
-                  </>
-                )}
-              </button>
+            <div className="p-5 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:border-blue-500 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="w-7 h-7 rounded-md font-mono text-xs font-bold bg-indigo-600 text-white flex items-center justify-center">02</span>
+                <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider font-semibold">Vision</span>
+              </div>
+              <h4 className="text-base font-bold text-white">Computer Vision Agent</h4>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                YOLOv8 surface defect detection with bounding box localization, confidence scoring, and product mismatch guardrails.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:border-blue-500 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="w-7 h-7 rounded-md font-mono text-xs font-bold bg-emerald-600 text-white flex items-center justify-center">03</span>
+                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-semibold">Compliance</span>
+              </div>
+              <h4 className="text-base font-bold text-white">Dimensional Agent</h4>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                Deterministic comparison of CMM measurements against nominal ± tolerance engineering limits (USL/LSL).
+              </p>
+            </div>
+
+            <div className="p-5 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:border-blue-500 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="w-7 h-7 rounded-md font-mono text-xs font-bold bg-amber-600 text-white flex items-center justify-center">04</span>
+                <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider font-semibold">Telemetry</span>
+              </div>
+              <h4 className="text-base font-bold text-white">Process Monitoring Agent</h4>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                Machine vibration spike detection, spindle RPM, feed rate drift, and Isolation Forest ML anomaly analysis.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:border-blue-500 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="w-7 h-7 rounded-md font-mono text-xs font-bold bg-cyan-600 text-white flex items-center justify-center">05</span>
+                <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider font-semibold">Capability</span>
+              </div>
+              <h4 className="text-base font-bold text-white">SPC Capability Agent</h4>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                I-MR individuals control charting, Nelson rule pattern trips, and statistical process capability (Cp / Cpk).
+              </p>
+            </div>
+
+            <div className="p-5 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:border-blue-500 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="w-7 h-7 rounded-md font-mono text-xs font-bold bg-purple-600 text-white flex items-center justify-center">06</span>
+                <span className="text-[10px] font-mono text-purple-400 uppercase tracking-wider font-semibold">Diagnosis</span>
+              </div>
+              <h4 className="text-base font-bold text-white">RCA Reasoning Agent</h4>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                6M Ishikawa categorization, 5-Whys causal synthesis, RAG historical NCR matching, and Bayesian probability updating.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:border-blue-500 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="w-7 h-7 rounded-md font-mono text-xs font-bold bg-rose-600 text-white flex items-center justify-center">07</span>
+                <span className="text-[10px] font-mono text-rose-400 uppercase tracking-wider font-semibold">Governance</span>
+              </div>
+              <h4 className="text-base font-bold text-white">Critic Reviewer Agent</h4>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                Audits causal claims, checks calculation consistency, and enforces IATF safety guardrails against unauthorized machine overrides.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:border-blue-500 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="w-7 h-7 rounded-md font-mono text-xs font-bold bg-teal-600 text-white flex items-center justify-center">08</span>
+                <span className="text-[10px] font-mono text-teal-400 uppercase tracking-wider font-semibold">Action</span>
+              </div>
+              <h4 className="text-base font-bold text-white">CAPA Formulation Agent</h4>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                Structured 8D action formulation: immediate physical containment, process correction, and preventive mistake-proofing.
+              </p>
             </div>
           </div>
-
-          <div className="mt-8 pb-6 overflow-x-auto scrollbar-none">
-            <div className="flex items-center justify-between min-w-[850px] relative px-2">
-
-              <div className="absolute top-1/2 left-4 right-4 -translate-y-1/2 h-1 bg-slate-800 z-0">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 transition-all duration-700"
-                  style={{ width: `${(activeStage / (workflowStages.length - 1)) * 100}%` }}
-                />
-              </div>
-
-              {workflowStages.map((s, idx) => {
-                const isActive = activeStage === idx;
-                const isPassed = activeStage > idx;
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      setActiveStage(idx);
-                      setIsFlowPlaying(false);
-                    }}
-                    className="relative z-10 flex flex-col items-center group cursor-pointer focus:outline-none"
-                    title={`Inspect Stage ${s.stage}: ${s.name}`}
-                  >
-                    <div
-                      className={`w-9 h-9 rounded-xl font-mono text-xs font-bold flex items-center justify-center transition-all duration-300 ${
-                        isActive
-                          ? "bg-blue-600 text-white ring-4 ring-blue-400/30 scale-110 shadow-lg"
-                          : isPassed
-                          ? "bg-indigo-900 text-indigo-200 border border-indigo-700"
-                          : "bg-slate-800 text-slate-400 border border-slate-700 group-hover:bg-slate-700 group-hover:text-white"
-                      }`}
-                    >
-                      {isPassed ? "✓" : s.stage}
-                    </div>
-                    <span
-                      className={`mt-2 text-[10px] font-medium tracking-tight whitespace-nowrap transition-colors ${
-                        isActive ? "text-blue-400 font-bold" : "text-slate-400 group-hover:text-slate-200"
-                      }`}
-                    >
-                      {s.name.split(" ")[0]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {(() => {
-            const current = workflowStages[activeStage];
-            return (
-              <div className="mt-6 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-850 via-slate-800 to-slate-900 border-2 border-blue-500/80 shadow-2xl transition-all">
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pb-6 border-b border-slate-700/80">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <span className="w-8 h-8 rounded-lg bg-blue-600 text-white font-mono font-bold text-sm flex items-center justify-center">
-                        {current.stage}
-                      </span>
-                      <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-blue-950 text-blue-300 border border-blue-700">
-                        {current.category}
-                      </span>
-                      <span className="text-xs text-slate-400 font-medium">
-                        &bull; {current.agent}
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                      {current.name}
-                    </h3>
-                    <p className="mt-2 text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed">
-                      {current.desc}
-                    </p>
-                  </div>
-
-                  <div className="w-full lg:w-auto p-4 rounded-xl bg-slate-900/90 border border-slate-700 shrink-0 min-w-[280px]">
-                    <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
-                      {current.preview.label}
-                    </div>
-                    <div className="mt-1 text-xs font-mono font-bold text-emerald-400">
-                      {current.preview.value}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                    <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Stage Inflow</div>
-                    <div className="mt-1.5 text-xs text-slate-200 font-medium">{current.input}</div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/60">
-                    <div className="text-[11px] font-mono text-blue-400 uppercase tracking-wider">Processing Engine</div>
-                    <div className="mt-1.5 text-xs text-blue-200 font-medium">{current.agent}</div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                    <div className="text-[11px] font-mono text-emerald-400 uppercase tracking-wider">Deterministic Output</div>
-                    <div className="mt-1.5 text-xs text-emerald-200 font-medium">{current.output}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {workflowStages.map((s, idx) => {
-              const isActive = activeStage === idx;
-              return (
-                <div
-                  key={idx}
-                  onClick={() => {
-                    setActiveStage(idx);
-                    setIsFlowPlaying(false);
-                  }}
-                  className={`p-5 rounded-xl border transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-slate-800/90 border-blue-500 ring-2 ring-blue-500/30 shadow-lg"
-                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-850"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <span
-                      className={`w-7 h-7 rounded-md font-mono text-xs font-bold flex items-center justify-center ${
-                        isActive ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-400 border border-slate-700"
-                      }`}
-                    >
-                      {s.stage}
-                    </span>
-                    {isActive && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-blue-400 px-2 py-0.5 rounded bg-blue-950 border border-blue-800">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />
-                        ACTIVE
-                      </span>
-                    )}
-                  </div>
-                  <h4 className={`text-base font-bold tracking-tight ${isActive ? "text-white" : "text-slate-200"}`}>
-                    {s.name}
-                  </h4>
-                  <p className="mt-2 text-xs text-slate-400 leading-relaxed line-clamp-3">
-                    {s.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
         </div>
       </section>
 
