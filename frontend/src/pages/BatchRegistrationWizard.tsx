@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 interface Props {
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, params?: Record<string, string>) => void;
   onBatchCreated?: (batchId: string) => void;
 }
 
@@ -795,7 +795,10 @@ export const BatchRegistrationWizard: React.FC<Props> = ({ onNavigate, onBatchCr
                     </p>
                     <div className="pt-2 flex justify-center gap-3">
                       <button
-                        onClick={() => onNavigate("ai-review")}
+                        onClick={() => onNavigate("ai-review", {
+                          workflow_id: completedWorkflow?.workflow_id || "",
+                          batch_id: batchNumber
+                        })}
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
                       >
                         Inspect Agent Review Dossier

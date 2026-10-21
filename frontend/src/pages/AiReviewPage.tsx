@@ -95,9 +95,32 @@ export const AiReviewPage: React.FC<Props> = ({ onRunPipeline, isRunningPipeline
   };
 
   useEffect(() => {
-    if (workflowId) {
-      setWorkflowIdInput(workflowId);
-      loadWorkflow(workflowId);
+    const searchParams = new URLSearchParams(window.location.search);
+    const qWf = searchParams.get("workflow_id") || searchParams.get("wf_id") || "";
+    const qBatch = searchParams.get("batch_id") || searchParams.get("batch") || "";
+
+    const targetWf = workflowId || qWf;
+
+    if (targetWf) {
+      setWorkflowIdInput(targetWf);
+      loadWorkflow(targetWf);
+    } else if (qBatch) {
+      setLoading(true);
+      api.getLatestWorkflowForBatch(qBatch)
+        .then((res) => {
+          if (res && res.workflow_id) {
+            setWorkflowState(res);
+            setWorkflowIdInput(res.workflow_id);
+          } else {
+            loadHistory();
+          }
+        })
+        .catch(() => {
+          loadHistory();
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     } else if (workflowIdInput) {
       loadWorkflow(workflowIdInput);
     } else {
