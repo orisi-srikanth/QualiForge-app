@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     KNOWLEDGE_DB_PATH: str = os.path.join(DATA_DIR, "knowledge_db")
     KNOWLEDGE_DOCS_PATH: str = os.path.join(DATA_DIR, "knowledge_docs")
     MVTEC_ROOT: str = ""
-    YOLO_MODEL_PATH: str = os.path.join(BASE_DIR, "models", "agent2", "best.pt")
+    YOLO_MODEL_PATH: str = os.path.join(BASE_DIR, "models", "agent2", "best.onnx")
     YOLO_CONF_THRESHOLD: float = 0.25
     YOLO_MODEL_NAME: str = "qualiforge-agent2-yolo"
     YOLO_MODEL_VERSION: str = "trained-best-pt"

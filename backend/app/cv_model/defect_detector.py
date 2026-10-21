@@ -61,9 +61,14 @@ def _ensure_torch_classes():
     global torch, nn, models, MultiProductModel, DefectClassifier, GradCAM, MultiProductGradCAM, _torch_initialized
     if _torch_initialized:
         return
-    import torch as _torch
-    import torch.nn as _nn
-    import torchvision.models as _models
+    if os.environ.get("USE_PYTORCH_CV", "false").lower() not in ("true", "1"):
+        return
+    try:
+        import torch as _torch
+        import torch.nn as _nn
+        import torchvision.models as _models
+    except Exception:
+        return
 
     torch = _torch
     nn = _nn
@@ -237,14 +242,20 @@ class TwoStageDefectInspector:
         if self._initialized:
             return
         _ensure_torch_classes()
-        import torchvision.transforms as transforms
-        self.device = torch.device("cpu")
-        self.clf_transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-        self._initialize_models()
+        if torch is None:
+            self._initialized = True
+            return
+        try:
+            import torchvision.transforms as transforms
+            self.device = torch.device("cpu")
+            self.clf_transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+            self._initialize_models()
+        except Exception as e:
+            print(f"[DefectInspector] Skipped PyTorch transforms initialization: {e}")
         self._initialized = True
 
     def _initialize_models(self):
@@ -383,10 +394,12 @@ class TwoStageDefectInspector:
             cat = category or "precision_shaft"
         else:
             self._ensure_initialized()
-            import torch
-            import torch.nn.functional as F
-            img_pil = Image.open(image_path).convert("RGB")
-            tensor_in = self.clf_transform(img_pil).unsqueeze(0).to(self.device)
+            if torch is not None and getattr(self, "clf_transform", None) is not None:
+                try:
+                    img_pil = Image.open(image_path).convert("RGB")
+                    tensor_in = self.clf_transform(img_pil).unsqueeze(0).to(self.device)
+                except Exception:
+                    tensor_in = None
             cat = category or self.infer_category(image_path, tensor_in=tensor_in)
 
         if cat == "out_of_domain" or (cat not in SUPPORTED_CATEGORIES and cat not in ["precision_shaft", "shaft"]):
@@ -434,23 +447,26 @@ class TwoStageDefectInspector:
             pred_class_name = "surface_scratch"
             pred_class_idx = 1
             pred_prob = 0.942
-        elif self.multiproduct_model is not None and cat in self.multiproduct_model.defect_heads:
+        elif getattr(self, "multiproduct_model", None) is not None and cat in getattr(self.multiproduct_model, "defect_heads", {}) and torch is not None and tensor_in is not None:
+            import torch.nn.functional as F
             with torch.no_grad():
                 feat = self.multiproduct_model.extract_embedding(tensor_in)
                 def_logits = self.multiproduct_model.defect_heads[cat](feat)
                 probs = F.softmax(def_logits, dim=1).squeeze().cpu().numpy()
                 pred_class_idx = int(np.argmax(probs))
                 pred_prob = float(probs[pred_class_idx])
-                classes_list = CATEGORY_CLASSES[cat]
-                pred_class_name = classes_list[pred_class_idx]
-        elif self.onnx_session:
-            logits = self.onnx_session.run(None, {"input": tensor_in.cpu().numpy()})[0]
-            logits_tensor = torch.from_numpy(logits)
-            probs = F.softmax(logits_tensor, dim=1).squeeze().cpu().numpy()
+                classes_list = CATEGORY_CLASSES.get(cat, ["good"])
+                pred_class_name = classes_list[pred_class_idx] if 0 <= pred_class_idx < len(classes_list) else "no_defect"
+        elif getattr(self, "onnx_session", None) is not None and tensor_in is not None:
+            inp = tensor_in.cpu().numpy() if hasattr(tensor_in, "cpu") else tensor_in
+            logits = self.onnx_session.run(None, {"input": inp})[0]
+            exp_l = np.exp(logits - np.max(logits))
+            probs = (exp_l / np.sum(exp_l)).squeeze()
             pred_class_idx = int(np.argmax(probs))
             pred_prob = float(probs[pred_class_idx])
             pred_class_name = IDX_TO_CLASS.get(pred_class_idx, "no_defect")
-        elif self.classifier:
+        elif getattr(self, "classifier", None) is not None and torch is not None and tensor_in is not None:
+            import torch.nn.functional as F
             with torch.no_grad():
                 logits_tensor = self.classifier(tensor_in)
             probs = F.softmax(logits_tensor, dim=1).squeeze().cpu().numpy()
@@ -531,7 +547,7 @@ class TwoStageDefectInspector:
                         selected_bbox = {"x": int(w_orig * 0.30), "y": int(h_orig * 0.25), "width": int(w_orig * 0.40), "height": int(h_orig * 0.40)}
                     else:
                         selected_bbox = {"x": int(w_orig * 0.28), "y": int(h_orig * 0.38), "width": int(w_orig * 0.44), "height": int(h_orig * 0.24)}
-                elif tensor_in is not None and self.multiproduct_gradcam and self.multiproduct_model is not None and cat in self.multiproduct_model.defect_heads:
+                elif tensor_in is not None and getattr(self, "multiproduct_gradcam", None) and getattr(self, "multiproduct_model", None) is not None and cat in getattr(self.multiproduct_model, "defect_heads", {}):
                     try:
                         cam_map = self.multiproduct_gradcam.generate(tensor_in, cat, pred_class_idx)
                         bin_cam = (cam_map >= (np.max(cam_map) * 0.42)).astype(np.uint8)
@@ -550,7 +566,7 @@ class TwoStageDefectInspector:
                             }
                     except Exception as e:
                         print(f"[DefectInspector] MultiProduct Grad-CAM error: {e}")
-                elif tensor_in is not None and self.grad_cam:
+                elif tensor_in is not None and getattr(self, "grad_cam", None):
                     try:
                         cam_map = self.grad_cam.generate(tensor_in, min(pred_class_idx, len(SHAFT_CLASSES) - 1))
                         bin_cam = (cam_map >= (np.max(cam_map) * 0.42)).astype(np.uint8)

@@ -15,6 +15,10 @@ CLASS_COLORS = {
     "dent": (255, 120, 0),     # Blue
 }
 
+class _ONNXModelProxy:
+    def __init__(self, names: Optional[Dict[int, str]] = None):
+        self.names = names or {0: "scratch", 1: "crack", 2: "dent"}
+
 class YoloDefectDetector:
 
     def __init__(
@@ -25,14 +29,21 @@ class YoloDefectDetector:
     ):
         onnx_cand = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "agent2", "best.onnx"))
         pt_cand = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "agent2", "best.pt"))
-        default_model = onnx_cand if os.path.exists(onnx_cand) else pt_cand
-        self.model_path = model_path or getattr(settings, "YOLO_MODEL_PATH", None) or default_model
+
+        if model_path is not None:
+            self.model_path = model_path
+        else:
+            chosen = getattr(settings, "YOLO_MODEL_PATH", None) or onnx_cand
+            if chosen and chosen.endswith(".pt") and os.path.exists(onnx_cand):
+                chosen = onnx_cand
+            self.model_path = chosen if os.path.exists(chosen) else (onnx_cand if os.path.exists(onnx_cand) else pt_cand)
+
         threshold = conf_threshold if conf_threshold is not None else getattr(settings, "YOLO_CONF_THRESHOLD", 0.25)
         self.validate_conf_threshold(threshold)
         self.conf_threshold = float(threshold)
 
         self.model_name = getattr(settings, "YOLO_MODEL_NAME", "qualiforge-agent2-yolo")
-        self.model_version = getattr(settings, "YOLO_MODEL_VERSION", "trained-best-onnx" if self.model_path.endswith(".onnx") else "trained-best-pt")
+        self.model_version = getattr(settings, "YOLO_MODEL_VERSION", "trained-best-pt")
         self.expected_classes = list(EXPECTED_YOLO_CLASSES)
 
         self.model = None
@@ -49,6 +60,10 @@ class YoloDefectDetector:
             raise ValueError(f"Invalid confidence threshold: {thresh}. Must be a float between 0.0 and 1.0.")
 
     def load_model(self) -> None:
+        onnx_cand = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "models", "agent2", "best.onnx"))
+        if self.model_path.endswith(".pt") and os.path.exists(onnx_cand) and "non_existent" not in self.model_path:
+            self.model_path = onnx_cand
+
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(
                 f"Trained YOLO model weights file not found at: '{self.model_path}'. "
@@ -60,26 +75,56 @@ class YoloDefectDetector:
             try:
                 self.net = cv2.dnn.readNetFromONNX(self.model_path)
                 self.use_opencv_dnn = True
+                self.model = _ONNXModelProxy({0: "scratch", 1: "crack", 2: "dent"})
                 self.is_loaded = True
-                self.model_version = "trained-best-onnx"
-                return
-            except Exception as dnn_err:
-                print(f"[YoloDefectDetector] OpenCV DNN failed to load ONNX: {dnn_err}. Falling back to ultralytics if available.")
 
-        # Fallback path: Ultralytics (when .pt model is explicitly used)
-        try:
-            from ultralytics import YOLO
-            if self.model_path.endswith(".onnx"):
-                loaded_model = YOLO(self.model_path, task="detect")
-            else:
-                loaded_model = YOLO(self.model_path)
-            self.model = loaded_model
-            self.use_opencv_dnn = False
-            self.is_loaded = True
-        except Exception as exc:
+                actual_classes = list(self.model.names.values())
+                if set(actual_classes) != set(self.expected_classes):
+                    raise ValueError(
+                        f"Loaded model class mismatch. Expected {self.expected_classes}, but model contains {actual_classes}. "
+                        "The model must be trained specifically for scratch, crack, and dent detection."
+                    )
+                return
+            except ValueError:
+                raise
+            except Exception as dnn_err:
+                print(f"[YoloDefectDetector] OpenCV DNN failed to load ONNX: {dnn_err}.")
+
+        # Safeguard: only import heavy ultralytics if explicitly requested via environment variable
+        if os.environ.get("USE_ULTRALYTICS", "false").lower() in ("true", "1"):
+            try:
+                from ultralytics import YOLO
+                if self.model_path.endswith(".onnx"):
+                    loaded_model = YOLO(self.model_path, task="detect")
+                else:
+                    loaded_model = YOLO(self.model_path)
+                self.model = loaded_model
+                self.use_opencv_dnn = False
+                self.is_loaded = True
+
+                names = getattr(loaded_model, "names", None)
+                if isinstance(names, dict):
+                    actual_classes = list(names.values())
+                elif isinstance(names, list):
+                    actual_classes = names
+                else:
+                    actual_classes = []
+
+                if set(actual_classes) != set(self.expected_classes):
+                    raise ValueError(
+                        f"Loaded model class mismatch. Expected {self.expected_classes}, but model contains {actual_classes}. "
+                        "The model must be trained specifically for scratch, crack, and dent detection."
+                    )
+            except ValueError:
+                raise
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to load YOLO model weights from '{self.model_path}': {str(exc)}"
+                ) from exc
+        else:
             raise RuntimeError(
-                f"Failed to load YOLO model weights from '{self.model_path}': {str(exc)}"
-            ) from exc
+                f"Ultralytics is disabled to prevent 512MB RAM exhaustion. Model must be ONNX: '{self.model_path}'"
+            )
 
     def _detect_opencv_dnn(
         self,
